@@ -25,7 +25,27 @@ TODO
 
 Select from a list of options.
 
-TODO
+Run example with [`cargo run --example select`](./examples/select.rs).
+
+![Select](./assets/select.png)
+
+```rust
+use demand::{DemandOption, Select};
+
+fn main() {
+    let ms = Select::new("Toppings")
+        .description("Select your topping")
+        .filterable(true)
+        .option(DemandOption::new("Lettuce"))
+        .option(DemandOption::new("Tomatoes"))
+        .option(DemandOption::new("Charm Sauce"))
+        .option(DemandOption::new("Jalapenos").label("Jalapeños"))
+        .option(DemandOption::new("Cheese"))
+        .option(DemandOption::new("Vegan Cheese"))
+        .option(DemandOption::new("Nutella"));
+    ms.run().expect("error running select");
+}
+```
 
 ## Multiselect
 
@@ -57,6 +77,7 @@ fn main() {
 ## Confirm
 
 Confirm a question with a yes or no.
+Run example with [`cargo run --example confirm`](./examples/confirm.rs).
 
 ![Confirm](./assets/confirm.png)
 

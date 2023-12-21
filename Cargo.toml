@@ -7,7 +7,6 @@ license = "MIT"
 repository = "https://github.com/jdx/demand"
 readme = "README.md"
 keywords = ["cli", "prompt", "console"]
-files = ["src", "Cargo.toml", "README.md", "LICENSE"]
 
 [dependencies]
 console = "0.15"
