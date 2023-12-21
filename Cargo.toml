@@ -1,0 +1,14 @@
+[package]
+name = "demand"
+version = "0.1.0"
+edition = "2021"
+description = "A CLI prompt library"
+license = "MIT"
+repository = "https://github.com/jdx/demand"
+readme = "README.md"
+keywords = ["cli", "prompt", "console"]
+files = ["src", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+console = "0.15"
+termcolor = "1"
