@@ -1,26 +1,27 @@
+use std::fmt::Display;
 use std::sync::atomic::AtomicUsize;
 
 /// An individual option in a select or multi-select.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DemandOption {
+#[derive(Debug, Clone)]
+pub struct DemandOption<T: Display> {
     /// Unique ID for this option.
-    id: usize,
-    /// Key for this option. Returned by the select.
-    pub key: String,
+    pub(crate) id: usize,
+    /// The item this option represents.
+    pub item: T,
     /// Display label for this option.
     pub label: String,
     /// Whether this option is initially selected.
     pub selected: bool,
 }
 
-impl DemandOption {
+impl<T: Display> DemandOption<T> {
     /// Create a new option with the given key.
-    pub fn new(key: &str) -> Self {
+    pub fn new(item: T) -> Self {
         static ID: AtomicUsize = AtomicUsize::new(0);
         Self {
             id: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            key: key.to_string(),
-            label: key.to_string(),
+            label: item.to_string(),
+            item,
             selected: false,
         }
     }
@@ -37,3 +38,10 @@ impl DemandOption {
         self
     }
 }
+
+impl<T: Display> PartialEq for DemandOption<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl<T: Display> Eq for DemandOption<T> {}

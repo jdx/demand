@@ -1,6 +1,8 @@
 use crate::theme::Theme;
 use crate::DemandOption;
 use console::{Key, Term};
+use std::collections::HashSet;
+use std::fmt::Display;
 use std::io;
 use std::io::Write;
 use termcolor::{Buffer, WriteColor};
@@ -25,7 +27,7 @@ use termcolor::{Buffer, WriteColor};
 ///   .option(DemandOption::new("Nutella"));///
 /// let toppings = ms.run().expect("error running multi select");
 /// ```
-pub struct MultiSelect {
+pub struct MultiSelect<T: Display> {
     /// The title of the selector
     pub title: String,
     /// The colors/style of the selector
@@ -33,7 +35,7 @@ pub struct MultiSelect {
     /// A description to display above the selector
     pub description: String,
     /// The options which can be selected
-    pub options: Vec<DemandOption>,
+    pub options: Vec<DemandOption<T>>,
     /// The minimum number of options which must be selected
     pub min: usize,
     /// The maximum number of options which can be selected
@@ -51,7 +53,7 @@ pub struct MultiSelect {
     capacity: usize,
 }
 
-impl MultiSelect {
+impl<T: Display> MultiSelect<T> {
     /// Create a new multi select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
@@ -81,7 +83,7 @@ impl MultiSelect {
     }
 
     /// Add an option to the selector
-    pub fn option(mut self, option: DemandOption) -> Self {
+    pub fn option(mut self, option: DemandOption<T>) -> Self {
         self.options.push(option);
         self
     }
@@ -111,7 +113,7 @@ impl MultiSelect {
     }
 
     /// Displays the selector to the user and returns their selected options
-    pub fn run(mut self) -> io::Result<Vec<String>> {
+    pub fn run(mut self) -> io::Result<Vec<T>> {
         let max_height = self.term.size().0 as usize;
         self.capacity = max_height.max(8) - 4;
         self.pages = ((self.options.len() as f64) / self.capacity as f64).ceil() as usize;
@@ -149,7 +151,7 @@ impl MultiSelect {
                             .options
                             .iter()
                             .filter(|o| o.selected)
-                            .map(|o| o.key.clone())
+                            .map(|o| o.label.to_string())
                             .collect::<Vec<_>>();
                         if selected.len() < self.min {
                             if self.min == 1 {
@@ -173,6 +175,12 @@ impl MultiSelect {
                         self.term.show_cursor()?;
                         let output = self.render_success(&selected)?;
                         self.term.write_all(output.as_bytes())?;
+                        let selected = self
+                            .options
+                            .into_iter()
+                            .filter(|o| o.selected)
+                            .map(|o| o.item)
+                            .collect::<Vec<_>>();
                         return Ok(selected);
                     }
                     _ => {}
@@ -181,7 +189,7 @@ impl MultiSelect {
         }
     }
 
-    fn filtered_options(&self) -> Vec<&DemandOption> {
+    fn filtered_options(&self) -> Vec<&DemandOption<T>> {
         self.options
             .iter()
             .filter(|opt| {
@@ -194,7 +202,7 @@ impl MultiSelect {
             .collect()
     }
 
-    fn visible_options(&self) -> Vec<&DemandOption> {
+    fn visible_options(&self) -> Vec<&DemandOption<T>> {
         let filtered_options = self.filtered_options();
         let start = self.cur_page * self.capacity;
         filtered_options
@@ -241,31 +249,30 @@ impl MultiSelect {
         if visible_options.is_empty() {
             return;
         }
-        let opt = visible_options[self.cursor].clone();
+        let id = visible_options[self.cursor].id;
+        let selected = visible_options[self.cursor].selected;
         self.options
             .iter_mut()
-            .find(|o| **o == opt)
+            .find(|o| o.id == id)
             .unwrap()
-            .selected = !opt.selected;
+            .selected = !selected;
     }
 
     fn handle_toggle_all(&mut self) {
         self.err = None;
-        let filtered_options = self
-            .filtered_options()
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>();
+        let filtered_options = self.filtered_options();
         if filtered_options.is_empty() {
             return;
         }
         let select = !filtered_options.iter().all(|o| o.selected);
-        for opt in filtered_options {
-            self.options
-                .iter_mut()
-                .find(|o| **o == opt)
-                .unwrap()
-                .selected = select;
+        let ids = filtered_options
+            .into_iter()
+            .map(|o| o.id)
+            .collect::<HashSet<_>>();
+        for opt in &mut self.options {
+            if ids.contains(&opt.id) {
+                opt.selected = select;
+            }
         }
     }
 
