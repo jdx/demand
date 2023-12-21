@@ -1,10 +1,12 @@
 # demand
 
-![Crates.io](https://img.shields.io/crates/d/demand)
-![docs.rs](https://img.shields.io/docsrs/demand)
-![GitHub License](https://img.shields.io/github/license/jdx/demand)
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jdx/demand/test.yml)
-![GitHub issues](https://img.shields.io/github/issues/jdx/demand)
+[![Crates.io](https://img.shields.io/crates/v/demand)
+](https://crates.io/crates/demand)
+[![docs.rs](https://img.shields.io/docsrs/demand)](https://docs.rs/demand)
+[![GitHub License](https://img.shields.io/github/license/jdx/demand)](./LICENSE)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jdx/demand/test.yml)](https://github.com/jdx/demand/actions/workflows/test.yml)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/jdx/demand)](https://github.com/jdx/demand/actions)
+[![GitHub issues](https://img.shields.io/github/issues/jdx/demand)](http://github.com/jdx/demand/issues)
 
 A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracelet/huh).
 
