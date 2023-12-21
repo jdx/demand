@@ -19,6 +19,9 @@ pub struct Theme {
     pub help_key: ColorSpec,
     pub help_desc: ColorSpec,
     pub help_sep: ColorSpec,
+
+    pub focused_button: ColorSpec,
+    pub blurred_button: ColorSpec,
 }
 
 impl Theme {
@@ -39,6 +42,8 @@ impl Theme {
             help_key: ColorSpec::new(),
             help_desc: ColorSpec::new(),
             help_sep: ColorSpec::new(),
+            focused_button: ColorSpec::new(),
+            blurred_button: ColorSpec::new(),
         }
     }
 
@@ -49,9 +54,16 @@ impl Theme {
         let red = Color::Rgb(255, 70, 114);
         let fuchsia = Color::Rgb(247, 128, 226);
         let green = Color::Rgb(2, 191, 135);
+        let cream = Color::Rgb(255, 253, 245);
 
         let mut title = make_color(indigo);
         title.set_bold(true);
+
+        let mut focused_button = make_color(cream);
+        focused_button.set_bg(Some(fuchsia));
+
+        let mut blurred_button = make_color(normal);
+        blurred_button.set_bg(Some(Color::Ansi256(238)));
 
         Self {
             title,
@@ -71,6 +83,9 @@ impl Theme {
             help_key: make_color(Color::Rgb(98, 98, 98)),
             help_desc: make_color(Color::Rgb(74, 74, 74)),
             help_sep: make_color(Color::Rgb(60, 60, 60)),
+
+            focused_button,
+            blurred_button,
         }
     }
 }
