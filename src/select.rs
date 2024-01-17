@@ -121,6 +121,11 @@ impl<T: Display> Select<T> {
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => self.handle_stop_filtering(false),
                     Key::Enter => {
+                        // if the cursor is on an empty option, don't return it
+                        if self.visible_options().get(self.cursor).is_none() {
+                            self.handle_stop_filtering(false);
+                            continue;
+                        }
                         self.clear()?;
                         self.term.show_cursor()?;
                         let id = self.visible_options().get(self.cursor).unwrap().id;
@@ -196,10 +201,13 @@ impl<T: Display> Select<T> {
 
     fn handle_stop_filtering(&mut self, save: bool) {
         self.filtering = false;
+        self.cur_page = 0;
 
         let visible_options = self.visible_options();
         if !visible_options.is_empty() {
             self.cursor = self.cursor.min(self.visible_options().len() - 1);
+        } else {
+            self.cursor = 0;
         }
         if !save {
             self.filter.clear();
