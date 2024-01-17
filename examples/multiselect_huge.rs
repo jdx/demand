@@ -66,7 +66,6 @@ fn main() {
         .option(DemandOption::new("Skittles"))
         .option(DemandOption::new("Starburst"))
         .option(DemandOption::new("Twizzlers"))
-        .option(DemandOption::new("Milk Duds"))
-    ;
+        .option(DemandOption::new("Milk Duds"));
     ms.run().expect("error running multi select");
 }
