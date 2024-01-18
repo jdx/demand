@@ -13,7 +13,37 @@ A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracel
 
 Single-line text input.
 
-TODO
+Run example with [`cargo run --example input`](./examples/input.rs).
+
+```rust
+use demand::Input;
+
+fn main() {
+    let t = Input::new("What's your name?")
+        .description("We'll use this to personalize your experience.")
+        .placeholder("Enter your name")
+        .prompt("Name: ");
+    let i = t.run().expect("error running input");
+    println!("Input: {}", i);
+}
+```
+
+![Input](./assets/input.png)
+
+Run example with [`cargo run --example input-password`](./examples/input-password.rs).
+
+```rust
+use demand::Input;
+
+fn main() {
+    let t = Input::new("Set a password")
+        .placeholder("Enter password")
+        .prompt("Password: ")
+        .password(true);
+    let i = t.run().expect("error running input");
+    println!("Password: {}", i);
+}
+```
 
 ## Text
 
