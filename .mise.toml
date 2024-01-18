@@ -1,0 +1,16 @@
+[tasks.assets]
+description = "Create assets with vhs"
+run = """
+#!/usr/bin/env bash
+# Create VHS recordings of all tape files in the assets directory
+for i in $(ls -1 assets/*.tape); do
+    vhs $i
+done
+"""
+
+[tasks.tests]
+description = "Run tests"
+run = [
+  "cargo clippy -- -D warnings",
+  "cargo fmt -- --check"
+]
