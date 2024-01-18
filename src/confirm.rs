@@ -2,7 +2,6 @@ use crate::theme::Theme;
 
 use console::{Key, Term};
 
-
 use std::io;
 use std::io::Write;
 use termcolor::{Buffer, WriteColor};
