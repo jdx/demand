@@ -15,6 +15,8 @@ Single-line text input.
 
 Run example with [`cargo run --example input`](./examples/input.rs).
 
+![Input](./assets/input.gif)
+
 ```rust
 use demand::Input;
 
@@ -28,9 +30,9 @@ fn main() {
 }
 ```
 
-![Input](./assets/input.png)
-
 Run example with [`cargo run --example input-password`](./examples/input-password.rs).
+
+![Input](./assets/input-password.gif)
 
 ```rust
 use demand::Input;
