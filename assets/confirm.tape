@@ -55,7 +55,7 @@
 #   Hide                            Hide the subsequent commands from the output
 #   Show                            Show the subsequent commands in the output
 
-Output assets/input.gif
+Output assets/confirm.gif
 
 Set Shell "fish"
 Set Padding 10
@@ -65,15 +65,13 @@ Set Height 300
 Set TypingSpeed 100ms
 
 Hide
-Type "cargo build --example input && clear" Enter
+Type "cargo build --example confirm && clear" Enter
 Sleep 2s
 Show
 
-Type "target/debug/examples/input" Enter
+Type "target/debug/examples/confirm" Enter
 Sleep 2s
-Type "John Doe" Sleep 1s
-Left 4
-Backspace 4
-Type "Jane" Sleep 1s
+Right Sleep 1
+Left Sleep 1
 Enter
 Sleep 2s

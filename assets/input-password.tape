@@ -60,7 +60,7 @@ Output assets/input-password.gif
 Set Shell "fish"
 Set Padding 10
 Set FontSize 16
-Set Width 600
+Set Width 800
 Set Height 300
 Set TypingSpeed 100ms
 
