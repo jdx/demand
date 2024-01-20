@@ -55,7 +55,7 @@
 #   Hide                            Hide the subsequent commands from the output
 #   Show                            Show the subsequent commands in the output
 
-Output assets/input.gif
+Output assets/select.gif
 
 Set Shell "fish"
 Set Padding 10
@@ -69,11 +69,11 @@ Type "cargo build --example input && clear" Enter
 Sleep 2s
 Show
 
-Type "target/debug/examples/input" Enter
+Type "target/debug/examples/select" Enter
 Sleep 2s
-Type "John Doe" Sleep 1s
-Left 4
-Backspace 4
-Type "Jane" Sleep 1s
+Type "/" Sleep 1s
+Type "Cheese" Sleep 1s
+Enter Sleep 1s
+Down Sleep 1s
 Enter
 Sleep 2s

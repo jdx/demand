@@ -59,7 +59,7 @@ Select from a list of options.
 
 Run example with [`cargo run --example select`](./examples/select.rs).
 
-![Select](./assets/select.png)
+![Select](./assets/select.gif)
 
 ```rust
 use demand::{DemandOption, Select};
@@ -84,7 +84,7 @@ fn main() {
 Select multiple options from a list.
 Run example with [`cargo run --example multiselect`](./examples/multiselect.rs).
 
-![Multiselect](./assets/multiselect.png)
+![Multiselect](./assets/multiselect.gif)
 
 ```rust
 use demand::{DemandOption, MultiSelect};
@@ -111,7 +111,7 @@ fn main() {
 Confirm a question with a yes or no.
 Run example with [`cargo run --example confirm`](./examples/confirm.rs).
 
-![Confirm](./assets/confirm.png)
+![Confirm](./assets/confirm.gif)
 
 ```rust
 use demand::Confirm;
