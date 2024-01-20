@@ -36,6 +36,7 @@ pub struct Input {
     /// Colors/style of the input
     pub theme: Theme,
 
+    cursor: usize,
     height: usize,
     term: Term,
 }
@@ -52,6 +53,7 @@ impl Input {
             inline: false,
             password: false,
             theme: Theme::default(),
+            cursor: 0,
             height: 0,
             term: Term::stderr(),
         }
@@ -100,38 +102,34 @@ impl Input {
 
     /// Displays the input to the user and returns the response
     pub fn run(mut self) -> io::Result<String> {
-        let output = self.render()?;
-        self.height = output.lines().count() - 1;
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()?;
         self.term.show_cursor()?;
-        self.render_placeholder()?;
         loop {
+            self.clear()?;
+            let output = self.render()?;
+
+            self.height = output.lines().count() - 1;
+            self.term.write_all(output.as_bytes())?;
+            self.term.flush()?;
+            self.set_cursor()?;
+
             match self.term.read_key()? {
                 Key::Char(c) => self.handle_key(c)?,
                 Key::Backspace => self.handle_backspace()?,
+                Key::ArrowLeft => self.handle_arrow_left()?,
+                Key::ArrowRight => self.handle_arrow_right()?,
+                Key::Home => self.handle_home()?,
+                Key::End => self.handle_end()?,
                 Key::Enter => {
                     return self.handle_submit();
                 }
                 _ => {}
             }
-
-            let chars_count = self.input.chars().count();
-            if chars_count > 0 {
-                self.clear_placeholder()?;
-                self.term.clear_chars(chars_count - 1)?;
-            } else {
-                self.render_placeholder()?;
-            }
-
-            let input = self.render_input()?;
-            self.term.write_all(input.as_bytes())?;
-            self.term.flush()?;
         }
     }
 
     fn handle_key(&mut self, c: char) -> io::Result<()> {
-        self.input.push(c);
+        self.input.insert(self.cursor, c);
+        self.cursor += 1;
         Ok(())
     }
 
@@ -140,10 +138,38 @@ impl Input {
         if chars_count > 1 {
             self.term.move_cursor_left(1)?;
         }
-        if chars_count > 0 {
-            self.input.pop();
-            self.term.clear_chars(1)?;
+        if chars_count > 0 && self.cursor > 0 {
+            self.input.remove(self.cursor - 1);
         }
+        if self.cursor > 0 {
+            self.cursor -= 1;
+        }
+        Ok(())
+    }
+
+    fn handle_arrow_left(&mut self) -> io::Result<()> {
+        if self.cursor > 0 {
+            self.term.move_cursor_left(1)?;
+            self.cursor -= 1;
+        }
+        Ok(())
+    }
+
+    fn handle_arrow_right(&mut self) -> io::Result<()> {
+        if self.cursor < self.input.chars().count() {
+            self.term.move_cursor_right(1)?;
+            self.cursor += 1;
+        }
+        Ok(())
+    }
+
+    fn handle_home(&mut self) -> io::Result<()> {
+        self.cursor = 0;
+        Ok(())
+    }
+
+    fn handle_end(&mut self) -> io::Result<()> {
+        self.cursor = self.input.chars().count();
         Ok(())
     }
 
@@ -154,7 +180,7 @@ impl Input {
         Ok(self.input)
     }
 
-    fn render(&self) -> io::Result<String> {
+    fn render(&mut self) -> io::Result<String> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
@@ -178,32 +204,18 @@ impl Input {
                 false => write!(out, "{}", self.prompt)?,
             }
         }
-
         out.reset()?;
-        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
-    }
 
-    fn render_placeholder(&mut self) -> io::Result<()> {
-        if !self.placeholder.is_empty() {
-            let mut out = Buffer::ansi();
+        if !self.placeholder.is_empty() && self.input.is_empty() {
             out.set_color(&self.theme.input_placeholder)?;
-            out.write_all(self.placeholder.as_bytes())?;
-            self.term.write_all(out.as_slice())?;
+            write!(out, "{}", &self.placeholder)?;
             self.term
                 .move_cursor_left(self.placeholder.chars().count())?;
-            self.term.flush()?;
             out.reset()?;
         }
-        Ok(())
-    }
+        write!(out, "{}", &self.render_input()?)?;
 
-    fn clear_placeholder(&mut self) -> io::Result<()> {
-        if !self.placeholder.is_empty() {
-            let placeholder_count = self.placeholder.chars().count();
-            self.term.move_cursor_right(placeholder_count)?;
-            self.term.clear_chars(placeholder_count)?;
-        }
-        Ok(())
+        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
     fn render_input(&mut self) -> io::Result<String> {
@@ -222,6 +234,17 @@ impl Input {
         writeln!(out, " {}", &self.render_input()?.to_string())?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn set_cursor(&mut self) -> io::Result<()> {
+        if !self.placeholder.is_empty() && self.input.is_empty() {
+            self.term
+                .move_cursor_left(self.placeholder.chars().count())?;
+        } else {
+            self.term.move_cursor_left(self.input.chars().count())?;
+        }
+        self.term.move_cursor_right(self.cursor)?;
+        Ok(())
     }
 
     fn clear(&mut self) -> io::Result<()> {
