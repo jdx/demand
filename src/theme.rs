@@ -1,4 +1,7 @@
+use once_cell::sync::Lazy;
 use termcolor::{Color, ColorSpec};
+
+pub(crate) static DEFAULT: Lazy<Theme> = Lazy::new(Theme::default);
 
 /// Theme for styling the UI.
 ///
