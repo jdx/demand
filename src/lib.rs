@@ -5,6 +5,8 @@ pub use input::Input;
 pub use multiselect::MultiSelect;
 pub use option::DemandOption;
 pub use select::Select;
+pub use spinner::Spinner;
+pub use spinner::SpinnerStyle;
 pub use theme::Theme;
 
 mod confirm;
@@ -12,4 +14,5 @@ mod input;
 mod multiselect;
 mod option;
 mod select;
+mod spinner;
 mod theme;
