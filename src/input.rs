@@ -48,7 +48,7 @@ impl Input {
             title: title.into(),
             description: String::new(),
             placeholder: String::new(),
-            prompt: String::new(),
+            prompt: "> ".to_string(),
             input: String::new(),
             inline: false,
             password: false,
@@ -203,6 +203,8 @@ impl Input {
                 true => write!(out, ">")?,
                 false => write!(out, " {}", self.prompt)?,
             }
+        } else {
+            write!(out, " ")?;
         }
         out.reset()?;
 
