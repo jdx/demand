@@ -6,7 +6,7 @@ use std::{
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
-use crate::Theme;
+use crate::{theme, Theme};
 
 /// Single line text input
 ///
@@ -18,7 +18,7 @@ use crate::Theme;
 ///   .description("We'll use this to personalize your experience.")
 ///   .placeholder("Enter your name");
 /// let name = input.run().expect("error running input");
-pub struct Input {
+pub struct Input<'a> {
     /// The title of the input
     pub title: String,
     /// A description to display after the title
@@ -34,14 +34,14 @@ pub struct Input {
     /// Input entered by the user
     pub input: String,
     /// Colors/style of the input
-    pub theme: Theme,
+    pub theme: &'a Theme,
 
     cursor: usize,
     height: usize,
     term: Term,
 }
 
-impl Input {
+impl<'a> Input<'a> {
     /// Creates a new input with the given title.
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl Input {
             input: String::new(),
             inline: false,
             password: false,
-            theme: Theme::default(),
+            theme: &*theme::DEFAULT,
             cursor: 0,
             height: 0,
             term: Term::stderr(),
@@ -95,7 +95,7 @@ impl Input {
     }
 
     /// Sets the theme of the input
-    pub fn theme(mut self, theme: Theme) -> Self {
+    pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
         self
     }

@@ -1,11 +1,12 @@
-use crate::theme::Theme;
-use crate::DemandOption;
-use console::{Key, Term};
-
 use std::fmt::Display;
 use std::io;
 use std::io::Write;
+
+use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
+
+use crate::theme::Theme;
+use crate::{theme, DemandOption};
 
 /// Select multiple options from a list
 ///
@@ -25,11 +26,11 @@ use termcolor::{Buffer, WriteColor};
 ///   .option(DemandOption::new("Nutella"));
 /// let topping = ms.run().expect("error running multi select");
 /// ```
-pub struct Select<T: Display> {
+pub struct Select<'a, T: Display> {
     /// The title of the selector
     pub title: String,
     /// The colors/style of the selector
-    pub theme: Theme,
+    pub theme: &'a Theme,
     /// A description to display above the selector
     pub description: String,
     /// The options which can be selected
@@ -46,7 +47,7 @@ pub struct Select<T: Display> {
     capacity: usize,
 }
 
-impl<T: Display> Select<T> {
+impl<'a, T: Display> Select<'a, T> {
     /// Create a new select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
@@ -54,7 +55,7 @@ impl<T: Display> Select<T> {
             description: String::new(),
             options: vec![],
             filterable: false,
-            theme: Theme::default(),
+            theme: &*theme::DEFAULT,
             cursor: 0,
             height: 0,
             term: Term::stderr(),
@@ -85,7 +86,7 @@ impl<T: Display> Select<T> {
     }
 
     /// Set the theme of the selector
-    pub fn theme(mut self, theme: Theme) -> Self {
+    pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
         self
     }

@@ -7,7 +7,7 @@ use std::{
 use console::Term;
 use termcolor::{Buffer, WriteColor};
 
-use crate::Theme;
+use crate::{theme, Theme};
 
 /// Show a spinner
 ///
@@ -24,26 +24,26 @@ use crate::Theme;
 ///    })
 ///   .expect("error running spinner");
 /// ```
-pub struct Spinner {
+pub struct Spinner<'a> {
     // The title of the spinner
     pub title: String,
     // The style of the spinner
     pub style: SpinnerStyle,
     /// The colors/style of the spinner
-    pub theme: Theme,
+    pub theme: &'a Theme,
 
     term: Term,
     frame: usize,
     height: usize,
 }
 
-impl Spinner {
+impl<'a> Spinner<'a> {
     /// Create a new spinner with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
             style: SpinnerStyle::line(),
-            theme: Theme::default(),
+            theme: &*theme::DEFAULT,
             term: Term::stderr(),
             frame: 0,
             height: 0,
@@ -57,7 +57,7 @@ impl Spinner {
     }
 
     /// Set the theme of the dialog
-    pub fn theme(mut self, theme: Theme) -> Self {
+    pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
         self
     }

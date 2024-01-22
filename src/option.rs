@@ -44,4 +44,5 @@ impl<T: Display> PartialEq for DemandOption<T> {
         self.id == other.id
     }
 }
+
 impl<T: Display> Eq for DemandOption<T> {}

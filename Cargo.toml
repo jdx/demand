@@ -9,5 +9,6 @@ readme = "README.md"
 keywords = ["cli", "prompt", "console"]
 
 [dependencies]
-console = "0.15"
-termcolor = "1"
+console = "0.15.8"
+once_cell = "1.19.0"
+termcolor = "1.4.1"

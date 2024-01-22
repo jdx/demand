@@ -1,10 +1,11 @@
-use crate::theme::Theme;
-
-use console::{Key, Term};
-
 use std::io;
 use std::io::Write;
+
+use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
+
+use crate::theme;
+use crate::theme::Theme;
 
 /// Select multiple options from a list
 ///
@@ -18,11 +19,11 @@ use termcolor::{Buffer, WriteColor};
 /// let yes = ms.run().expect("error running confirm");
 /// println!("yes: {}", yes);
 /// ```
-pub struct Confirm {
+pub struct Confirm<'a> {
     /// The title of the selector
     pub title: String,
     /// The colors/style of the selector
-    pub theme: Theme,
+    pub theme: &'a Theme,
     /// A description to display above the selector
     pub description: String,
     /// The text to display for the affirmative option
@@ -35,13 +36,13 @@ pub struct Confirm {
     height: usize,
 }
 
-impl Confirm {
+impl<'a> Confirm<'a> {
     /// Create a new multi select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
             description: String::new(),
-            theme: Theme::default(),
+            theme: &*theme::DEFAULT,
             term: Term::stderr(),
             affirmative: "Yes".to_string(),
             negative: "No".to_string(),
@@ -75,7 +76,7 @@ impl Confirm {
     }
 
     /// Set the theme of the dialog
-    pub fn theme(mut self, theme: Theme) -> Self {
+    pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
         self
     }

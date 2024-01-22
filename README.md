@@ -165,7 +165,7 @@ let theme = Theme {
 Input::new("What's your e-mail?")
         .description("Please enter your e-mail address.")
         .placeholder("name@domain.com")
-        .theme(theme.clone())
+        .theme(&theme)
         .run()
         .expect("error running input")?;
 ```
