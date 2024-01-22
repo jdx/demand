@@ -5,10 +5,12 @@ use termcolor::{Color, ColorSpec};
 /// # Example
 ///
 /// ```
+/// use demand::Theme;
+///
 /// let custom_theme = Theme {
 ///   selected_prefix: String::from(" •"),
 ///   unselected_prefix: String::from("  "),
-/// ..Theme:default()
+/// ..Theme::default()
 /// };
 /// ```
 #[derive(Clone, Debug)]
