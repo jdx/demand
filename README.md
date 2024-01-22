@@ -146,5 +146,4 @@ fn main() {
         .expect("error running spinner");
     println!("Done!");
 }
-
 ```

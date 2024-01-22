@@ -13,7 +13,9 @@ use crate::Theme;
 ///
 /// # Example
 /// ```rust
-/// use demand::Spinner;
+/// use demand::{Spinner,SpinnerStyle};
+/// use std::time::Duration;
+/// use std::thread::sleep;
 ///
 /// let spinner = Spinner::new("Loading data...")
 ///   .style(SpinnerStyle::line())
