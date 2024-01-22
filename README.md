@@ -129,12 +129,6 @@ fn main() {
 
 Supply your own custom theme or choose from one of the predefined themes:
 
-* Charm
-* Dracula
-* Catppuccin
-* Base 16
-* Default
-
 Derive a custom theme from the default theme.
 
 ```rust
@@ -152,3 +146,27 @@ Input::new("What's your e-mail?")
         .run()
         .expect("error running input")?;
 ```
+
+### Base 16
+
+![base16](./assets/themes/base16.gif)
+
+### Charm
+
+Default if colors are enabled in the console.
+
+![charm](./assets/themes/charm.gif)
+
+### Catppuccin
+
+![catppuccin](./assets/themes/catppuccin.gif)
+
+### Dracula
+
+![dracula](./assets/themes/dracula.gif)
+
+### New
+
+Default if colors are NOT enabled in the console.
+
+![new](./assets/themes/new.gif)

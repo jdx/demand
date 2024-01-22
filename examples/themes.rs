@@ -1,12 +1,19 @@
+use std::env::args;
+
 use demand::{Confirm, DemandOption, Input, MultiSelect, Theme};
 
 fn main() {
-    let theme = Theme {
-        selected_prefix: String::from(" •"),
-        selected_prefix_fg: Theme::color_rgb(2, 191, 135),
-        unselected_prefix: String::from("  "),
-        ..Theme::default()
-    };
+    let mut theme = Theme::new();
+    match args().nth(1) {
+        Some(arg) => match arg.as_str() {
+            "base16" => theme = Theme::base16(),
+            "charm" => theme = Theme::charm(),
+            "catppuccin" => theme = Theme::catppuccin(),
+            "dracula" => theme = Theme::dracula(),
+            _ => {}
+        },
+        None => {}
+    }
 
     let i = Input::new("What's your e-mail?")
         .description("Please enter your e-mail address.")
