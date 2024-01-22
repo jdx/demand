@@ -125,6 +125,29 @@ fn main() {
 }
 ```
 
+## Spinner
+
+Spinners are used to indicate that a process is running.
+Run example with [`cargo run --example spinner`](./examples/spinner.rs).
+
+![Spinner](./assets/spinner.gif)
+
+```rust
+use std::{thread::sleep, time::Duration};
+
+use demand::{Spinner, SpinnerStyle};
+
+fn main() {
+    Spinner::new("Loading Data...")
+        .style(SpinnerStyle::line())
+        .run(|| {
+            sleep(Duration::from_secs(2));
+        })
+        .expect("error running spinner");
+    println!("Done!");
+}
+```
+
 ## Themes
 
 Supply your own custom theme or choose from one of the predefined themes:
