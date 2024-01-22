@@ -28,7 +28,7 @@ pub struct Theme {
 
 impl Theme {
     /// Create a new theme with no colors.
-    pub fn default() -> Self {
+    pub fn new() -> Self {
         let placeholder = Color::Ansi256(8);
 
         let mut focused_button = make_color(Color::Ansi256(0));
@@ -54,8 +54,8 @@ impl Theme {
             help_key: ColorSpec::new(),
             help_desc: ColorSpec::new(),
             help_sep: ColorSpec::new(),
-            focused_button: focused_button,
-            blurred_button: blurred_button,
+            focused_button,
+            blurred_button,
         }
     }
 
@@ -239,7 +239,7 @@ impl Default for Theme {
         if console::colors_enabled_stderr() {
             Theme::charm()
         } else {
-            Theme::default()
+            Theme::new()
         }
     }
 }
