@@ -1,29 +1,59 @@
 use termcolor::{Color, ColorSpec};
 
 /// Theme for styling the UI.
+///
+/// # Example
+///
+/// ```
+/// let custom_theme = Theme {
+///   selected_prefix: String::from(" •"),
+///   unselected_prefix: String::from("  "),
+/// ..Theme:default()
+/// };
+/// ```
 #[derive(Clone, Debug)]
 pub struct Theme {
+    /// Prompt title color
     pub title: ColorSpec,
-    pub error_indicator: ColorSpec,
+    /// Prompt description color
     pub description: ColorSpec,
+    /// Cursor color
     pub cursor: ColorSpec,
+
+    /// Selected option color
     pub selected_option: ColorSpec,
+    /// Selected option prefix color
     pub selected_prefix: String,
+    /// Selected prefix foreground color
     pub selected_prefix_fg: ColorSpec,
+    /// Unselected option color
     pub unselected_option: ColorSpec,
+    /// Unselected option prefix color
     pub unselected_prefix: String,
+    /// Unselected prefix foreground color
     pub unselected_prefix_fg: ColorSpec,
 
+    /// Input cursor color
     pub input_cursor: ColorSpec,
+    /// Input placeholder color
     pub input_placeholder: ColorSpec,
+    /// Input prompt color
     pub input_prompt: ColorSpec,
 
+    /// Help item key color
     pub help_key: ColorSpec,
+    /// Help item description color
     pub help_desc: ColorSpec,
+    /// Help item separator color
     pub help_sep: ColorSpec,
 
+    /// Focused button
     pub focused_button: ColorSpec,
+    /// Blurred button
     pub blurred_button: ColorSpec,
+
+    /// Error indicator color
+    pub error_indicator: ColorSpec,
 }
 
 impl Theme {
@@ -59,7 +89,7 @@ impl Theme {
         }
     }
 
-    // Create a new thee with the charm color scheme
+    /// Create a new theme with the charm color scheme
     pub fn charm() -> Self {
         let normal = Color::Ansi256(252);
         let indigo = Color::Rgb(117, 113, 249);
@@ -103,7 +133,7 @@ impl Theme {
         }
     }
 
-    // Create a new thee with the dracula color scheme
+    /// Create a new theme with the dracula color scheme
     pub fn dracula() -> Self {
         let background = Color::Rgb(40, 42, 54); // #282a36
         let foreground = Color::Rgb(248, 248, 242); // #f8f8f2
@@ -148,7 +178,7 @@ impl Theme {
         }
     }
 
-    // Create a new thee with the base16 color scheme
+    /// Create a new theme with the base16 color scheme
     pub fn base16() -> Self {
         let mut title = make_color(Color::Ansi256(6));
         title.set_bold(true);
@@ -185,7 +215,7 @@ impl Theme {
         }
     }
 
-    // Create a new thee with the catppuccin color scheme
+    /// Create a new theme with the catppuccin color scheme
     pub fn catppuccin() -> Self {
         let base = Color::Rgb(30, 30, 46);
         let text = Color::Rgb(205, 214, 244);
@@ -231,6 +261,16 @@ impl Theme {
             focused_button,
             blurred_button,
         }
+    }
+
+    /// Create a new color with foreground color from an RGB value.
+    pub fn color_rgb(r: u8, g: u8, b: u8) -> ColorSpec {
+        make_color(Color::Rgb(r, g, b))
+    }
+
+    /// Create a new color with foreground color from an ANSI 256 color code.
+    pub fn color_ansi256(n: u8) -> ColorSpec {
+        make_color(Color::Ansi256(n))
     }
 }
 

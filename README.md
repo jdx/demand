@@ -124,3 +124,31 @@ fn main() {
     println!("yes: {}", yes);
 }
 ```
+
+## Themes
+
+Supply your own custom theme or choose from one of the predefined themes:
+
+* Charm
+* Dracula
+* Catppuccin
+* Base 16
+* Default
+
+Derive a custom theme from the default theme.
+
+```rust
+let theme = Theme {
+    selected_prefix: String::from(" •"),
+    selected_prefix_fg: Theme::color_rgb(2, 191, 135),
+    unselected_prefix: String::from("  "),
+    ..Theme::default()
+};
+
+Input::new("What's your e-mail?")
+        .description("Please enter your e-mail address.")
+        .placeholder("name@domain.com")
+        .theme(theme.clone())
+        .run()
+        .expect("error running input")?;
+```
