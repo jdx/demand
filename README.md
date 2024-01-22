@@ -147,3 +147,49 @@ fn main() {
     println!("Done!");
 }
 ```
+
+## Themes
+
+Supply your own custom theme or choose from one of the predefined themes:
+
+Derive a custom theme from the default theme.
+
+```rust
+let theme = Theme {
+    selected_prefix: String::from(" •"),
+    selected_prefix_fg: Theme::color_rgb(2, 191, 135),
+    unselected_prefix: String::from("  "),
+    ..Theme::default()
+};
+
+Input::new("What's your e-mail?")
+        .description("Please enter your e-mail address.")
+        .placeholder("name@domain.com")
+        .theme(theme.clone())
+        .run()
+        .expect("error running input")?;
+```
+
+### Base 16
+
+![base16](./assets/themes/base16.gif)
+
+### Charm
+
+Default if colors are enabled in the console.
+
+![charm](./assets/themes/charm.gif)
+
+### Catppuccin
+
+![catppuccin](./assets/themes/catppuccin.gif)
+
+### Dracula
+
+![dracula](./assets/themes/dracula.gif)
+
+### New
+
+Default if colors are NOT enabled in the console.
+
+![new](./assets/themes/new.gif)
