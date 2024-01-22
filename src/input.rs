@@ -186,22 +186,22 @@ impl Input {
         out.set_color(&self.theme.title)?;
         match self.inline {
             true => write!(out, "{}", self.title)?,
-            false => writeln!(out, "{}", self.title)?,
+            false => writeln!(out, " {}", self.title)?,
         }
 
         out.set_color(&self.theme.description)?;
         if !self.description.is_empty() {
             match self.inline {
                 true => write!(out, "{}", self.description)?,
-                false => writeln!(out, "{}", self.description)?,
+                false => writeln!(out, " {}", self.description)?,
             }
         }
 
         out.set_color(&self.theme.input_prompt)?;
         if !self.prompt.is_empty() {
             match self.inline {
-                true => write!(out, "> ")?,
-                false => write!(out, "{}", self.prompt)?,
+                true => write!(out, ">")?,
+                false => write!(out, " {}", self.prompt)?,
             }
         }
         out.reset()?;
@@ -213,6 +213,7 @@ impl Input {
                 .move_cursor_left(self.placeholder.chars().count())?;
             out.reset()?;
         }
+
         write!(out, "{}", &self.render_input()?)?;
 
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
@@ -229,7 +230,7 @@ impl Input {
     fn render_success(&mut self) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, "{}", self.title)?;
+        write!(out, " {}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         writeln!(out, " {}", &self.render_input()?.to_string())?;
         out.reset()?;
