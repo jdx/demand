@@ -18,7 +18,7 @@ use crate::{theme, Theme};
 ///   .description("We'll use this to personalize your experience.")
 ///   .placeholder("Enter your name");
 /// let name = input.run().expect("error running input");
-/// ````
+/// ```
 pub struct Input<'a> {
     /// The title of the input
     pub title: String,

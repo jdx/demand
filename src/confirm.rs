@@ -133,12 +133,11 @@ impl<'a> Confirm<'a> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        writeln!(out, " {}", self.title)?;
 
         if !self.description.is_empty() {
             out.set_color(&self.theme.description)?;
             write!(out, " {}", self.description)?;
-            writeln!(out)?;
         }
         writeln!(out, "\n")?;
 
@@ -217,8 +216,8 @@ mod tests {
 
         assert_eq!(
             indoc! {
-              " Are you sure? This will do a thing.
-
+              " Are you sure?
+               This will do a thing.
 
                  Yes!     No.  
 
