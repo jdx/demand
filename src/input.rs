@@ -136,9 +136,6 @@ impl<'a> Input<'a> {
 
     fn handle_backspace(&mut self) -> io::Result<()> {
         let chars_count = self.input.chars().count();
-        if chars_count > 1 {
-            self.term.move_cursor_left(1)?;
-        }
         if chars_count > 0 && self.cursor > 0 {
             self.input.remove(self.cursor - 1);
         }
@@ -150,7 +147,6 @@ impl<'a> Input<'a> {
 
     fn handle_arrow_left(&mut self) -> io::Result<()> {
         if self.cursor > 0 {
-            self.term.move_cursor_left(1)?;
             self.cursor -= 1;
         }
         Ok(())
@@ -158,7 +154,6 @@ impl<'a> Input<'a> {
 
     fn handle_arrow_right(&mut self) -> io::Result<()> {
         if self.cursor < self.input.chars().count() {
-            self.term.move_cursor_right(1)?;
             self.cursor += 1;
         }
         Ok(())
@@ -212,8 +207,6 @@ impl<'a> Input<'a> {
         if !self.placeholder.is_empty() && self.input.is_empty() {
             out.set_color(&self.theme.input_placeholder)?;
             write!(out, "{}", &self.placeholder)?;
-            self.term
-                .move_cursor_left(self.placeholder.chars().count())?;
             out.reset()?;
         }
 
