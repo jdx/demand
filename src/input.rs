@@ -266,6 +266,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_render() {
+        let mut input = Input::new("Title")
+            .description("Description")
+            .prompt("$ ")
+            .placeholder("Placeholder");
+
+        assert_eq!(
+            " Title\n Description\n $ Placeholder",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
     fn test_render_title() {
         let mut input = Input::new("Title");
 
@@ -301,19 +314,6 @@ mod tests {
 
         assert_eq!(
             " Title\n > Placeholder",
-            without_ansi(input.render().unwrap().as_str())
-        );
-    }
-
-    #[test]
-    fn test_render_all() {
-        let mut input = Input::new("Title")
-            .description("Description")
-            .prompt("$ ")
-            .placeholder("Placeholder");
-
-        assert_eq!(
-            " Title\n Description\n $ Placeholder",
             without_ansi(input.render().unwrap().as_str())
         );
     }
