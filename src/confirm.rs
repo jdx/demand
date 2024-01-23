@@ -13,10 +13,10 @@ use crate::theme::Theme;
 /// ```rust
 /// use demand::Confirm;
 ///
-/// let ms = Confirm::new("Are you sure?")
+/// let confirm = Confirm::new("Are you sure?")
 ///   .affirmative("Yes!")
 ///   .negative("No.");
-/// let yes = ms.run().expect("error running confirm");
+/// let yes = confirm.run().expect("error running confirm");
 /// println!("yes: {}", yes);
 /// ```
 pub struct Confirm<'a> {
@@ -133,12 +133,11 @@ impl<'a> Confirm<'a> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        writeln!(out, " {}", self.title)?;
 
         if !self.description.is_empty() {
             out.set_color(&self.theme.description)?;
             write!(out, " {}", self.description)?;
-            writeln!(out)?;
         }
         writeln!(out, "\n")?;
 
@@ -199,5 +198,32 @@ impl<'a> Confirm<'a> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::without_ansi;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render() {
+        let confirm = Confirm::new("Are you sure?")
+            .description("This will do a thing.")
+            .affirmative("Yes!")
+            .negative("No.");
+
+        assert_eq!(
+            indoc! {
+              " Are you sure?
+               This will do a thing.
+
+                 Yes!     No.  
+
+              ←/→ toggle • y/n/enter submit"
+            },
+            without_ansi(confirm.render().unwrap().as_str())
+        );
     }
 }

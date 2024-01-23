@@ -15,7 +15,7 @@ use crate::{theme, DemandOption};
 /// ```rust
 /// use demand::{DemandOption, MultiSelect};
 ///
-/// let ms = MultiSelect::new("Toppings")
+/// let multiselect = MultiSelect::new("Toppings")
 ///   .description("Select your toppings")
 ///   .min(1)
 ///   .max(4)
@@ -26,8 +26,8 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Jalapenos").label("Jalapeños"))
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
-///   .option(DemandOption::new("Nutella"));///
-/// let toppings = ms.run().expect("error running multi select");
+///   .option(DemandOption::new("Nutella"));
+/// let toppings = multiselect.run().expect("error running multi select");
 /// ```
 pub struct MultiSelect<'a, T: Display> {
     /// The title of the selector
@@ -58,14 +58,14 @@ pub struct MultiSelect<'a, T: Display> {
 impl<'a, T: Display> MultiSelect<'a, T> {
     /// Create a new multi select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
-        Self {
+        let mut ms = MultiSelect {
             title: title.into(),
             description: String::new(),
             options: vec![],
             min: 0,
             max: usize::MAX,
             filterable: false,
-            theme: &*theme::DEFAULT,
+            theme: &theme::DEFAULT,
             err: None,
             cursor: 0,
             height: 0,
@@ -75,7 +75,10 @@ impl<'a, T: Display> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
-        }
+        };
+        let max_height = ms.term.size().0 as usize;
+        ms.capacity = max_height.max(8) - 4;
+        ms
     }
 
     /// Set the description of the selector
@@ -87,6 +90,16 @@ impl<'a, T: Display> MultiSelect<'a, T> {
     /// Add an option to the selector
     pub fn option(mut self, option: DemandOption<T>) -> Self {
         self.options.push(option);
+        self.pages = self.get_pages();
+        self
+    }
+
+    /// Add multiple options to the selector
+    pub fn options(mut self, options: Vec<DemandOption<T>>) -> Self {
+        for option in options {
+            self.options.push(option);
+        }
+        self.pages = self.get_pages();
         self
     }
 
@@ -116,12 +129,9 @@ impl<'a, T: Display> MultiSelect<'a, T> {
 
     /// Displays the selector to the user and returns their selected options
     pub fn run(mut self) -> io::Result<Vec<T>> {
-        let max_height = self.term.size().0 as usize;
-        self.capacity = max_height.max(8) - 4;
-        self.pages = self.get_pages();
-
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
+
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -218,7 +228,7 @@ impl<'a, T: Display> MultiSelect<'a, T> {
         let visible_options = self.visible_options();
         if self.cursor < visible_options.len().max(1) - 1 {
             self.cursor += 1;
-        } else if self.cur_page < self.pages - 1 {
+        } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
             self.cursor = 0;
         }
@@ -240,7 +250,7 @@ impl<'a, T: Display> MultiSelect<'a, T> {
     }
 
     fn handle_right(&mut self) {
-        if self.cur_page < self.pages - 1 {
+        if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
         }
     }
@@ -292,19 +302,24 @@ impl<'a, T: Display> MultiSelect<'a, T> {
         }
         if !save {
             self.filter.clear();
-            self.pages = self.get_pages();
+            self.reset_paging();
         }
     }
 
     fn handle_filter_key(&mut self, c: char) {
         self.err = None;
         self.filter.push(c);
-        self.pages = self.get_pages();
+        self.reset_paging();
     }
 
     fn handle_filter_backspace(&mut self) {
         self.err = None;
         self.filter.pop();
+        self.reset_paging();
+    }
+
+    fn reset_paging(&mut self) {
+        self.cur_page = 0;
         self.pages = self.get_pages();
     }
 
@@ -420,5 +435,43 @@ impl<'a, T: Display> MultiSelect<'a, T> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::without_ansi;
+
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render() {
+        let select = MultiSelect::new("Toppings")
+            .description("Select your toppings")
+            .option(DemandOption::new("Lettuce").selected(true))
+            .option(DemandOption::new("Tomatoes").selected(true))
+            .option(DemandOption::new("Charm Sauce"))
+            .option(DemandOption::new("Jalapenos").label("Jalapeños"))
+            .option(DemandOption::new("Cheese"))
+            .option(DemandOption::new("Vegan Cheese"))
+            .option(DemandOption::new("Nutella"));
+
+        assert_eq!(
+            indoc! {
+              " Toppings
+             Select your toppings
+             >[•] Lettuce
+              [•] Tomatoes
+              [ ] Charm Sauce
+              [ ] Jalapeños
+              [ ] Cheese
+              [ ] Vegan Cheese
+              [ ] Nutella
+
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
     }
 }

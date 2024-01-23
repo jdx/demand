@@ -14,7 +14,7 @@ use crate::{theme, DemandOption};
 /// ```rust
 /// use demand::{DemandOption, Select};
 ///
-/// let ms = Select::new("Toppings")
+/// let select = Select::new("Toppings")
 ///   .description("Select your topping")
 ///   .filterable(true)
 ///   .option(DemandOption::new("Lettuce"))
@@ -24,7 +24,7 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
 ///   .option(DemandOption::new("Nutella"));
-/// let topping = ms.run().expect("error running multi select");
+/// let topping = select.run().expect("error running multi select");
 /// ```
 pub struct Select<'a, T: Display> {
     /// The title of the selector
@@ -37,6 +37,7 @@ pub struct Select<'a, T: Display> {
     pub options: Vec<DemandOption<T>>,
     /// Whether the selector can be filtered with a query
     pub filterable: bool,
+
     cursor: usize,
     height: usize,
     term: Term,
@@ -50,12 +51,12 @@ pub struct Select<'a, T: Display> {
 impl<'a, T: Display> Select<'a, T> {
     /// Create a new select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
-        Self {
+        let mut s = Select {
             title: title.into(),
             description: String::new(),
             options: vec![],
             filterable: false,
-            theme: &*theme::DEFAULT,
+            theme: &theme::DEFAULT,
             cursor: 0,
             height: 0,
             term: Term::stderr(),
@@ -64,7 +65,10 @@ impl<'a, T: Display> Select<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
-        }
+        };
+        let max_height = s.term.size().0 as usize;
+        s.capacity = max_height.max(8) - 4;
+        s
     }
 
     /// Set the description of the selector
@@ -76,6 +80,16 @@ impl<'a, T: Display> Select<'a, T> {
     /// Add an option to the selector
     pub fn option(mut self, option: DemandOption<T>) -> Self {
         self.options.push(option);
+        self.pages = self.get_pages();
+        self
+    }
+
+    /// Add multiple options to the selector
+    pub fn options(mut self, options: Vec<DemandOption<T>>) -> Self {
+        for option in options {
+            self.options.push(option);
+        }
+        self.pages = self.get_pages();
         self
     }
 
@@ -93,10 +107,6 @@ impl<'a, T: Display> Select<'a, T> {
 
     /// Displays the selector to the user and returns their selected options
     pub fn run(mut self) -> io::Result<T> {
-        let max_height = self.term.size().0 as usize;
-        self.capacity = max_height.max(8) - 4;
-        self.pages = self.get_pages();
-
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -164,7 +174,7 @@ impl<'a, T: Display> Select<'a, T> {
         let visible_options = self.visible_options();
         if self.cursor < visible_options.len().max(1) - 1 {
             self.cursor += 1;
-        } else if self.cur_page < self.pages - 1 {
+        } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
             self.cursor = 0;
         }
@@ -186,7 +196,7 @@ impl<'a, T: Display> Select<'a, T> {
     }
 
     fn handle_right(&mut self) {
-        if self.cur_page < self.pages - 1 {
+        if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
         }
     }
@@ -314,5 +324,39 @@ impl<'a, T: Display> Select<'a, T> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::without_ansi;
+
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render() {
+        let select = Select::new("Country")
+            .description("Select your Country")
+            .option(DemandOption::new("United States").selected(true))
+            .option(DemandOption::new("Germany"))
+            .option(DemandOption::new("Brazil"))
+            .option(DemandOption::new("Canada"))
+            .option(DemandOption::new("Mexico"));
+
+        assert_eq!(
+            indoc! {
+              " Country
+               Select your Country
+               > United States
+                 Germany
+                 Brazil
+                 Canada
+                 Mexico
+
+              ↑/↓/k/j up/down • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
     }
 }

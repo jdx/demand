@@ -16,3 +16,6 @@ mod option;
 mod select;
 mod spinner;
 mod theme;
+
+#[cfg(test)]
+mod test;
