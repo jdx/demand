@@ -22,5 +22,14 @@ done
 description = "Run tests"
 run = [
   "cargo clippy -- -D warnings",
-  "cargo fmt -- --check"
+  "cargo fmt -- --check",
+  "cargo test --lib --tests"
+]
+
+[tasks.coverage]
+description = "Run tests with coverage"
+run = [
+  "cargo clippy -- -D warnings",
+  "cargo fmt -- --check",
+  "cargo tarpaulin --lib --tests"
 ]

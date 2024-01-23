@@ -14,7 +14,7 @@ use crate::{theme, DemandOption};
 /// ```rust
 /// use demand::{DemandOption, Select};
 ///
-/// let ms = Select::new("Toppings")
+/// let select = Select::new("Toppings")
 ///   .description("Select your topping")
 ///   .filterable(true)
 ///   .option(DemandOption::new("Lettuce"))
@@ -24,7 +24,7 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
 ///   .option(DemandOption::new("Nutella"));
-/// let topping = ms.run().expect("error running multi select");
+/// let topping = select.run().expect("error running multi select");
 /// ```
 pub struct Select<'a, T: Display> {
     /// The title of the selector
@@ -314,5 +314,34 @@ impl<'a, T: Display> Select<'a, T> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::without_ansi;
+
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render() {
+        let select = Select::new("Country")
+            .description("Select your Country")
+            .option(DemandOption::new("United States").selected(true))
+            .option(DemandOption::new("Germany"))
+            .option(DemandOption::new("Brazil"))
+            .option(DemandOption::new("Canada"))
+            .option(DemandOption::new("Mexico"));
+
+        assert_eq!(
+            indoc! {
+              " Country
+               Select your Country
+             
+              ↑/↓/k/j up/down • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
     }
 }

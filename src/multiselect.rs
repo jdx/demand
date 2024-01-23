@@ -15,7 +15,7 @@ use crate::{theme, DemandOption};
 /// ```rust
 /// use demand::{DemandOption, MultiSelect};
 ///
-/// let ms = MultiSelect::new("Toppings")
+/// let multiselect = MultiSelect::new("Toppings")
 ///   .description("Select your toppings")
 ///   .min(1)
 ///   .max(4)
@@ -26,8 +26,8 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Jalapenos").label("Jalapeños"))
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
-///   .option(DemandOption::new("Nutella"));///
-/// let toppings = ms.run().expect("error running multi select");
+///   .option(DemandOption::new("Nutella"));
+/// let toppings = multiselect.run().expect("error running multi select");
 /// ```
 pub struct MultiSelect<'a, T: Display> {
     /// The title of the selector
@@ -420,5 +420,36 @@ impl<'a, T: Display> MultiSelect<'a, T> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::without_ansi;
+
+    use super::*;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render() {
+        let select = MultiSelect::new("Toppings")
+            .description("Select your toppings")
+            .option(DemandOption::new("Lettuce").selected(true))
+            .option(DemandOption::new("Tomatoes").selected(true))
+            .option(DemandOption::new("Charm Sauce"))
+            .option(DemandOption::new("Jalapenos").label("Jalapeños"))
+            .option(DemandOption::new("Cheese"))
+            .option(DemandOption::new("Vegan Cheese"))
+            .option(DemandOption::new("Nutella"));
+
+        assert_eq!(
+            indoc! {
+              " Toppings
+             Select your toppings
+           
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
     }
 }

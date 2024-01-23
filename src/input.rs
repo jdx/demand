@@ -18,6 +18,7 @@ use crate::{theme, Theme};
 ///   .description("We'll use this to personalize your experience.")
 ///   .placeholder("Enter your name");
 /// let name = input.run().expect("error running input");
+/// ````
 pub struct Input<'a> {
     /// The title of the input
     pub title: String,
@@ -255,5 +256,65 @@ impl<'a> Input<'a> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test::without_ansi;
+
+    use super::*;
+
+    #[test]
+    fn test_render_title() {
+        let mut input = Input::new("Title");
+
+        assert_eq!(
+            " Title\n > ",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_description() {
+        let mut input = Input::new("Title").description("Description");
+
+        assert_eq!(
+            " Title\n Description\n > ",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_prompt() {
+        let mut input = Input::new("Title").prompt("$ ");
+
+        assert_eq!(
+            " Title\n $ ",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_placeholder() {
+        let mut input = Input::new("Title").placeholder("Placeholder");
+
+        assert_eq!(
+            " Title\n > Placeholder",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_all() {
+        let mut input = Input::new("Title")
+            .description("Description")
+            .prompt("$ ")
+            .placeholder("Placeholder");
+
+        assert_eq!(
+            " Title\n Description\n $ Placeholder",
+            without_ansi(input.render().unwrap().as_str())
+        );
     }
 }

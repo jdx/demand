@@ -178,3 +178,31 @@ impl SpinnerStyle {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::test::without_ansi;
+
+    use super::*;
+
+    #[test]
+    fn test_render() {
+        for t in vec![
+            SpinnerStyle::dots(),
+            SpinnerStyle::jump(),
+            SpinnerStyle::line(),
+            SpinnerStyle::points(),
+            SpinnerStyle::meter(),
+            SpinnerStyle::minidots(),
+            SpinnerStyle::ellipsis(),
+        ] {
+            let mut spinner = Spinner::new("Loading data...").style(t);
+            for f in spinner.style.chars.clone().iter() {
+                assert_eq!(
+                    format!("{} Loading data...", f),
+                    without_ansi(spinner.render().unwrap().as_str())
+                );
+            }
+        }
+    }
+}
