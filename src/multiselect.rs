@@ -118,7 +118,7 @@ impl<'a, T: Display> MultiSelect<'a, T> {
     pub fn run(mut self) -> io::Result<Vec<T>> {
         let max_height = self.term.size().0 as usize;
         self.capacity = max_height.max(8) - 4;
-        self.pages = ((self.options.len() as f64) / self.capacity as f64).ceil() as usize;
+        self.pages = self.get_pages();
 
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
@@ -292,17 +292,28 @@ impl<'a, T: Display> MultiSelect<'a, T> {
         }
         if !save {
             self.filter.clear();
+            self.pages = self.get_pages();
         }
     }
 
     fn handle_filter_key(&mut self, c: char) {
         self.err = None;
         self.filter.push(c);
+        self.pages = self.get_pages();
     }
 
     fn handle_filter_backspace(&mut self) {
         self.err = None;
         self.filter.pop();
+        self.pages = self.get_pages();
+    }
+
+    fn get_pages(&self) -> usize {
+        if self.filtering {
+            ((self.filtered_options().len() as f64) / self.capacity as f64).ceil() as usize
+        } else {
+            ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
+        }
     }
 
     fn render(&self) -> io::Result<String> {
