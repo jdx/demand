@@ -114,6 +114,8 @@ impl<'a> Input<'a> {
             self.set_cursor()?;
 
             match self.term.read_key()? {
+                Key::Char('\u{15}') => self.handle_ctrl_u()?,
+                Key::Char('\u{17}') => self.handle_ctrl_w()?,
                 Key::Char(c) => self.handle_key(c)?,
                 Key::Backspace => self.handle_backspace()?,
                 Key::ArrowLeft => self.handle_arrow_left()?,
@@ -131,6 +133,33 @@ impl<'a> Input<'a> {
     fn handle_key(&mut self, c: char) -> io::Result<()> {
         self.input.insert(self.cursor, c);
         self.cursor += 1;
+        Ok(())
+    }
+
+    fn handle_ctrl_u(&mut self) -> io::Result<()> {
+        self.input.replace_range(..self.cursor, "");
+        self.cursor = 0;
+        Ok(())
+    }
+
+    fn handle_ctrl_w(&mut self) -> io::Result<()> {
+        let slice = &self.input[0..self.cursor].trim_end();
+        let offset = slice
+            .char_indices()
+            .rfind(|&(_, x)| x == ' ')
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        let from = match offset > 0 {
+            true => offset + 1,
+            false => offset,
+        };
+        self.input.replace_range(from..self.cursor, "");
+
+        match offset > 0 {
+            true => self.cursor -= self.cursor - from,
+            false => self.cursor = 0,
+        }
         Ok(())
     }
 
