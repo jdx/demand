@@ -1,3 +1,19 @@
+[tools]
+"cargo:cargo-tarpaulin" = "0.27.3"
+"cargo:git-cliff" = "1.4.0"
+
+[tasks.changelog]
+description = "Generate changelog"
+run = "git cliff -o CHANGELOG.md"
+
+[tasks.coverage]
+description = "Run tests with coverage"
+run = [
+  "cargo clippy -- -D warnings",
+  "cargo fmt -- --check",
+  "cargo tarpaulin --lib --tests"
+]
+
 [tasks."recordings input"]
 description = "Create recordings with vhs"
 run = """
@@ -24,12 +40,4 @@ run = [
   "cargo clippy -- -D warnings",
   "cargo fmt -- --check",
   "cargo test --lib --tests"
-]
-
-[tasks.coverage]
-description = "Run tests with coverage"
-run = [
-  "cargo clippy -- -D warnings",
-  "cargo fmt -- --check",
-  "cargo tarpaulin --lib --tests"
 ]
