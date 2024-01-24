@@ -157,7 +157,7 @@ impl<'a> Input<'a> {
         self.input.replace_range(from..self.cursor, "");
 
         match offset > 0 {
-            true => self.cursor -= self.cursor - from,
+            true => self.cursor = self.cursor - (self.cursor - from),
             false => self.cursor = 0,
         }
         Ok(())
