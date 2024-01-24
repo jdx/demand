@@ -5,6 +5,7 @@ use std::{
 };
 
 use console::Term;
+use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
 use crate::{theme, Theme};
@@ -18,7 +19,7 @@ use crate::{theme, Theme};
 /// use std::thread::sleep;
 ///
 /// let spinner = Spinner::new("Loading data...")
-///   .style(SpinnerStyle::line())
+///   .style(&SpinnerStyle::line())
 ///   .run(|| {
 ///        sleep(Duration::from_secs(2));
 ///    })
@@ -28,7 +29,7 @@ pub struct Spinner<'a> {
     // The title of the spinner
     pub title: String,
     // The style of the spinner
-    pub style: SpinnerStyle,
+    pub style: &'a SpinnerStyle,
     /// The colors/style of the spinner
     pub theme: &'a Theme,
 
@@ -42,8 +43,8 @@ impl<'a> Spinner<'a> {
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
-            style: SpinnerStyle::line(),
-            theme: &*theme::DEFAULT,
+            style: &DEFAULT,
+            theme: &theme::DEFAULT,
             term: Term::stderr(),
             frame: 0,
             height: 0,
@@ -51,7 +52,7 @@ impl<'a> Spinner<'a> {
     }
 
     /// Set the style of the spinner
-    pub fn style(mut self, style: SpinnerStyle) -> Self {
+    pub fn style(mut self, style: &'a SpinnerStyle) -> Self {
         self.style = style;
         self
     }
@@ -91,12 +92,12 @@ impl<'a> Spinner<'a> {
     fn render(&mut self) -> io::Result<String> {
         let mut out = Buffer::ansi();
 
-        if self.frame > self.style.chars.len() - 1 {
+        if self.frame > self.style.frames.len() - 1 {
             self.frame = 0
         }
 
         out.set_color(&self.theme.input_prompt)?;
-        write!(out, "{} ", self.style.chars[self.frame])?;
+        write!(out, "{} ", self.style.frames[self.frame])?;
         out.reset()?;
 
         write!(out, "{}", self.title)?;
@@ -114,66 +115,77 @@ impl<'a> Spinner<'a> {
     }
 }
 
+pub(crate) static DEFAULT: Lazy<SpinnerStyle> = Lazy::new(SpinnerStyle::line);
+
 /// The style of the spinner
 ///
 /// # Example
 /// ```rust
 /// use demand::SpinnerStyle;
+/// use std::time::Duration;
 ///
-/// let style = SpinnerStyle::dots();
+/// let dots_style = SpinnerStyle::dots();
+/// let custom_style = SpinnerStyle {
+///   frames: vec!["  ", ". ", "..", "..."],
+///   fps: Duration::from_millis(1000 / 10),
+/// };
 /// ```
 pub struct SpinnerStyle {
-    chars: Vec<&'static str>,
-    fps: Duration,
+    /// The characters to use as frames for the spinner
+    pub frames: Vec<&'static str>,
+    /// The frames per second of the spinner
+    /// Usually represented as a fraction of a second in milliseconds for example `Duration::from_millis(1000/10)`
+    /// which would be 10 frames per second
+    pub fps: Duration,
 }
 
 impl SpinnerStyle {
     // Create a new spinner type of dots
     pub fn dots() -> Self {
         Self {
-            chars: vec!["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"],
+            frames: vec!["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"],
             fps: Duration::from_millis(1000 / 10),
         }
     }
     // Create a new spinner type of jump
     pub fn jump() -> Self {
         Self {
-            chars: vec!["⢄", "⢂", "⢁", "⡁", "⡈", "⡐", "⡠"],
+            frames: vec!["⢄", "⢂", "⢁", "⡁", "⡈", "⡐", "⡠"],
             fps: Duration::from_millis(1000 / 10),
         }
     }
     // Create a new spinner type of line
     pub fn line() -> Self {
         Self {
-            chars: vec!["-", "\\", "|", "/"],
+            frames: vec!["-", "\\", "|", "/"],
             fps: Duration::from_millis(1000 / 10),
         }
     }
     // Create a new spinner type of points
     pub fn points() -> Self {
         Self {
-            chars: vec!["∙∙∙", "●∙∙", "∙●∙", "∙∙●"],
+            frames: vec!["∙∙∙", "●∙∙", "∙●∙", "∙∙●"],
             fps: Duration::from_millis(1000 / 7),
         }
     }
     // Create a new spinner type of meter
     pub fn meter() -> Self {
         Self {
-            chars: vec!["▱▱▱", "▰▱▱", "▰▰▱", "▰▰▰", "▰▰▱", "▰▱▱", "▱▱▱"],
+            frames: vec!["▱▱▱", "▰▱▱", "▰▰▱", "▰▰▰", "▰▰▱", "▰▱▱", "▱▱▱"],
             fps: Duration::from_millis(1000 / 7),
         }
     }
     // Create a new spinner type of mini dots
     pub fn minidots() -> Self {
         Self {
-            chars: vec!["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+            frames: vec!["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
             fps: Duration::from_millis(1000 / 12),
         }
     }
     // Create a new spinner type of ellipsis
     pub fn ellipsis() -> Self {
         Self {
-            chars: vec!["   ", ".  ", ".. ", "..."],
+            frames: vec!["   ", ".  ", ".. ", "..."],
             fps: Duration::from_millis(1000 / 3),
         }
     }
@@ -196,8 +208,8 @@ mod test {
             SpinnerStyle::minidots(),
             SpinnerStyle::ellipsis(),
         ] {
-            let mut spinner = Spinner::new("Loading data...").style(t);
-            for f in spinner.style.chars.clone().iter() {
+            let mut spinner = Spinner::new("Loading data...").style(&t);
+            for f in spinner.style.frames.clone().iter() {
                 assert_eq!(
                     format!("{} Loading data...", f),
                     without_ansi(spinner.render().unwrap().as_str())
