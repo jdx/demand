@@ -42,6 +42,9 @@ pub struct Input<'a> {
     term: Term,
 }
 
+const CTRL_U: char = '\u{15}';
+const CTRL_W: char = '\u{17}';
+
 impl<'a> Input<'a> {
     /// Creates a new input with the given title.
     pub fn new<S: Into<String>>(title: S) -> Self {
@@ -114,8 +117,8 @@ impl<'a> Input<'a> {
             self.set_cursor()?;
 
             match self.term.read_key()? {
-                Key::Char('\u{15}') => self.handle_ctrl_u()?,
-                Key::Char('\u{17}') => self.handle_ctrl_w()?,
+                Key::Char(CTRL_U) => self.handle_ctrl_u()?,
+                Key::Char(CTRL_W) => self.handle_ctrl_w()?,
                 Key::Char(c) => self.handle_key(c)?,
                 Key::Backspace => self.handle_backspace()?,
                 Key::ArrowLeft => self.handle_arrow_left()?,
@@ -143,10 +146,11 @@ impl<'a> Input<'a> {
     }
 
     fn handle_ctrl_w(&mut self) -> io::Result<()> {
-        let slice = &self.input[0..self.cursor].trim_end();
+        let slice = &self.input[0..self.cursor]
+            .trim_end_matches(|c: char| c.is_ascii_punctuation() || c.is_ascii_whitespace());
         let offset = slice
             .char_indices()
-            .rfind(|&(_, x)| x == ' ')
+            .rfind(|&(_, x)| x.is_ascii_punctuation() || x.is_ascii_whitespace())
             .map(|(i, _)| i)
             .unwrap_or(0);
 
