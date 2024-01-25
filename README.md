@@ -47,12 +47,6 @@ fn main() {
 }
 ```
 
-## Text
-
-Multi-line text input.
-
-TODO
-
 ## Select
 
 Select from a list of options.
