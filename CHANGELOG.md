@@ -20,6 +20,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.0.0
 - Add changelog via git-cliff (#29)
 - Align and update examples (#14)
 
