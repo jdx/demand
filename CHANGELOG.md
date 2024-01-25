@@ -12,6 +12,7 @@
 
 ### Features
 
+- Spinner - expose SpinnerStyle and add example (#28)
 - Input - add support for ctrl+w and ctrl-u (#27)
 - Add tests to verify initial rendering (#25)
 - Add themes dracula, catppuccin, base16 (#19)
@@ -19,7 +20,7 @@
 
 ### Miscellaneous Tasks
 
-- Add changelog via git-cliff
+- Add changelog via git-cliff (#29)
 - Align and update examples (#14)
 
 ## [0.4.0] - 2024-01-18
