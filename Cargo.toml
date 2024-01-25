@@ -11,7 +11,7 @@ keywords = ["cli", "prompt", "console"]
 [dependencies]
 console = "0.15.8"
 once_cell = "1.19.0"
-termcolor = "1.4.1"
+termcolor = "1.1"
 
 [dev-dependencies]
 ctor = "0.2.6"
