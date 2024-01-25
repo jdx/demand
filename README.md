@@ -187,3 +187,8 @@ Default if colors are enabled in the console.
 Default if colors are NOT enabled in the console.
 
 ![new](./assets/themes/new.gif)
+
+## "demand"
+
+The name of this library is inspired by a great [mistranslation](https://www.bbc.com/culture/article/20150202-the-greatest-mistranslations-ever)
+that soured US-French relations in 1830. In French, the verb "demander" means "to ask".
