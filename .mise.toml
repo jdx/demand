@@ -1,6 +1,7 @@
 [tools]
 "cargo:cargo-tarpaulin" = "0.27.3"
 "cargo:git-cliff" = "1.4.0"
+"cargo:cargo-release" = "0.25.4"
 
 [tasks.changelog]
 description = "Generate changelog"
@@ -41,3 +42,6 @@ run = [
   "cargo fmt -- --check",
   "cargo test --lib --tests"
 ]
+
+[tasks.release]
+run = 'cargo release'

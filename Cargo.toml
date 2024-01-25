@@ -16,3 +16,9 @@ termcolor = "1.4.1"
 [dev-dependencies]
 ctor = "0.2.6"
 indoc = "2.0.4"
+
+[package.metadata.release]
+allow-branch = ["main"]
+sign-tag = true
+sign-commit = true
+pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{version}}" ]
