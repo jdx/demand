@@ -7,7 +7,7 @@
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/jdx/demand/test.yml)](https://github.com/jdx/demand/actions/workflows/test.yml)
 [![GitHub issues](https://img.shields.io/github/issues/jdx/demand)](http://github.com/jdx/demand/issues)
 
-A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracelet/huh).
+A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracelet/huh). Maintained by [@jdx](https://github.com/jdx) and [@roele](https://github.com/roele).
 
 ## Input
 
