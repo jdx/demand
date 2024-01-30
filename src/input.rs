@@ -214,7 +214,7 @@ impl<'a> Input<'a> {
 
         out.set_color(&self.theme.title)?;
         match self.inline {
-            true => write!(out, "{}", self.title)?,
+            true => write!(out, " {}", self.title)?,
             false => writeln!(out, " {}", self.title)?,
         }
 
@@ -229,7 +229,7 @@ impl<'a> Input<'a> {
         out.set_color(&self.theme.input_prompt)?;
         if !self.prompt.is_empty() {
             match self.inline {
-                true => write!(out, ">")?,
+                true => write!(out, "{}", self.prompt)?,
                 false => write!(out, " {}", self.prompt)?,
             }
         } else {
@@ -340,6 +340,20 @@ mod tests {
 
         assert_eq!(
             " Title\n > Placeholder",
+            without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_inline() {
+        let mut input = Input::new("Title?")
+            .description("Description.")
+            .prompt("Prompt:")
+            .placeholder("Placeholder")
+            .inline(true);
+
+        assert_eq!(
+            " Title?Description.Prompt:Placeholder",
             without_ansi(input.render().unwrap().as_str())
         );
     }
