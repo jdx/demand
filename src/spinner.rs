@@ -8,7 +8,7 @@ use console::Term;
 use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{theme, Theme};
+use crate::{common, theme, Theme};
 
 /// Show a spinner
 ///
@@ -36,6 +36,7 @@ pub struct Spinner<'a> {
     term: Term,
     frame: usize,
     height: usize,
+    overflow: usize,
 }
 
 impl<'a> Spinner<'a> {
@@ -48,6 +49,7 @@ impl<'a> Spinner<'a> {
             term: Term::stderr(),
             frame: 0,
             height: 0,
+            overflow: 0,
         }
     }
 
@@ -76,7 +78,6 @@ impl<'a> Spinner<'a> {
         loop {
             self.clear()?;
             let output = self.render()?;
-            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             sleep(self.style.fps);
             if handle.is_finished() {
@@ -84,6 +85,7 @@ impl<'a> Spinner<'a> {
                 self.term.show_cursor()?;
                 break;
             }
+            self.update_height(output)?;
         }
         Ok(())
     }
@@ -107,7 +109,15 @@ impl<'a> Spinner<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    fn update_height(&mut self, output: String) -> io::Result<()> {
+        let (height, overflow) = common::get_height(&self.term, output);
+        self.height = height;
+        self.overflow = overflow;
+        Ok(())
+    }
+
     fn clear(&mut self) -> io::Result<()> {
+        self.term.move_cursor_up(self.overflow)?;
         self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;

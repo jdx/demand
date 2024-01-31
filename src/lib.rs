@@ -9,6 +9,7 @@ pub use spinner::Spinner;
 pub use spinner::SpinnerStyle;
 pub use theme::Theme;
 
+mod common;
 mod confirm;
 mod input;
 mod multiselect;
