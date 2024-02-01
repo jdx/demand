@@ -1,7 +1,7 @@
 use demand::Input;
 
 fn main() {
-    let not_empty_min_8 = |s: &str| {
+    let notempty_minlen = |s: &str| {
         if s.is_empty() {
             return Err("Name cannot be empty");
         }
@@ -15,7 +15,7 @@ fn main() {
         .description("We'll use this to personalize your experience.")
         .placeholder("Enter your name")
         .prompt("Name: ")
-        .validation(not_empty_min_8);
+        .validation(notempty_minlen);
     let i = t.run().expect("error running input");
     println!("Input: {}", i);
 }
