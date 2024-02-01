@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use console::{Key, Term};
+use console::{measure_text_width, Key, Term};
 use termcolor::{Buffer, WriteColor};
 
 use crate::{theme, Theme};
@@ -134,34 +134,38 @@ impl<'a> Input<'a> {
     }
 
     fn handle_key(&mut self, c: char) -> io::Result<()> {
-        self.input.insert(self.cursor, c);
+        let idx = self.get_char_idx(&self.input, self.cursor);
+        self.input.insert(idx, c);
         self.cursor += 1;
         Ok(())
     }
 
     fn handle_ctrl_u(&mut self) -> io::Result<()> {
-        self.input.replace_range(..self.cursor, "");
+        let idx = self.get_char_idx(&self.input, self.cursor);
+        self.input.replace_range(..idx, "");
         self.cursor = 0;
         Ok(())
     }
 
     fn handle_ctrl_w(&mut self) -> io::Result<()> {
-        let slice = &self.input[0..self.cursor]
-            .trim_end_matches(|c: char| c.is_ascii_punctuation() || c.is_ascii_whitespace());
+        let idx = self.get_char_idx(&self.input, self.cursor);
+        let slice = &self.input[0..idx];
         let offset = slice
+            .trim_end_matches(|c: char| c.is_ascii_punctuation() || c.is_ascii_whitespace())
             .char_indices()
             .rfind(|&(_, x)| x.is_ascii_punctuation() || x.is_ascii_whitespace())
             .map(|(i, _)| i)
             .unwrap_or(0);
-
         let from = match offset > 0 {
             true => offset + 1,
             false => offset,
         };
-        self.input.replace_range(from..self.cursor, "");
+        let len = measure_text_width(&self.input[from..idx]);
+
+        self.input.replace_range(from..idx, "");
 
         match offset > 0 {
-            true => self.cursor = self.cursor - (self.cursor - from),
+            true => self.cursor -= len,
             false => self.cursor = 0,
         }
         Ok(())
@@ -170,7 +174,8 @@ impl<'a> Input<'a> {
     fn handle_backspace(&mut self) -> io::Result<()> {
         let chars_count = self.input.chars().count();
         if chars_count > 0 && self.cursor > 0 {
-            self.input.remove(self.cursor - 1);
+            let idx = self.get_char_idx(&self.input, self.cursor - 1);
+            self.input.remove(idx);
         }
         if self.cursor > 0 {
             self.cursor -= 1;
@@ -264,6 +269,14 @@ impl<'a> Input<'a> {
         writeln!(out, " {}", &self.render_input()?.to_string())?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn get_char_idx(&self, input: &str, cursor: usize) -> usize {
+        input
+            .char_indices()
+            .nth(cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input.len())
     }
 
     fn set_cursor(&mut self) -> io::Result<()> {
