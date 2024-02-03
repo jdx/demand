@@ -6,7 +6,7 @@ use std::{
 use console::{measure_text_width, Key, Term};
 use termcolor::{Buffer, WriteColor};
 
-use crate::{theme, Theme};
+use crate::{common, theme, Theme};
 
 /// Single line text input
 ///
@@ -41,6 +41,7 @@ pub struct Input<'a> {
 
     cursor: usize,
     height: usize,
+    overflow: usize,
     term: Term,
     err: Option<String>,
 }
@@ -65,6 +66,7 @@ impl<'a> Input<'a> {
             validation: |_| Ok(()),
             cursor: 0,
             height: 0,
+            overflow: 0,
             term: Term::stderr(),
             err: None,
         }
@@ -130,8 +132,6 @@ impl<'a> Input<'a> {
         loop {
             self.clear()?;
             let output = self.render()?;
-
-            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.set_cursor()?;
@@ -150,6 +150,7 @@ impl<'a> Input<'a> {
                     self.clear_err()?;
                     self.validate()?;
                     if self.err.is_none() {
+                        self.update_height(output)?;
                         return self.handle_submit();
                     }
                 }
@@ -158,6 +159,8 @@ impl<'a> Input<'a> {
             if key != Key::Enter {
                 self.clear_err()?;
             }
+
+            self.update_height(output)?;
         }
     }
 
@@ -320,6 +323,13 @@ impl<'a> Input<'a> {
             .unwrap_or(self.input.len())
     }
 
+    fn update_height(&mut self, output: String) -> io::Result<()> {
+        let (height, overflow) = common::get_height(&self.term, output);
+        self.height = height;
+        self.overflow = overflow;
+        Ok(())
+    }
+
     fn set_cursor(&mut self) -> io::Result<()> {
         if !self.placeholder.is_empty() && self.input.is_empty() {
             self.term
@@ -359,6 +369,7 @@ impl<'a> Input<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
+        self.term.move_cursor_up(self.overflow)?;
         self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;

@@ -4,8 +4,8 @@ use std::io::Write;
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
-use crate::theme;
 use crate::theme::Theme;
+use crate::{common, theme};
 
 /// Select multiple options from a list
 ///
@@ -34,6 +34,7 @@ pub struct Confirm<'a> {
     pub selected: bool,
     term: Term,
     height: usize,
+    overflow: usize,
 }
 
 impl<'a> Confirm<'a> {
@@ -48,6 +49,7 @@ impl<'a> Confirm<'a> {
             negative: "No".to_string(),
             selected: true,
             height: 0,
+            overflow: 0,
         }
     }
 
@@ -88,7 +90,6 @@ impl<'a> Confirm<'a> {
         loop {
             self.clear()?;
             let output = self.render()?;
-            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             match self.term.read_key()? {
@@ -96,17 +97,22 @@ impl<'a> Confirm<'a> {
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
                 Key::Char(c) if c == affirmative_char => {
                     self.selected = true;
+                    self.update_height(output)?;
                     return self.handle_submit();
                 }
                 Key::Char(c) if c == negative_char => {
                     self.selected = false;
+                    self.update_height(output)?;
                     return self.handle_submit();
                 }
                 Key::Enter => {
+                    self.update_height(output)?;
                     return self.handle_submit();
                 }
                 _ => {}
             }
+
+            self.update_height(output)?;
         }
     }
 
@@ -193,7 +199,15 @@ impl<'a> Confirm<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    fn update_height(&mut self, output: String) -> io::Result<()> {
+        let (height, overflow) = common::get_height(&self.term, output);
+        self.height = height;
+        self.overflow = overflow;
+        Ok(())
+    }
+
     fn clear(&mut self) -> io::Result<()> {
+        self.term.move_cursor_up(self.overflow)?;
         self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
