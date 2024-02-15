@@ -11,7 +11,9 @@ A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracel
 
 ## Input
 
-Single-line text input.
+* Single-line text input with variable prompt and placeholder
+* Auto-complete suggestions with `TAB`
+* Validate input with a custom closure
 
 Run example with [`cargo run --example input`](./examples/input.rs).
 
@@ -35,11 +37,23 @@ fn main() {
         .description("We'll use this to personalize your experience.")
         .placeholder("Enter your name")
         .prompt("Name: ")
+        .suggestions(vec![
+            "Adam Grant",
+            "Danielle Steel",
+            "Eveline Widmer-Schlumpf",
+            "Robert De Niro",
+            "Ronaldo Rodrigues de Jesus",
+            "Sarah Michelle Gellar",
+            "Yael Naim",
+            "Zack Snyder",
+        ])
         .validation(notempty_minlen);
     let i = t.run().expect("error running input");
     println!("Input: {}", i);
 }
 ```
+
+### Password
 
 Run example with [`cargo run --example input-password`](./examples/input-password.rs).
 

@@ -15,6 +15,16 @@ fn main() {
         .description("We'll use this to personalize your experience.")
         .placeholder("Enter your name")
         .prompt("Name: ")
+        .suggestions(vec![
+            "Adam Grant",
+            "Danielle Steel",
+            "Eveline Widmer-Schlumpf",
+            "Robert De Niro",
+            "Ronaldo Rodrigues de Jesus",
+            "Sarah Michelle Gellar",
+            "Yael Naim",
+            "Zack Snyder",
+        ])
         .validation(notempty_minlen);
     let i = t.run().expect("error running input");
     println!("Input: {}", i);

@@ -72,10 +72,9 @@ Show
 Type "target/debug/examples/input" Enter
 Sleep 2s
 Enter Sleep 1s
-Type "Joe Doe" Sleep 1s
-Enter Sleep 1s
-Left 4
-Backspace 3
-Type "Jane" Sleep 1s
+Type "Rob" Sleep 1s
+Backspace 1 Sleep 1s
+Type "n" Sleep 1s
+Tab Sleep 1s
 Enter
 Sleep 2s
