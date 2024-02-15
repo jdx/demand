@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.2] - 2024-02-01
+
+### Bug Fixes
+
+- Input - panics if charaters with more than one unicode points are used (#37)
+- Input - always renders default prompt if inline (#33)
+
+### Features
+
+- Add input validation (#34)
+
+### Miscellaneous Tasks
+
+- Update README.md
+
+## [1.0.1] - 2024-01-25
+
+### Miscellaneous Tasks
+
+- Release demand version 1.0.1
+
 ## [1.0.0] - 2024-01-25
 
 ### Bug Fixes
