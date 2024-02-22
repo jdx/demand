@@ -28,6 +28,8 @@ pub struct Input<'a> {
     pub prompt: String,
     /// A placeholder to display in the input
     pub placeholder: String,
+    /// A list of suggestions to autocomplete from
+    pub suggestions: Vec<&'a str>,
     /// Show the input inline
     pub inline: bool,
     /// Whether to mask the input
@@ -39,10 +41,12 @@ pub struct Input<'a> {
     /// Validation function
     pub validation: fn(&str) -> Result<(), &str>,
 
+    // Internal state
     cursor: usize,
     height: usize,
     term: Term,
     err: Option<String>,
+    suggestion: Option<String>,
 }
 
 const CTRL_U: char = '\u{15}';
@@ -56,17 +60,21 @@ impl<'a> Input<'a> {
         Self {
             title: title.into(),
             description: String::new(),
-            placeholder: String::new(),
             prompt: "> ".to_string(),
+            placeholder: String::new(),
+            suggestions: vec![],
             input: String::new(),
             inline: false,
             password: false,
             theme: &*theme::DEFAULT,
             validation: |_| Ok(()),
+
+            // Internal state
             cursor: 0,
             height: 0,
             term: Term::stderr(),
             err: None,
+            suggestion: None,
         }
     }
 
@@ -99,6 +107,12 @@ impl<'a> Input<'a> {
     /// The placeholder is displayed in the input before the user enters any text
     pub fn placeholder(mut self, placeholder: &str) -> Self {
         self.placeholder = placeholder.to_string();
+        self
+    }
+
+    // Sets the suggestions of the input
+    pub fn suggestions(mut self, suggestions: Vec<&'static str>) -> Self {
+        self.suggestions = suggestions;
         self
     }
 
@@ -153,11 +167,13 @@ impl<'a> Input<'a> {
                         return self.handle_submit();
                     }
                 }
+                Key::Tab => self.handle_tab()?,
                 _ => {}
             }
             if key != Key::Enter {
                 self.clear_err()?;
             }
+            self.suggest()?;
         }
     }
 
@@ -235,6 +251,14 @@ impl<'a> Input<'a> {
         Ok(())
     }
 
+    fn handle_tab(&mut self) -> io::Result<()> {
+        if self.suggestion.is_some() {
+            self.input.push_str(self.suggestion.as_ref().unwrap());
+            self.cursor = self.input.chars().count();
+        }
+        Ok(())
+    }
+
     fn handle_submit(mut self) -> io::Result<String> {
         self.clear()?;
         let output = self.render_success()?;
@@ -276,6 +300,12 @@ impl<'a> Input<'a> {
 
         write!(out, "{}", &self.render_input()?)?;
 
+        if self.suggestion.is_some() {
+            out.set_color(&self.theme.input_placeholder)?;
+            write!(out, "{}", self.suggestion.as_ref().unwrap())?;
+            out.reset()?;
+        }
+
         if self.err.is_some() {
             out.set_color(&self.theme.error_indicator)?;
             writeln!(out)?;
@@ -305,6 +335,27 @@ impl<'a> Input<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    fn suggest(&mut self) -> io::Result<()> {
+        if self.input.is_empty() {
+            self.suggestion = None;
+            return Ok(());
+        }
+        self.suggestion = self
+            .suggestions
+            .clone()
+            .into_iter()
+            .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
+            .and_then(|s| {
+                let suggestion = s[self.input.len()..].to_string();
+                if !suggestion.is_empty() {
+                    Some(suggestion)
+                } else {
+                    None
+                }
+            });
+        Ok(())
+    }
+
     fn validate(&mut self) -> io::Result<()> {
         self.err = (self.validation)(&self.input)
             .map_err(|err| err.to_string())
@@ -321,11 +372,18 @@ impl<'a> Input<'a> {
     }
 
     fn set_cursor(&mut self) -> io::Result<()> {
+        // if we have a placeholer, move the cursor left to beginning of the input
         if !self.placeholder.is_empty() && self.input.is_empty() {
             self.term
                 .move_cursor_left(self.placeholder.chars().count())?;
         } else {
             self.term.move_cursor_left(self.input.chars().count())?;
+        }
+
+        // if we have a suggestion, move the cursor left to end of the input
+        if self.suggestion.is_some() {
+            self.term
+                .move_cursor_left(self.suggestion.as_ref().unwrap().chars().count())?;
         }
 
         // if there is an error, move the cursor up from error message and right to the input
