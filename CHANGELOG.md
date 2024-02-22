@@ -1,6 +1,17 @@
 # Changelog
 
-## [1.0.2] - 2024-02-01
+## [1.1.0] - 2024-02-22
+
+### Features
+
+- Add input autocompletion (#39)
+
+### Miscellaneous Tasks
+
+- Update example gifs
+- Remove unnecessary println statements from examples
+
+## [1.0.2] - 2024-02-15
 
 ### Bug Fixes
 
@@ -13,6 +24,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.0.2
 - Update README.md
 
 ## [1.0.1] - 2024-01-25
