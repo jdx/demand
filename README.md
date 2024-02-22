@@ -49,7 +49,6 @@ fn main() {
         ])
         .validation(notempty_minlen);
     let i = t.run().expect("error running input");
-    println!("Input: {}", i);
 }
 ```
 
@@ -68,7 +67,6 @@ fn main() {
         .prompt("Password: ")
         .password(true);
     let i = t.run().expect("error running input");
-    println!("Password: {}", i);
 }
 ```
 
@@ -140,7 +138,6 @@ fn main() {
         .affirmative("Yes!")
         .negative("No.");
     let yes = ms.run().expect("error running confirm");
-    println!("yes: {}", yes);
 }
 ```
 
@@ -163,7 +160,6 @@ fn main() {
             sleep(Duration::from_secs(2));
         })
         .expect("error running spinner");
-    println!("Done!");
 }
 ```
 

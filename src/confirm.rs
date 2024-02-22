@@ -17,7 +17,6 @@ use crate::theme::Theme;
 ///   .affirmative("Yes!")
 ///   .negative("No.");
 /// let yes = confirm.run().expect("error running confirm");
-/// println!("yes: {}", yes);
 /// ```
 pub struct Confirm<'a> {
     /// The title of the selector

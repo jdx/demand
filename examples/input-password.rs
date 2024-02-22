@@ -6,5 +6,4 @@ fn main() {
         .prompt("Password: ")
         .password(true);
     let i = t.run().expect("error running input");
-    println!("Password: {}", i);
 }

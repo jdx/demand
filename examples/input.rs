@@ -27,5 +27,4 @@ fn main() {
         ])
         .validation(notempty_minlen);
     let i = t.run().expect("error running input");
-    println!("Input: {}", i);
 }
