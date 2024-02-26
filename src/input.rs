@@ -192,6 +192,11 @@ impl<'a> Input<'a> {
     }
 
     fn handle_ctrl_w(&mut self) -> io::Result<()> {
+        // is masked, delete whole line to not reveal whitespace
+        if self.password {
+            self.handle_ctrl_u()?;
+            return Ok(());
+        }
         let idx = self.get_char_idx(&self.input, self.cursor);
         let slice = &self.input[0..idx];
         let offset = slice
