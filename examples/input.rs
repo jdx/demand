@@ -26,5 +26,5 @@ fn main() {
             "Zack Snyder",
         ])
         .validation(notempty_minlen);
-    let i = t.run().expect("error running input");
+    t.run().expect("error running input");
 }

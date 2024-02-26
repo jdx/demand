@@ -5,5 +5,5 @@ fn main() {
         .description("This will do a thing.")
         .affirmative("Yes!")
         .negative("No.");
-    let yes = ms.run().expect("error running confirm");
+    ms.run().expect("error running confirm");
 }

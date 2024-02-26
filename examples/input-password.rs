@@ -5,5 +5,5 @@ fn main() {
         .placeholder("Enter password")
         .prompt("Password: ")
         .password(true);
-    let i = t.run().expect("error running input");
+    t.run().expect("error running input");
 }
