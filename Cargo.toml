@@ -15,7 +15,7 @@ termcolor = "1.1"
 
 [dev-dependencies]
 ctor = "0.2.7"
-indoc = "2.0.4"
+indoc = "2.0.5"
 
 [package.metadata.release]
 allow-branch = ["main"]
