@@ -26,7 +26,7 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Nutella"));
 /// let topping = select.run().expect("error running multi select");
 /// ```
-pub struct Select<'a, T: Display> {
+pub struct Select<'a, T> {
     /// The title of the selector
     pub title: String,
     /// The colors/style of the selector
@@ -48,7 +48,7 @@ pub struct Select<'a, T: Display> {
     capacity: usize,
 }
 
-impl<'a, T: Display> Select<'a, T> {
+impl<'a, T> Select<'a, T> {
     /// Create a new select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         let mut s = Select {
@@ -136,7 +136,7 @@ impl<'a, T: Display> Select<'a, T> {
                         self.term.show_cursor()?;
                         let id = self.visible_options().get(self.cursor).unwrap().id;
                         let selected = self.options.iter().find(|o| o.id == id).unwrap();
-                        let output = self.render_success(&selected.item.to_string())?;
+                        let output = self.render_success(&selected.label)?;
                         let selected = self.options.into_iter().find(|o| o.id == id).unwrap();
                         self.term.write_all(output.as_bytes())?;
                         return Ok(selected.item);
@@ -353,6 +353,48 @@ mod tests {
                  Brazil
                  Canada
                  Mexico
+
+              ↑/↓/k/j up/down • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn non_display() {
+        struct Thing {
+            num: u32,
+            thing: Option<()>,
+        }
+        let things = [
+            Thing {
+                num: 1,
+                thing: Some(()),
+            },
+            Thing {
+                num: 2,
+                thing: None,
+            },
+        ];
+        let select = Select::new("things").description("pick a thing").options(
+            things
+                .iter()
+                .enumerate()
+                .map(|(i, t)| {
+                    if i == 0 {
+                        DemandOption::with_label("First", t).selected(true)
+                    } else {
+                        DemandOption::new(t.num).item(t)
+                    }
+                })
+                .collect(),
+        );
+        assert_eq!(
+            indoc! {
+              " things
+               pick a thing
+               > First
+                 2
 
               ↑/↓/k/j up/down • enter confirm"
             },
