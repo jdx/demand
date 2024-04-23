@@ -29,7 +29,7 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Nutella"));
 /// let toppings = multiselect.run().expect("error running multi select");
 /// ```
-pub struct MultiSelect<'a, T: Display> {
+pub struct MultiSelect<'a, T> {
     /// The title of the selector
     pub title: String,
     /// The colors/style of the selector
@@ -55,7 +55,7 @@ pub struct MultiSelect<'a, T: Display> {
     capacity: usize,
 }
 
-impl<'a, T: Display> MultiSelect<'a, T> {
+impl<'a, T> MultiSelect<'a, T> {
     /// Create a new multi select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         let mut ms = MultiSelect {
@@ -468,6 +468,55 @@ mod tests {
               [ ] Cheese
               [ ] Vegan Cheese
               [ ] Nutella
+
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
+            },
+            without_ansi(select.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn non_display() {
+        struct Thing {
+            num: u32,
+            thing: Option<()>,
+        }
+        let things = [
+            Thing {
+                num: 1,
+                thing: Some(()),
+            },
+            Thing {
+                num: 2,
+                thing: None,
+            },
+            Thing {
+                num: 3,
+                thing: None,
+            },
+        ];
+        let select = MultiSelect::new("things")
+            .description("pick a thing")
+            .options(
+                things
+                    .iter()
+                    .enumerate()
+                    .map(|(i, t)| {
+                        if i == 0 {
+                            DemandOption::with_label("First", t)
+                        } else {
+                            DemandOption::new(t.num).item(t).selected(true)
+                        }
+                    })
+                    .collect(),
+            );
+        assert_eq!(
+            indoc! {
+              " things
+             pick a thing
+             >[ ] First
+              [•] 2
+              [•] 3
 
             ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
             },

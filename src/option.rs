@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicUsize;
 
 /// An individual option in a select or multi-select.
 #[derive(Debug, Clone)]
-pub struct DemandOption<T: Display> {
+pub struct DemandOption<T> {
     /// Unique ID for this option.
     pub(crate) id: usize,
     /// The item this option represents.
@@ -14,8 +14,8 @@ pub struct DemandOption<T: Display> {
     pub selected: bool,
 }
 
-impl<T: Display> DemandOption<T> {
-    /// Create a new option with the given key.
+impl<T: ToString> DemandOption<T> {
+    /// Create a new option with the item as the label
     pub fn new(item: T) -> Self {
         static ID: AtomicUsize = AtomicUsize::new(0);
         Self {
@@ -25,7 +25,27 @@ impl<T: Display> DemandOption<T> {
             selected: false,
         }
     }
+}
 
+impl<T> DemandOption<T> {
+    /// Create a new option with a label and item
+    pub fn with_label<S: Into<String>>(label: S, item: T) -> Self {
+        static ID: AtomicUsize = AtomicUsize::new(0);
+        Self {
+            id: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            label: label.into(),
+            item,
+            selected: false,
+        }
+    }
+    pub fn item<I>(self, item: I) -> DemandOption<I> {
+        DemandOption {
+            id: self.id,
+            item,
+            label: self.label,
+            selected: self.selected,
+        }
+    }
     /// Set the display label for this option.
     pub fn label(mut self, name: &str) -> Self {
         self.label = name.to_string();

@@ -64,28 +64,30 @@ impl<'a> Spinner<'a> {
     }
 
     /// Displays the dialog to the user and returns their response
-    pub fn run<F>(mut self, func: F) -> io::Result<()>
+    pub fn run<'scope, F, T>(mut self, func: F) -> io::Result<T>
     where
-        F: Fn() + Send + 'static,
+        F: FnOnce() -> T + Send + 'scope,
+        T: Send + 'scope,
     {
-        let handle = std::thread::spawn(move || {
-            func();
-        });
-
-        self.term.hide_cursor()?;
-        loop {
-            self.clear()?;
-            let output = self.render()?;
-            self.height = output.lines().count() - 1;
-            self.term.write_all(output.as_bytes())?;
-            sleep(self.style.fps);
-            if handle.is_finished() {
+        std::thread::scope(|s| {
+            let handle = s.spawn(func);
+            self.term.hide_cursor()?;
+            loop {
                 self.clear()?;
-                self.term.show_cursor()?;
-                break;
+                let output = self.render()?;
+                self.height = output.lines().count();
+                self.term.write_all(output.as_bytes())?;
+                sleep(self.style.fps);
+                if handle.is_finished() {
+                    self.clear()?;
+                    self.term.show_cursor()?;
+                    break;
+                }
             }
-        }
-        Ok(())
+            handle.join().map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("thread panicked: {e:?}"))
+            })
+        })
     }
 
     /// Render the spinner and return the output
@@ -216,5 +218,26 @@ mod test {
                 );
             }
         }
+    }
+
+    #[test]
+    fn scope_test() {
+        let spinner = Spinner::new("Scoped");
+        let mut a = [1, 2, 3];
+        let mut i = 0;
+        let out = spinner
+            .run(|| {
+                for n in &mut a {
+                    if i == 1 {
+                        *n = 5;
+                    }
+                    i += 1;
+                    std::thread::sleep(Duration::from_millis(*n));
+                }
+                i * 5
+            })
+            .unwrap();
+        assert_eq!(a, [1, 5, 3]);
+        assert_eq!(out, 15);
     }
 }
