@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::io;
 use std::io::Write;
 
@@ -364,16 +363,16 @@ mod tests {
     fn non_display() {
         struct Thing {
             num: u32,
-            thing: Option<()>,
+            _thing: Option<()>,
         }
         let things = [
             Thing {
                 num: 1,
-                thing: Some(()),
+                _thing: Some(()),
             },
             Thing {
                 num: 2,
-                thing: None,
+                _thing: None,
             },
         ];
         let select = Select::new("things").description("pick a thing").options(
