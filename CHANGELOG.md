@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.1] - 2024-04-23
+
+### Bug Fixes
+
+- Clippy warnings
+- Do not reveal whitespace when masked (#42)
+- Remove unused variables from examples
+
+### Features
+
+- DemandOption no longer requires item to impl Display, Select and MultiSelect trait bounds updated to reflect that (#47)
+
 ## [1.1.0] - 2024-02-22
 
 ### Features
@@ -8,6 +20,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.1.0
 - Update example gifs
 - Remove unnecessary println statements from examples
 
@@ -88,4 +101,5 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
+
 
