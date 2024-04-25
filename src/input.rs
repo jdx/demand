@@ -377,7 +377,7 @@ impl<'a> Input<'a> {
     }
 
     fn set_cursor(&mut self) -> io::Result<()> {
-        // if we have a placeholer, move the cursor left to beginning of the input
+        // if we have a placeholder, move the cursor left to beginning of the input
         if !self.placeholder.is_empty() && self.input.is_empty() {
             self.term
                 .move_cursor_left(self.placeholder.chars().count())?;

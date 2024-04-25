@@ -75,7 +75,7 @@ impl<'a> Spinner<'a> {
             loop {
                 self.clear()?;
                 let output = self.render()?;
-                self.height = output.lines().count();
+                self.height = output.lines().count() - 1;
                 self.term.write_all(output.as_bytes())?;
                 sleep(self.style.fps);
                 if handle.is_finished() {
@@ -110,8 +110,11 @@ impl<'a> Spinner<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_to_end_of_screen()?;
-        self.term.clear_last_lines(self.height)?;
+        if self.height == 0 {
+            self.term.clear_line()?;
+        } else {
+            self.term.clear_last_lines(self.height)?;
+        }
         self.height = 0;
         Ok(())
     }
