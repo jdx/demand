@@ -6,6 +6,7 @@ pub use multiselect::MultiSelect;
 pub use option::DemandOption;
 pub use select::Select;
 pub use spinner::Spinner;
+pub use spinner::SpinnerAction;
 pub use spinner::SpinnerStyle;
 pub use theme::Theme;
 

@@ -1,5 +1,6 @@
 use std::{
     io::{self, Write},
+    sync::mpsc::{self, Sender, TryRecvError},
     thread::sleep,
     time::Duration,
 };
@@ -8,7 +9,19 @@ use console::Term;
 use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{theme, Theme};
+use crate::Theme;
+
+/// tell a prompt to do something while running
+/// currently its only useful for spinner
+/// but that could change
+pub enum SpinnerAction {
+    /// change the theme
+    Theme(Box<Theme>),
+    /// change the style
+    Style(SpinnerStyle),
+    /// change the title
+    Title(String),
+}
 
 /// Show a spinner
 ///
@@ -25,26 +38,26 @@ use crate::{theme, Theme};
 ///    })
 ///   .expect("error running spinner");
 /// ```
-pub struct Spinner<'a> {
+pub struct Spinner {
     // The title of the spinner
     pub title: String,
     // The style of the spinner
-    pub style: &'a SpinnerStyle,
+    pub style: SpinnerStyle,
     /// The colors/style of the spinner
-    pub theme: &'a Theme,
+    pub theme: Theme,
 
     term: Term,
     frame: usize,
     height: usize,
 }
 
-impl<'a> Spinner<'a> {
+impl Spinner {
     /// Create a new spinner with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
-            style: &DEFAULT,
-            theme: &theme::DEFAULT,
+            style: SpinnerStyle::line(),
+            theme: Theme::default(),
             term: Term::stderr(),
             frame: 0,
             height: 0,
@@ -52,13 +65,13 @@ impl<'a> Spinner<'a> {
     }
 
     /// Set the style of the spinner
-    pub fn style(mut self, style: &'a SpinnerStyle) -> Self {
+    pub fn style(mut self, style: SpinnerStyle) -> Self {
         self.style = style;
         self
     }
 
     /// Set the theme of the dialog
-    pub fn theme(mut self, theme: &'a Theme) -> Self {
+    pub fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
         self
     }
@@ -66,13 +79,27 @@ impl<'a> Spinner<'a> {
     /// Displays the dialog to the user and returns their response
     pub fn run<'scope, F, T>(mut self, func: F) -> io::Result<T>
     where
-        F: FnOnce() -> T + Send + 'scope,
+        F: FnOnce(Sender<SpinnerAction>) -> T + Send + 'scope,
         T: Send + 'scope,
     {
         std::thread::scope(|s| {
-            let handle = s.spawn(func);
+            let (sender, receiver) = mpsc::channel();
+            let handle = s.spawn(|| func(sender));
             self.term.hide_cursor()?;
             loop {
+                match receiver.try_recv() {
+                    Ok(a) => match a {
+                        SpinnerAction::Title(title) => self.title = title,
+                        SpinnerAction::Style(s) => self.style = s,
+                        SpinnerAction::Theme(theme) => self.theme = *theme,
+                    },
+                    Err(TryRecvError::Empty) => (),
+                    Err(TryRecvError::Disconnected) => {
+                        self.clear()?;
+                        self.term.show_cursor()?;
+                        break;
+                    }
+                }
                 self.clear()?;
                 let output = self.render()?;
                 self.height = output.lines().count();
@@ -210,7 +237,7 @@ mod test {
             SpinnerStyle::minidots(),
             SpinnerStyle::ellipsis(),
         ] {
-            let mut spinner = Spinner::new("Loading data...").style(&t);
+            let mut spinner = Spinner::new("Loading data...").style(t);
             for f in spinner.style.frames.clone().iter() {
                 assert_eq!(
                     format!("{} Loading data...", f),
@@ -226,7 +253,7 @@ mod test {
         let mut a = [1, 2, 3];
         let mut i = 0;
         let out = spinner
-            .run(|| {
+            .run(|_| {
                 for n in &mut a {
                     if i == 1 {
                         *n = 5;
