@@ -140,7 +140,7 @@ impl<'a> Input<'a> {
 
     /// Displays the input to the user and returns the response
     pub fn run(mut self) -> io::Result<String> {
-        self.term.show_cursor()?;
+        self.term.hide_cursor()?;
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -303,13 +303,7 @@ impl<'a> Input<'a> {
             out.reset()?;
         }
 
-        write!(out, "{}", &self.render_input()?)?;
-
-        if self.suggestion.is_some() {
-            out.set_color(&self.theme.input_placeholder)?;
-            write!(out, "{}", self.suggestion.as_ref().unwrap())?;
-            out.reset()?;
-        }
+        self.render_input(&mut out)?;
 
         if self.err.is_some() {
             out.set_color(&self.theme.error_indicator)?;
@@ -319,14 +313,55 @@ impl<'a> Input<'a> {
             out.reset()?;
         }
 
+        writeln!(out)?;
+        out.reset()?;
+
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    fn render_input(&mut self) -> io::Result<String> {
+    fn render_input(&mut self, out: &mut Buffer) -> io::Result<String> {
         let input = match self.password {
             true => self.input.chars().map(|_| '*').collect::<String>(),
             false => self.input.to_string(),
         };
+        let i = self.get_char_idx(&input, self.cursor);
+        write!(out, "{}", &input[..i])?;
+        if i < input.len() {
+            out.set_color(&self.theme.real_cursor_color(None))?;
+            write!(out, "{}", &input[i..i + 1])?;
+        }
+        if i + 1 < input.len() {
+            out.reset()?;
+            write!(out, "{}", &input[i + 1..])?;
+        }
+
+        if let Some(suggestion) = &self.suggestion {
+            if !suggestion.is_empty() {
+                if i >= input.len() {
+                    out.set_color(
+                        &self
+                            .theme
+                            .real_cursor_color(Some(&self.theme.input_placeholder)),
+                    )?;
+                    write!(out, "{}", &suggestion[..1])?;
+                    // if suggestion.len() > 1 {
+                    out.set_color(&self.theme.input_placeholder)?;
+                    write!(out, "{}", &suggestion[1..])?;
+                    // }
+                } else {
+                    out.set_color(&self.theme.input_placeholder)?;
+                    write!(out, "{suggestion}")?;
+                }
+                out.reset()?;
+            } else if i >= input.len() {
+                out.set_color(&self.theme.real_cursor_color(None))?;
+                write!(out, " ")?;
+            }
+        } else if i >= input.len() {
+            out.set_color(&self.theme.real_cursor_color(None))?;
+            write!(out, " ")?;
+        }
+
         Ok(input)
     }
 
@@ -335,7 +370,7 @@ impl<'a> Input<'a> {
         out.set_color(&self.theme.title)?;
         write!(out, " {}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
-        writeln!(out, " {}", &self.render_input()?.to_string())?;
+        self.render_input(&mut out)?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
