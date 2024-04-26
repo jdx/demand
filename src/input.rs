@@ -324,20 +324,20 @@ impl<'a> Input<'a> {
             true => self.input.chars().map(|_| '*').collect::<String>(),
             false => self.input.to_string(),
         };
-        let i = self.get_char_idx(&input, self.cursor);
-        write!(out, "{}", &input[..i])?;
-        if i < input.len() {
+        let cursor_idx = self.get_char_idx(&input, self.cursor);
+        write!(out, "{}", &input[..cursor_idx])?;
+        if cursor_idx < input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
-            write!(out, "{}", &input[i..i + 1])?;
+            write!(out, "{}", &input[cursor_idx..cursor_idx + 1])?;
         }
-        if i + 1 < input.len() {
+        if cursor_idx + 1 < input.len() {
             out.reset()?;
-            write!(out, "{}", &input[i + 1..])?;
+            write!(out, "{}", &input[cursor_idx + 1..])?;
         }
 
         if let Some(suggestion) = &self.suggestion {
             if !suggestion.is_empty() {
-                if i >= input.len() {
+                if cursor_idx >= input.len() {
                     out.set_color(
                         &self
                             .theme
@@ -353,11 +353,11 @@ impl<'a> Input<'a> {
                     write!(out, "{suggestion}")?;
                 }
                 out.reset()?;
-            } else if i >= input.len() {
+            } else if cursor_idx >= input.len() {
                 out.set_color(&self.theme.real_cursor_color(None))?;
                 write!(out, " ")?;
             }
-        } else if i >= input.len() {
+        } else if cursor_idx >= input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
             write!(out, " ")?;
         }
