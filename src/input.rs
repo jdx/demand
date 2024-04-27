@@ -370,7 +370,7 @@ impl<'a> Input<'a> {
         out.set_color(&self.theme.title)?;
         write!(out, " {}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
-        self.render_input(&mut out)?;
+        write!(out, "{}", self.input)?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
