@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.1] - 2024-04-23
+## [1.1.2] - 2024-04-27
 
 ### Bug Fixes
 
@@ -11,6 +11,10 @@
 ### Features
 
 - DemandOption no longer requires item to impl Display, Select and MultiSelect trait bounds updated to reflect that (#47)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.1.1
 
 ## [1.1.0] - 2024-02-22
 
@@ -101,5 +105,4 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
-
 
