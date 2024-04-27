@@ -110,7 +110,7 @@ impl<'a> Input<'a> {
         self
     }
 
-    // Sets the suggestions of the input
+    /// Sets the suggestions of the input
     pub fn suggestions(mut self, suggestions: Vec<&'static str>) -> Self {
         self.suggestions = suggestions;
         self
@@ -297,12 +297,6 @@ impl<'a> Input<'a> {
         }
         out.reset()?;
 
-        // if !self.placeholder.is_empty() && self.input.is_empty() {
-        //     out.set_color(&self.theme.input_placeholder)?;
-        //     write!(out, "{}", &self.placeholder)?;
-        //     out.reset()?;
-        // }
-
         self.render_input(&mut out)?;
 
         if self.err.is_some() {
@@ -362,10 +356,10 @@ impl<'a> Input<'a> {
                             .real_cursor_color(Some(&self.theme.input_placeholder)),
                     )?;
                     write!(out, "{}", &suggestion[..1])?;
-                    // if suggestion.len() > 1 {
-                    out.set_color(&self.theme.input_placeholder)?;
-                    write!(out, "{}", &suggestion[1..])?;
-                    // }
+                    if suggestion.len() > 1 {
+                        out.set_color(&self.theme.input_placeholder)?;
+                        write!(out, "{}", &suggestion[1..])?;
+                    }
                 } else {
                     out.set_color(&self.theme.input_placeholder)?;
                     write!(out, "{suggestion}")?;
@@ -390,7 +384,7 @@ impl<'a> Input<'a> {
         out.set_color(&self.theme.title)?;
         write!(out, " {}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
-        writeln!(out, "{}", self.input)?;
+        writeln!(out, " {}", self.input)?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
