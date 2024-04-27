@@ -499,7 +499,7 @@ mod tests {
             .placeholder("Placeholder");
 
         assert_eq!(
-            " Title\n Description\n $ Placeholder",
+            " Title\n Description\n $ Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -509,7 +509,7 @@ mod tests {
         let mut input = Input::new("Title");
 
         assert_eq!(
-            " Title\n > ",
+            " Title\n >  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -519,7 +519,7 @@ mod tests {
         let mut input = Input::new("Title").description("Description");
 
         assert_eq!(
-            " Title\n Description\n > ",
+            " Title\n Description\n >  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -529,7 +529,7 @@ mod tests {
         let mut input = Input::new("Title").prompt("$ ");
 
         assert_eq!(
-            " Title\n $ ",
+            " Title\n $  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -539,7 +539,7 @@ mod tests {
         let mut input = Input::new("Title").placeholder("Placeholder");
 
         assert_eq!(
-            " Title\n > Placeholder",
+            " Title\n > Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -553,7 +553,7 @@ mod tests {
             .inline(true);
 
         assert_eq!(
-            " Title?Description.Prompt:Placeholder",
+            " Title?Description.Prompt:Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -567,14 +567,14 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title\n Description\n > \n\n * Name cannot be empty",
+            " Title\n Description\n >  \n\n * Name cannot be empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
 
         input.input = "non empty".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title\n Description\n > non empty",
+            " Title\n Description\n > non empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -589,14 +589,14 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title?Description.> \n\n * Name cannot be empty",
+            " Title?Description.>  \n\n * Name cannot be empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
 
         input.input = "non empty".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title?Description.> non empty",
+            " Title?Description.> non empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
