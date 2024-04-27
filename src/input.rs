@@ -297,11 +297,11 @@ impl<'a> Input<'a> {
         }
         out.reset()?;
 
-        if !self.placeholder.is_empty() && self.input.is_empty() {
-            out.set_color(&self.theme.input_placeholder)?;
-            write!(out, "{}", &self.placeholder)?;
-            out.reset()?;
-        }
+        // if !self.placeholder.is_empty() && self.input.is_empty() {
+        //     out.set_color(&self.theme.input_placeholder)?;
+        //     write!(out, "{}", &self.placeholder)?;
+        //     out.reset()?;
+        // }
 
         self.render_input(&mut out)?;
 
@@ -324,6 +324,20 @@ impl<'a> Input<'a> {
             true => self.input.chars().map(|_| '*').collect::<String>(),
             false => self.input.to_string(),
         };
+        if !self.placeholder.is_empty() && self.input.is_empty() {
+            out.set_color(
+                &self
+                    .theme
+                    .real_cursor_color(Some(&self.theme.input_placeholder)),
+            )?;
+            write!(out, "{}", &self.placeholder[..1])?;
+            if self.placeholder.len() > 1 {
+                out.set_color(&self.theme.input_placeholder)?;
+                write!(out, "{}", &self.placeholder[1..])?;
+                out.reset()?;
+            }
+            return Ok(input);
+        }
         let cursor_idx = self.get_char_idx(&input, self.cursor);
         write!(out, "{}", &input[..cursor_idx])?;
         if cursor_idx < input.len() {
