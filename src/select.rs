@@ -303,6 +303,7 @@ impl<'a, T> Select<'a, T> {
                 write!(out, " {}", desc)?;
             }
         }
+        writeln!(out)?;
 
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
@@ -353,7 +354,8 @@ mod tests {
                  Canada
                  Mexico
 
-              ↑/↓/k/j up/down • enter confirm"
+              ↑/↓/k/j up/down • enter confirm
+              "
             },
             without_ansi(select.render().unwrap().as_str())
         );
@@ -395,7 +397,8 @@ mod tests {
                > First
                  2
 
-              ↑/↓/k/j up/down • enter confirm"
+              ↑/↓/k/j up/down • enter confirm
+              "
             },
             without_ansi(select.render().unwrap().as_str())
         );
