@@ -324,6 +324,7 @@ impl<'a> Input<'a> {
             true => self.input.chars().map(|_| '*').collect::<String>(),
             false => self.input.to_string(),
         };
+
         if !self.placeholder.is_empty() && self.input.is_empty() {
             out.set_color(
                 &self
@@ -338,11 +339,14 @@ impl<'a> Input<'a> {
             }
             return Ok(input);
         }
+
         let cursor_idx = self.get_char_idx(&input, self.cursor);
         write!(out, "{}", &input[..cursor_idx])?;
+
         if cursor_idx < input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
             write!(out, "{}", &input[cursor_idx..cursor_idx + 1])?;
+            out.reset()?;
         }
         if cursor_idx + 1 < input.len() {
             out.reset()?;
@@ -370,10 +374,12 @@ impl<'a> Input<'a> {
             } else if cursor_idx >= input.len() {
                 out.set_color(&self.theme.real_cursor_color(None))?;
                 write!(out, " ")?;
+                out.reset()?;
             }
         } else if cursor_idx >= input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
             write!(out, " ")?;
+            out.reset()?;
         }
 
         Ok(input)
