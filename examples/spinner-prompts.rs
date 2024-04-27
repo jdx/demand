@@ -8,14 +8,15 @@ fn main() {
                 .description("it says confirm")
                 .run()
                 .unwrap();
-            Input::new("input:")
+            Input::new("input ")
                 .description("go on say something")
                 .suggestions(vec!["hello there"])
                 .validation(|s| match !s.contains('j') {
                     true => Ok(()),
                     false => Err("ew stinky 'j' not welcome here"),
                 })
-                // .theme(&Theme::catppuccin())
+                .theme(&Theme::catppuccin())
+                .placeholder("Words go here")
                 .run()
                 .unwrap();
             Select::new("select")
