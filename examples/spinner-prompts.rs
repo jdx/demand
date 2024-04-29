@@ -3,7 +3,7 @@ use demand::{Confirm, DemandOption, Input, MultiSelect, Select, Spinner, Theme};
 fn main() {
     let spinner = Spinner::new("im out here");
     spinner
-        .run(|| {
+        .run(|_| {
             Confirm::new("confirm")
                 .description("it says confirm")
                 .run()

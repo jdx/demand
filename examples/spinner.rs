@@ -1,6 +1,6 @@
 use std::{thread::sleep, time::Duration};
 
-use demand::{Spinner, SpinnerAction, SpinnerStyle, Theme};
+use demand::{Spinner, SpinnerStyle, Theme};
 
 fn main() {
     let custom_style = SpinnerStyle {
@@ -9,27 +9,20 @@ fn main() {
         ],
         fps: Duration::from_millis(1000 / 10),
     };
+    let dots = SpinnerStyle::dots();
+    let line = SpinnerStyle::line();
 
+    let charm = Theme::charm();
+    let catppuccin = Theme::catppuccin();
     Spinner::new("Loading Data...")
-        .style(custom_style)
+        .style(&custom_style)
         .run(|s| {
             sleep(Duration::from_secs(2));
             let mut toggle = false;
             for name in ["Files", "Data", "Your Soul"] {
-                let _ = s.send(SpinnerAction::Title(format!("Loading {name}...")));
-                let _ = s.send(SpinnerAction::Style(if toggle {
-                    SpinnerStyle::dots()
-                } else {
-                    SpinnerStyle::line()
-                }));
-                let _ = s.send(SpinnerAction::Theme(
-                    if toggle {
-                        Theme::catppuccin()
-                    } else {
-                        Theme::charm()
-                    }
-                    .into(),
-                ));
+                let _ = s.title(format!("Loading {name}..."));
+                let _ = s.style(if toggle { &dots } else { &line });
+                let _ = s.theme(if toggle { &catppuccin } else { &charm });
                 toggle = !toggle;
                 sleep(Duration::from_secs(2));
             }
