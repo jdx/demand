@@ -41,7 +41,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     /// set the spinner theme
     /// will not compile if ref to theme doesn't outlast spinner
     pub fn theme(
-        &self,
+        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
         theme: &'spinner Theme,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
         let theme = unsafe { std::mem::transmute(theme) };
@@ -51,7 +51,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     /// set the spinner style
     /// will not compile if ref to style doesn't outlast spinner
     pub fn style(
-        &self,
+        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
         style: &'spinner SpinnerStyle,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
         let style = unsafe { std::mem::transmute(style) };
@@ -123,12 +123,16 @@ impl<'a> Spinner<'a> {
     // or style outside of the scope closure the theme and style will still be valid
     pub fn run<'scope, 'spinner: 'scope, F, T>(mut self, func: F) -> io::Result<T>
     where
-        F: FnOnce(SpinnerActionRunner<'spinner>) -> T + Send + 'scope,
+        F: FnOnce(&mut SpinnerActionRunner<'spinner>) -> T + Send + 'scope,
         T: Send + 'scope,
     {
         std::thread::scope(|s| {
             let (sender, receiver) = mpsc::channel();
-            let handle = s.spawn(|| func(SpinnerActionRunner::new(sender)));
+            let handle = s.spawn(move || {
+                // so you can just |s| instead of |mut s|
+                let mut sender = SpinnerActionRunner::new(sender);
+                func(&mut sender)
+            });
             self.term.hide_cursor()?;
             loop {
                 match receiver.try_recv() {
