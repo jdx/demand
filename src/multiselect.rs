@@ -414,6 +414,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 write!(out, " {}", desc)?;
             }
         }
+        writeln!(out)?;
 
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
@@ -468,7 +469,8 @@ mod tests {
               [ ] Vegan Cheese
               [ ] Nutella
 
-            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
+            "
             },
             without_ansi(select.render().unwrap().as_str())
         );
@@ -517,7 +519,8 @@ mod tests {
               [•] 2
               [•] 3
 
-            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm"
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
+            "
             },
             without_ansi(select.render().unwrap().as_str())
         );

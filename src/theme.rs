@@ -3,6 +3,12 @@ use termcolor::{Color, ColorSpec};
 
 pub(crate) static DEFAULT: Lazy<Theme> = Lazy::new(Theme::default);
 
+#[derive(Clone, Debug)]
+pub enum CursorShape {
+    Block,
+    Underline,
+}
+
 /// Theme for styling the UI.
 ///
 /// # Example
@@ -38,6 +44,13 @@ pub struct Theme {
     /// Unselected prefix foreground color
     pub unselected_prefix_fg: ColorSpec,
 
+    /// Char to use for the cursor
+    pub cursor_shape: CursorShape,
+    /// the color when there isnt text to get color from
+    pub cursor_style: ColorSpec,
+    /// use cusor_style even when there is text to get color from
+    pub force_style: bool,
+
     /// Input cursor color
     pub input_cursor: ColorSpec,
     /// Input placeholder color
@@ -72,6 +85,12 @@ impl Theme {
         let mut blurred_button = make_color(Color::Ansi256(7));
         blurred_button.set_bg(Some(Color::Ansi256(0)));
 
+        // TODO: theme them
+        let mut cursor_style = ColorSpec::new();
+        cursor_style
+            .set_fg(Some(Color::White))
+            .set_bg(Some(Color::Black));
+
         Self {
             title: ColorSpec::new(),
             error_indicator: ColorSpec::new(),
@@ -91,7 +110,37 @@ impl Theme {
             help_sep: ColorSpec::new(),
             focused_button,
             blurred_button,
+
+            // TODO: theme these
+            cursor_shape: CursorShape::Block,
+            cursor_style,
+            force_style: true,
         }
+    }
+
+    pub fn real_cursor_color(&self, other: Option<&ColorSpec>) -> ColorSpec {
+        // let mut c = self.input_cursor.clone();
+        let other = if self.force_style {
+            &self.cursor_style
+        } else {
+            other.unwrap_or(&self.cursor_style)
+        };
+
+        let mut c = ColorSpec::new();
+        match self.cursor_shape {
+            CursorShape::Block => {
+                c.set_bg(other.fg().copied());
+                c.set_fg(other.bg().copied());
+            }
+            CursorShape::Underline => {
+                c.set_bg(other.bg().copied());
+                c.set_fg(other.fg().copied());
+                c.set_underline(true);
+            }
+        }
+        // c.set_fg(self.input_cursor.bg().copied())
+        //     .set_bg(self.input_cursor.bg().copied());
+        c
     }
 
     /// Create a new theme with the charm color scheme
@@ -111,6 +160,12 @@ impl Theme {
 
         let mut blurred_button = make_color(normal);
         blurred_button.set_bg(Some(Color::Ansi256(238)));
+
+        // TODO: theme them
+        let mut cursor_style = ColorSpec::new();
+        cursor_style
+            .set_fg(Some(Color::White))
+            .set_bg(Some(Color::Black));
 
         Self {
             title,
@@ -135,6 +190,11 @@ impl Theme {
 
             focused_button,
             blurred_button,
+
+            // TODO: theme these
+            cursor_shape: CursorShape::Block,
+            cursor_style,
+            force_style: true,
         }
     }
 
@@ -156,6 +216,12 @@ impl Theme {
 
         let mut blurred_button = make_color(foreground);
         blurred_button.set_bg(Some(background));
+
+        // TODO: theme them
+        let mut cursor_style = ColorSpec::new();
+        cursor_style
+            .set_fg(Some(Color::White))
+            .set_bg(Some(Color::Black));
 
         Self {
             title,
@@ -180,6 +246,11 @@ impl Theme {
 
             focused_button,
             blurred_button,
+
+            // TODO: theme these
+            cursor_shape: CursorShape::Block,
+            cursor_style,
+            force_style: true,
         }
     }
 
@@ -193,6 +264,12 @@ impl Theme {
 
         let mut blurred_button = make_color(Color::Ansi256(7));
         blurred_button.set_bg(Some(Color::Ansi256(0)));
+
+        // TODO: theme them
+        let mut cursor_style = ColorSpec::new();
+        cursor_style
+            .set_fg(Some(Color::White))
+            .set_bg(Some(Color::Black));
 
         Self {
             title,
@@ -217,6 +294,11 @@ impl Theme {
 
             focused_button,
             blurred_button,
+
+            // TODO: theme these
+            cursor_shape: CursorShape::Block,
+            cursor_style,
+            force_style: true,
         }
     }
 
@@ -242,6 +324,12 @@ impl Theme {
         let mut blurred_button = make_color(text);
         blurred_button.set_bg(Some(base));
 
+        // TODO: theme them
+        let mut cursor_style = ColorSpec::new();
+        cursor_style
+            .set_fg(Some(Color::White))
+            .set_bg(Some(Color::Black));
+
         Self {
             title,
             error_indicator: make_color(red),
@@ -265,6 +353,11 @@ impl Theme {
 
             focused_button,
             blurred_button,
+
+            // TODO: theme these
+            cursor_shape: CursorShape::Block,
+            cursor_style,
+            force_style: true,
         }
     }
 

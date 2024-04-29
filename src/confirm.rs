@@ -173,6 +173,7 @@ impl<'a> Confirm<'a> {
             out.set_color(&self.theme.help_desc)?;
             write!(out, " {}", desc)?;
         }
+        writeln!(out)?;
 
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
@@ -220,7 +221,8 @@ mod tests {
 
                  Yes!     No.  
 
-              ←/→ toggle • y/n/enter submit"
+              ←/→ toggle • y/n/enter submit
+              "
             },
             without_ansi(confirm.render().unwrap().as_str())
         );
