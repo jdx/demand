@@ -1,5 +1,7 @@
 use std::{
     io::{self, Write},
+    marker::PhantomData,
+    sync::mpsc::{self, Sender, TryRecvError},
     thread::sleep,
     time::Duration,
 };
@@ -9,6 +11,58 @@ use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
 use crate::{theme, Theme};
+
+/// tell a prompt to do something while running
+/// currently its only useful for spinner
+/// but that could change
+pub enum SpinnerAction {
+    /// change the theme
+    Theme(&'static Theme),
+    /// change the style
+    Style(&'static SpinnerStyle),
+    /// change the title
+    Title(String),
+}
+
+// SAFETY: ensure that 'spinner lives longer than any use of style or theme by spinner
+pub struct SpinnerActionRunner<'spinner> {
+    sender: Sender<SpinnerAction>,
+    r: PhantomData<&'spinner ()>, // need to use 'spinner to have it on the struct
+}
+
+impl<'spinner> SpinnerActionRunner<'spinner> {
+    fn new(sender: Sender<SpinnerAction>) -> Self {
+        Self {
+            sender,
+            r: PhantomData,
+        }
+    }
+
+    /// set the spinner theme
+    /// will not compile if ref to theme doesn't outlast spinner
+    pub fn theme(
+        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
+        theme: &'spinner Theme,
+    ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
+        let theme = unsafe { std::mem::transmute(theme) };
+        self.sender.send(SpinnerAction::Theme(theme))
+    }
+
+    /// set the spinner style
+    /// will not compile if ref to style doesn't outlast spinner
+    pub fn style(
+        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
+        style: &'spinner SpinnerStyle,
+    ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
+        let style = unsafe { std::mem::transmute(style) };
+        self.sender.send(SpinnerAction::Style(style))
+    }
+
+    /// set the spinner title
+    pub fn title(&self, title: String) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
+        self.sender.send(SpinnerAction::Title(title))
+    }
+}
 
 /// Show a spinner
 ///
@@ -20,7 +74,7 @@ use crate::{theme, Theme};
 ///
 /// let spinner = Spinner::new("Loading data...")
 ///   .style(&SpinnerStyle::line())
-///   .run(|| {
+///   .run(|_| {
 ///        sleep(Duration::from_secs(2));
 ///    })
 ///   .expect("error running spinner");
@@ -53,26 +107,47 @@ impl<'a> Spinner<'a> {
 
     /// Set the style of the spinner
     pub fn style(mut self, style: &'a SpinnerStyle) -> Self {
-        self.style = style;
+        self.style = &style;
         self
     }
 
     /// Set the theme of the dialog
     pub fn theme(mut self, theme: &'a Theme) -> Self {
-        self.theme = theme;
+        self.theme = &theme;
         self
     }
 
     /// Displays the dialog to the user and returns their response
-    pub fn run<'scope, F, T>(mut self, func: F) -> io::Result<T>
+    // SAFETY: 'spinner must out live 'scope
+    // this ensures that as long as the spinner doesnt try to access the theme
+    // or style outside of the scope closure the theme and style will still be valid
+    pub fn run<'scope, 'spinner: 'scope, F, T>(mut self, func: F) -> io::Result<T>
     where
-        F: FnOnce() -> T + Send + 'scope,
+        F: FnOnce(&mut SpinnerActionRunner<'spinner>) -> T + Send + 'scope,
         T: Send + 'scope,
     {
         std::thread::scope(|s| {
-            let handle = s.spawn(func);
+            let (sender, receiver) = mpsc::channel();
+            let handle = s.spawn(move || {
+                // so you can just |s| instead of |mut s|
+                let mut sender = SpinnerActionRunner::new(sender);
+                func(&mut sender)
+            });
             self.term.hide_cursor()?;
             loop {
+                match receiver.try_recv() {
+                    Ok(a) => match a {
+                        SpinnerAction::Title(title) => self.title = title,
+                        SpinnerAction::Style(s) => self.style = s,
+                        SpinnerAction::Theme(theme) => self.theme = theme,
+                    },
+                    Err(TryRecvError::Empty) => (),
+                    Err(TryRecvError::Disconnected) => {
+                        self.clear()?;
+                        self.term.show_cursor()?;
+                        break;
+                    }
+                }
                 self.clear()?;
                 let output = self.render()?;
                 self.height = output.lines().count() - 1;
@@ -229,7 +304,7 @@ mod test {
         let mut a = [1, 2, 3];
         let mut i = 0;
         let out = spinner
-            .run(|| {
+            .run(|_| {
                 for n in &mut a {
                     if i == 1 {
                         *n = 5;
