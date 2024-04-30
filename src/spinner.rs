@@ -51,7 +51,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     /// set the spinner style
     /// will not compile if ref to style doesn't outlast spinner
     pub fn style(
-        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
+        &mut self, // with just this the compiler assumes that style might be stored in self so it wont let u mutate it after this fn call
         style: &'spinner SpinnerStyle,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
         let style = unsafe { std::mem::transmute(style) };
