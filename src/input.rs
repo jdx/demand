@@ -111,7 +111,7 @@ impl<'a> Input<'a> {
     }
 
     /// Sets the suggestions of the input
-    pub fn suggestions(mut self, suggestions: &'a [&'static str]) -> Self {
+    pub fn suggestions(mut self, suggestions: &'a [&'a str]) -> Self {
         self.suggestions = Some(suggestions);
         self
     }
