@@ -15,7 +15,7 @@ fn main() {
         .description("We'll use this to personalize your experience.")
         .placeholder("Enter your name")
         .prompt("Name: ")
-        .suggestions(vec![
+        .suggestions(&[
             "Adam Grant",
             "Danielle Steel",
             "Eveline Widmer-Schlumpf",

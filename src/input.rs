@@ -29,7 +29,7 @@ pub struct Input<'a> {
     /// A placeholder to display in the input
     pub placeholder: String,
     /// A list of suggestions to autocomplete from
-    pub suggestions: Vec<&'a str>,
+    pub suggestions: Option<&'a [&'a str]>,
     /// Show the input inline
     pub inline: bool,
     /// Whether to mask the input
@@ -62,7 +62,7 @@ impl<'a> Input<'a> {
             description: String::new(),
             prompt: "> ".to_string(),
             placeholder: String::new(),
-            suggestions: vec![],
+            suggestions: None,
             input: String::new(),
             inline: false,
             password: false,
@@ -111,8 +111,8 @@ impl<'a> Input<'a> {
     }
 
     /// Sets the suggestions of the input
-    pub fn suggestions(mut self, suggestions: Vec<&'static str>) -> Self {
-        self.suggestions = suggestions;
+    pub fn suggestions(mut self, suggestions: &'a [&'a str]) -> Self {
+        self.suggestions = Some(suggestions);
         self
     }
 
@@ -394,19 +394,15 @@ impl<'a> Input<'a> {
             self.suggestion = None;
             return Ok(());
         }
-        self.suggestion = self
-            .suggestions
-            .clone()
-            .into_iter()
-            .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
-            .and_then(|s| {
-                let suggestion = s[self.input.len()..].to_string();
-                if !suggestion.is_empty() {
-                    Some(suggestion)
-                } else {
-                    None
-                }
-            });
+        if let Some(suggestions) = &self.suggestions {
+            self.suggestion = suggestions
+                .iter()
+                .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
+                .and_then(|s| {
+                    let suggestion = s[self.input.len()..].to_string();
+                    (!suggestion.is_empty()).then_some(suggestion)
+                });
+        }
         Ok(())
     }
 

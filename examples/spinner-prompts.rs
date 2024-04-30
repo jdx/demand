@@ -10,7 +10,7 @@ fn main() {
                 .unwrap();
             Input::new("input ")
                 .description("go on say something")
-                .suggestions(vec!["hello there"])
+                .suggestions(&["hello there"])
                 .validation(|s| match !s.contains('j') {
                     true => Ok(()),
                     false => Err("ew stinky 'j' not welcome here"),

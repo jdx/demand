@@ -59,8 +59,11 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     }
 
     /// set the spinner title
-    pub fn title(&self, title: String) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
-        self.sender.send(SpinnerAction::Title(title))
+    pub fn title<S: Into<String>>(
+        &self,
+        title: S,
+    ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
+        self.sender.send(SpinnerAction::Title(title.into()))
     }
 }
 
