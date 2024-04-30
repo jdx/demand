@@ -51,7 +51,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     /// set the spinner style
     /// will not compile if ref to style doesn't outlast spinner
     pub fn style(
-        &mut self, // with just this the compiler assumes that style might be stored in self so it wont let u mutate it after this fn call
+        &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
         style: &'spinner SpinnerStyle,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
         let style = unsafe { std::mem::transmute(style) };
@@ -59,8 +59,11 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
     }
 
     /// set the spinner title
-    pub fn title(&self, title: String) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
-        self.sender.send(SpinnerAction::Title(title))
+    pub fn title<S: Into<String>>(
+        &self,
+        title: S,
+    ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
+        self.sender.send(SpinnerAction::Title(title.into()))
     }
 }
 
