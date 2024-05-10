@@ -164,6 +164,7 @@ impl<'a> Input<'a> {
                     self.clear_err()?;
                     self.validate()?;
                     if self.err.is_none() {
+                        self.term.show_cursor()?;
                         return self.handle_submit();
                     }
                 }
