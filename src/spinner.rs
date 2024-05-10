@@ -110,13 +110,13 @@ impl<'a> Spinner<'a> {
 
     /// Set the style of the spinner
     pub fn style(mut self, style: &'a SpinnerStyle) -> Self {
-        self.style = &style;
+        self.style = style;
         self
     }
 
     /// Set the theme of the dialog
     pub fn theme(mut self, theme: &'a Theme) -> Self {
-        self.theme = &theme;
+        self.theme = theme;
         self
     }
 
