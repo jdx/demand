@@ -165,6 +165,7 @@ impl<'a> Input<'a> {
                     self.validate()?;
                     if self.err.is_none() {
                         self.term.show_cursor()?;
+                        self.term.clear_to_end_of_screen()?;
                         return self.handle_submit();
                     }
                 }
@@ -468,7 +469,6 @@ impl<'a> Input<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
