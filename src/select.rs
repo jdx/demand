@@ -361,7 +361,6 @@ mod tests {
                  Brazil
                  Canada
                  Mexico
-
               ↑/↓/k/j up/down • enter confirm
               "
             },
@@ -404,7 +403,6 @@ mod tests {
                pick a thing
                > First
                  2
-
               ↑/↓/k/j up/down • enter confirm
               "
             },
