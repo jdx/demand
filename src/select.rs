@@ -114,10 +114,10 @@ impl<'a, T> Select<'a, T> {
             self.height = output.lines().count() - 1;
             if self.filtering {
                 match self.term.read_key()? {
-                    Key::Enter => self.handle_stop_filtering(true),
-                    Key::Escape => self.handle_stop_filtering(false),
-                    Key::Backspace => self.handle_filter_backspace(),
-                    Key::Char(c) => self.handle_filter_key(c),
+                    Key::Enter => self.handle_stop_filtering(true)?,
+                    Key::Escape => self.handle_stop_filtering(false)?,
+                    Key::Backspace => self.handle_filter_backspace()?,
+                    Key::Char(c) => self.handle_filter_key(c)?,
                     _ => {}
                 }
             } else {
@@ -128,7 +128,7 @@ impl<'a, T> Select<'a, T> {
                     Key::ArrowLeft | Key::Char('h') => self.handle_left(),
                     Key::ArrowRight | Key::Char('l') => self.handle_right(),
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false),
+                    Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Enter => {
                         self.clear()?;
                         self.term.show_cursor()?;
@@ -204,7 +204,7 @@ impl<'a, T> Select<'a, T> {
         self.filtering = true;
     }
 
-    fn handle_stop_filtering(&mut self, save: bool) {
+    fn handle_stop_filtering(&mut self, save: bool) -> Result<(), io::Error> {
         self.filtering = false;
         self.cur_page = 0;
 
@@ -212,18 +212,21 @@ impl<'a, T> Select<'a, T> {
             self.filter.clear();
             self.pages = self.get_pages();
         }
+        self.term.clear_to_end_of_screen()
     }
 
-    fn handle_filter_key(&mut self, c: char) {
+    fn handle_filter_key(&mut self, c: char) -> Result<(), io::Error> {
         self.filter.push(c);
         self.cur_page = 0;
         self.pages = self.get_pages();
+        self.term.clear_to_end_of_screen()
     }
 
-    fn handle_filter_backspace(&mut self) {
+    fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
         self.filter.pop();
         self.cur_page = 0;
         self.pages = self.get_pages();
+        self.term.clear_to_end_of_screen()
     }
 
     fn get_pages(&self) -> usize {
