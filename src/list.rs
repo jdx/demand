@@ -243,7 +243,7 @@ impl<'a> List<'a> {
             help_keys.push(("enter", "done"));
         }
         for (i, (key, desc)) in help_keys.iter().enumerate() {
-            if i > 0 || !self.filter.is_empty() {
+            if i > 0 || (!self.filtering && !self.filter.is_empty()) {
                 out.set_color(&self.theme.help_sep)?;
                 write!(out, " • ")?;
             }
