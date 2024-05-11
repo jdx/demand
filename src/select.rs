@@ -208,12 +208,6 @@ impl<'a, T> Select<'a, T> {
         self.filtering = false;
         self.cur_page = 0;
 
-        let visible_options = self.visible_options();
-        if !visible_options.is_empty() {
-            self.cursor = self.cursor.min(self.visible_options().len() - 1);
-        } else {
-            self.cursor = 0;
-        }
         if !save {
             self.filter.clear();
             self.pages = self.get_pages();
@@ -222,11 +216,13 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_filter_key(&mut self, c: char) {
         self.filter.push(c);
+        self.cur_page = 0;
         self.pages = self.get_pages();
     }
 
     fn handle_filter_backspace(&mut self) {
         self.filter.pop();
+        self.cur_page = 0;
         self.pages = self.get_pages();
     }
 
