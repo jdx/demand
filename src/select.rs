@@ -66,7 +66,7 @@ impl<'a, T> Select<'a, T> {
             capacity: 0,
         };
         let max_height = s.term.size().0 as usize;
-        s.capacity = max_height.max(8) - 4;
+        s.capacity = max_height.max(8) - 5;
         s
     }
 
