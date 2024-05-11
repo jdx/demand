@@ -276,35 +276,35 @@ impl<'a, T> Select<'a, T> {
         } else if !self.filter.is_empty() {
             out.set_color(&self.theme.description)?;
             write!(out, "/{}", self.filter)?;
-        } else {
-            let mut help_keys = vec![("↑/↓/k/j", "up/down")];
-            if self.pages > 1 {
-                help_keys.push(("←/→/h/l", "prev/next page"));
-            }
-            if self.filterable {
-                if self.filtering {
-                    help_keys = vec![("esc", "clear filter"), ("enter", "save filter")];
-                } else {
-                    help_keys.push(("/", "filter"));
-                    if !self.filter.is_empty() {
-                        help_keys.push(("esc", "clear filter"));
-                    }
+        }
+        let mut help_keys = vec![("↑/↓/k/j", "up/down")];
+        if self.pages > 1 {
+            help_keys.push(("←/→/h/l", "prev/next page"));
+        }
+        if self.filterable {
+            if self.filtering {
+                help_keys = vec![("esc", "clear filter"), ("enter", "save filter")];
+            } else {
+                help_keys.push(("/", "filter"));
+                if !self.filter.is_empty() {
+                    help_keys.push(("esc", "clear filter"));
                 }
-            }
-            if !self.filtering {
-                help_keys.push(("enter", "confirm"));
-            }
-            for (i, (key, desc)) in help_keys.iter().enumerate() {
-                if i > 0 {
-                    out.set_color(&self.theme.help_sep)?;
-                    write!(out, " • ")?;
-                }
-                out.set_color(&self.theme.help_key)?;
-                write!(out, "{}", key)?;
-                out.set_color(&self.theme.help_desc)?;
-                write!(out, " {}", desc)?;
             }
         }
+        if !self.filtering {
+            help_keys.push(("enter", "confirm"));
+        }
+        for (i, (key, desc)) in help_keys.iter().enumerate() {
+            if i > 0 || (!self.filtering && !self.filter.is_empty()) {
+                out.set_color(&self.theme.help_sep)?;
+                write!(out, " • ")?;
+            }
+            out.set_color(&self.theme.help_key)?;
+            write!(out, "{}", key)?;
+            out.set_color(&self.theme.help_desc)?;
+            write!(out, " {}", desc)?;
+        }
+
         writeln!(out)?;
 
         out.reset()?;
