@@ -84,6 +84,7 @@ impl<'a> Confirm<'a> {
     pub fn run(mut self) -> io::Result<bool> {
         let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
         let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+        self.term.clear_line()?;
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -95,13 +96,16 @@ impl<'a> Confirm<'a> {
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
                 Key::Char(c) if c == affirmative_char => {
                     self.selected = true;
+                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
                 }
                 Key::Char(c) if c == negative_char => {
                     self.selected = false;
+                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
                 }
                 Key::Enter => {
+                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
                 }
                 _ => {}
@@ -194,7 +198,6 @@ impl<'a> Confirm<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
