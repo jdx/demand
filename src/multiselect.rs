@@ -192,6 +192,7 @@ impl<'a, T> MultiSelect<'a, T> {
                             .filter(|o| o.selected)
                             .map(|o| o.item)
                             .collect::<Vec<_>>();
+                        self.term.clear_to_end_of_screen()?;
                         return Ok(selected);
                     }
                     _ => {}
@@ -431,7 +432,6 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
