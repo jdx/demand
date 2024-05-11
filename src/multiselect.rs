@@ -139,10 +139,10 @@ impl<'a, T> MultiSelect<'a, T> {
             self.height = output.lines().count() - 1;
             if self.filtering {
                 match self.term.read_key()? {
-                    Key::Enter => self.handle_stop_filtering(true),
-                    Key::Escape => self.handle_stop_filtering(false),
-                    Key::Backspace => self.handle_filter_backspace(),
-                    Key::Char(c) => self.handle_filter_key(c),
+                    Key::Enter => self.handle_stop_filtering(true)?,
+                    Key::Escape => self.handle_stop_filtering(false)?,
+                    Key::Backspace => self.handle_filter_backspace()?,
+                    Key::Char(c) => self.handle_filter_key(c)?,
                     _ => {}
                 }
             } else {
@@ -155,7 +155,7 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::Char('x') | Key::Char(' ') => self.handle_toggle(),
                     Key::Char('a') => self.handle_toggle_all(),
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false),
+                    Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Enter => {
                         let selected = self
                             .options
@@ -300,7 +300,7 @@ impl<'a, T> MultiSelect<'a, T> {
         self.filtering = true;
     }
 
-    fn handle_stop_filtering(&mut self, save: bool) {
+    fn handle_stop_filtering(&mut self, save: bool) -> Result<(), io::Error> {
         self.filtering = false;
 
         let visible_options = self.visible_options();
@@ -311,18 +311,21 @@ impl<'a, T> MultiSelect<'a, T> {
             self.filter.clear();
             self.reset_paging();
         }
+        self.term.clear_to_end_of_screen()
     }
 
-    fn handle_filter_key(&mut self, c: char) {
+    fn handle_filter_key(&mut self, c: char) -> Result<(), io::Error> {
         self.err = None;
         self.filter.push(c);
         self.reset_paging();
+        self.term.clear_to_end_of_screen()
     }
 
-    fn handle_filter_backspace(&mut self) {
+    fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
         self.err = None;
         self.filter.pop();
         self.reset_paging();
+        self.term.clear_to_end_of_screen()
     }
 
     fn reset_paging(&mut self) {
