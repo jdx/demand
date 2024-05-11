@@ -148,10 +148,10 @@ impl<'a, T> MultiSelect<'a, T> {
             } else {
                 self.term.hide_cursor()?;
                 match self.term.read_key()? {
-                    Key::ArrowDown | Key::Char('j') => self.handle_down(),
-                    Key::ArrowUp | Key::Char('k') => self.handle_up(),
-                    Key::ArrowLeft | Key::Char('h') => self.handle_left(),
-                    Key::ArrowRight | Key::Char('l') => self.handle_right(),
+                    Key::ArrowDown | Key::Char('j') => self.handle_down()?,
+                    Key::ArrowUp | Key::Char('k') => self.handle_up()?,
+                    Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
+                    Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('x') | Key::Char(' ') => self.handle_toggle(),
                     Key::Char('a') => self.handle_toggle_all(),
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
@@ -223,35 +223,43 @@ impl<'a, T> MultiSelect<'a, T> {
             .collect()
     }
 
-    fn handle_down(&mut self) {
+    fn handle_down(&mut self) -> Result<(), io::Error> {
         let visible_options = self.visible_options();
         if self.cursor < visible_options.len().max(1) - 1 {
             self.cursor += 1;
         } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
             self.cursor = 0;
+            self.term.clear_to_end_of_screen()?;
         }
+        Ok(())
     }
 
-    fn handle_up(&mut self) {
+    fn handle_up(&mut self) -> Result<(), io::Error> {
         if self.cursor > 0 {
             self.cursor -= 1;
         } else if self.cur_page > 0 {
             self.cur_page -= 1;
             self.cursor = self.visible_options().len().max(1) - 1;
+            self.term.clear_to_end_of_screen()?;
         }
+        Ok(())
     }
 
-    fn handle_left(&mut self) {
+    fn handle_left(&mut self) -> Result<(), io::Error> {
         if self.cur_page > 0 {
             self.cur_page -= 1;
+            self.term.clear_to_end_of_screen()?;
         }
+        Ok(())
     }
 
-    fn handle_right(&mut self) {
+    fn handle_right(&mut self) -> Result<(), io::Error> {
         if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
+            self.term.clear_to_end_of_screen()?;
         }
+        Ok(())
     }
 
     fn handle_toggle(&mut self) {
