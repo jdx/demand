@@ -138,6 +138,7 @@ impl<'a, T> Select<'a, T> {
                         let output = self.render_success(&selected.label)?;
                         let selected = self.options.into_iter().find(|o| o.id == id).unwrap();
                         self.term.write_all(output.as_bytes())?;
+                        self.term.clear_to_end_of_screen()?;
                         return Ok(selected.item);
                     }
                     _ => {}
@@ -320,7 +321,6 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_to_end_of_screen()?;
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
         Ok(())
