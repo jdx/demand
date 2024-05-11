@@ -76,7 +76,7 @@ impl<'a, T> MultiSelect<'a, T> {
             capacity: 0,
         };
         let max_height = ms.term.size().0 as usize;
-        ms.capacity = max_height.max(8) - 4;
+        ms.capacity = max_height.max(8) - 6;
         ms
     }
 
@@ -345,9 +345,6 @@ impl<'a, T> MultiSelect<'a, T> {
         if !self.description.is_empty() || self.pages > 1 {
             out.set_color(&self.theme.description)?;
             write!(out, " {}", self.description)?;
-            if self.pages > 1 {
-                write!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
-            }
             writeln!(out)?;
         }
         for (i, option) in self.visible_options().iter().enumerate() {
@@ -369,7 +366,10 @@ impl<'a, T> MultiSelect<'a, T> {
                 writeln!(out, " {}", option.label)?;
             }
         }
-        writeln!(out)?;
+        if self.pages > 1 {
+            out.set_color(&self.theme.description)?;
+            writeln!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
+        }
 
         if self.filtering {
             out.set_color(&self.theme.input_cursor)?;
