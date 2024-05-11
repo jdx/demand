@@ -1,4 +1,4 @@
-use demand::{Confirm, DemandOption, Input, MultiSelect, Select, Spinner, Theme};
+use demand::{Confirm, DemandOption, Input, List, MultiSelect, Select, Spinner, Theme};
 
 fn main() {
     let spinner = Spinner::new("im out here");
@@ -26,6 +26,7 @@ fn main() {
                     DemandOption::new("hello"),
                     DemandOption::new("how are you"),
                 ])
+                .filterable(true)
                 .run()
                 .unwrap();
             MultiSelect::new("more select")
@@ -35,8 +36,22 @@ fn main() {
                     DemandOption::new("hello"),
                     DemandOption::new("how are you"),
                 ])
+                .filterable(true)
                 .run()
                 .unwrap();
+            let _ = List::new("hewo")
+                .description("so many things")
+                .items(&[
+                    "hi",
+                    "hewo",
+                    "how are u",
+                    "i like trains",
+                    ":3",
+                    "do you like jazz",
+                    "hehe",
+                ])
+                .filterable(true)
+                .run();
             // Spinner::new("spinnerception")
             //     .run(|| std::thread::sleep(std::time::Duration::from_secs(1)))
         })
