@@ -89,8 +89,8 @@ impl<'a> List<'a> {
             if self.filtering {
                 // self.term.show_cursor()?;
                 match self.term.read_key()? {
-                    Key::Enter => self.handle_stop_filtering(true),
-                    Key::Escape => self.handle_stop_filtering(false),
+                    Key::Enter => self.handle_stop_filtering(true)?,
+                    Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
                     Key::Char(c) => self.handle_filter_key(c)?,
                     _ => {}
@@ -103,7 +103,7 @@ impl<'a> List<'a> {
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false),
+                    Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Enter => {
                         self.clear()?;
                         self.term.show_cursor()?;
@@ -154,13 +154,14 @@ impl<'a> List<'a> {
         self.filtering = true;
     }
 
-    fn handle_stop_filtering(&mut self, save: bool) {
+    fn handle_stop_filtering(&mut self, save: bool) -> Result<(), io::Error> {
         self.filtering = false;
         self.cur_page = 0;
         if !save {
             self.filter.clear();
             self.pages = self.get_pages();
         }
+        self.term.clear_to_end_of_screen()
     }
 
     fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
