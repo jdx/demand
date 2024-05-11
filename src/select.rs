@@ -66,7 +66,7 @@ impl<'a, T> Select<'a, T> {
             capacity: 0,
         };
         let max_height = s.term.size().0 as usize;
-        s.capacity = max_height.max(8) - 5;
+        s.capacity = max_height.max(8) - 6;
         s
     }
 
@@ -248,9 +248,6 @@ impl<'a, T> Select<'a, T> {
         if !self.description.is_empty() || self.pages > 1 {
             out.set_color(&self.theme.description)?;
             write!(out, " {}", self.description)?;
-            if self.pages > 1 {
-                write!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
-            }
             writeln!(out)?;
         }
         for (i, option) in self.visible_options().iter().enumerate() {
@@ -263,7 +260,10 @@ impl<'a, T> Select<'a, T> {
             out.set_color(&self.theme.unselected_option)?;
             writeln!(out, " {}", option.label)?;
         }
-        writeln!(out)?;
+        if self.pages > 1 {
+            out.set_color(&self.theme.description)?;
+            writeln!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
+        }
 
         if self.filtering {
             out.set_color(&self.theme.input_cursor)?;
