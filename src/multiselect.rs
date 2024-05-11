@@ -138,7 +138,6 @@ impl<'a, T> MultiSelect<'a, T> {
             self.term.flush()?;
             self.height = output.lines().count() - 1;
             if self.filtering {
-                self.term.show_cursor()?;
                 match self.term.read_key()? {
                     Key::Enter => self.handle_stop_filtering(true),
                     Key::Escape => self.handle_stop_filtering(false),
@@ -378,6 +377,8 @@ impl<'a, T> MultiSelect<'a, T> {
             write!(out, "/")?;
             out.reset()?;
             write!(out, "{}", self.filter)?;
+            out.set_color(&self.theme.real_cursor_color(None))?;
+            writeln!(out, " ")?;
         } else if !self.filter.is_empty() {
             out.set_color(&self.theme.description)?;
             write!(out, "/{}", self.filter)?;
