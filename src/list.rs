@@ -91,8 +91,8 @@ impl<'a> List<'a> {
                 match self.term.read_key()? {
                     Key::Enter => self.handle_stop_filtering(true),
                     Key::Escape => self.handle_stop_filtering(false),
-                    Key::Backspace => self.handle_filter_backspace(),
-                    Key::Char(c) => self.handle_filter_key(c),
+                    Key::Backspace => self.handle_filter_backspace()?,
+                    Key::Char(c) => self.handle_filter_key(c)?,
                     _ => {}
                 }
             } else {
@@ -163,16 +163,18 @@ impl<'a> List<'a> {
         }
     }
 
-    fn handle_filter_backspace(&mut self) {
+    fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
         self.filter.pop();
         self.scroll = 0;
         self.pages = self.get_pages();
+        self.term.clear_to_end_of_screen()
     }
 
-    fn handle_filter_key(&mut self, key: char) {
+    fn handle_filter_key(&mut self, key: char) -> Result<(), io::Error> {
         self.filter.push(key);
         self.scroll = 0;
         self.pages = self.get_pages();
+        self.term.clear_to_end_of_screen()
     }
 
     fn filtered_entries(&self) -> Vec<&&'a str> {
