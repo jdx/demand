@@ -15,6 +15,7 @@ fn main() {
         .filterable(true)
         .run();
     let _ = List::new("long hewo")
+        .description("really long")
         .item("Lettuce")
         .item("Tomatoes")
         .item("Charm Sauce")
