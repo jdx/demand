@@ -8,7 +8,7 @@ fn main() {
                 .description("it says confirm")
                 .run()
                 .unwrap();
-            Input::new("input ")
+            Input::new("input")
                 .description("go on say something")
                 .suggestions(&["hello there"])
                 .validation(|s| match !s.contains('j') {
