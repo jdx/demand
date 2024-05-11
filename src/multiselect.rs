@@ -480,7 +480,6 @@ mod tests {
               [ ] Cheese
               [ ] Vegan Cheese
               [ ] Nutella
-
             ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
             "
             },
@@ -530,7 +529,6 @@ mod tests {
              >[ ] First
               [•] 2
               [•] 3
-
             ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
             "
             },
