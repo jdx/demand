@@ -7,6 +7,10 @@
 - Add dialog with variable buttons (#54)
 - List (#51)
 
+### Miscellaneous Tasks
+
+- Release demand version 1.2.0
+
 ## [1.1.2] - 2024-04-27
 
 ### Miscellaneous Tasks
