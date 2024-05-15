@@ -141,6 +141,29 @@ fn main() {
 }
 ```
 
+## Dialog
+
+Show a dialog with multiple buttons.
+Run example with [`cargo run --example dialog`](./examples/dialog.rs).
+
+![Dialog](./assets/dialog.gif)
+
+```rust
+use demand::{Dialog, DialogButton};
+
+fn main() {
+    let ms = Dialog::new("Are you sure?")
+        .description("This will do a thing.")
+        .buttons(vec![
+            DialogButton::new("Ok"),
+            DialogButton::new("Not sure"),
+            DialogButton::new("Cancel"),
+        ])
+        .selected_button(1);
+    ms.run().expect("error running confirm");
+}
+```
+
 ## Spinner
 
 Spinners are used to indicate that a process is running.
