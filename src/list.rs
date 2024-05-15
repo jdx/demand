@@ -7,9 +7,13 @@ use termcolor::{Buffer, WriteColor};
 use crate::{theme, Theme};
 
 pub struct List<'a> {
+    /// Title of the list
     pub title: String,
+    /// Description of the list
     pub description: String,
+    /// Number of items to show on each page
     pub success_items: usize,
+    /// Colors/style of the input
     pub theme: &'a Theme,
 
     term: Term,
@@ -25,6 +29,7 @@ pub struct List<'a> {
 }
 
 impl<'a> List<'a> {
+    /// Creates a new list with a title
     pub fn new<S: Into<String>>(title: S) -> Self {
         let mut s = Self {
             title: title.into(),
@@ -47,38 +52,45 @@ impl<'a> List<'a> {
         s
     }
 
+    /// Sets the description of the list
     pub fn description(mut self, description: &str) -> Self {
         self.description = description.to_string();
         self
     }
 
+    /// Adds an item to the list
     pub fn item(mut self, entry: &'a str) -> Self {
         self.items.push(entry);
         self.pages = self.get_pages();
         self
     }
 
+    /// Adds multiple items to the list
     pub fn items(mut self, entries: &[&'a str]) -> Self {
         self.items.extend_from_slice(entries);
         self.pages = self.get_pages();
         self
     }
 
+    /// Sets the number of items to show on confirmation
     pub fn success_items(mut self, items: usize) -> Self {
         self.success_items = items;
         self
     }
 
+    /// Sets the list to be filterable
     pub fn filterable(mut self, filterable: bool) -> Self {
         self.filterable = filterable;
         self
     }
 
+    /// Sets the theme of the list
     pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
         self
     }
 
+    /// Displays the input to the user and returns the response
     pub fn run(mut self) -> Result<(), io::Error> {
         loop {
             self.clear()?;
@@ -272,7 +284,7 @@ impl<'a> List<'a> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, "{}", self.title)?;
+        write!(out, " {}", self.title)?;
 
         for entry in self.items.iter().take(self.success_items) {
             out.set_color(&self.theme.unselected_option)?;
