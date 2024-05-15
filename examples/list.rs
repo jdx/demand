@@ -1,21 +1,8 @@
 use demand::List;
 
 fn main() {
-    let _ = List::new("hewo")
-        .description("so many things")
-        .items(&[
-            "hi",
-            "hewo",
-            "how are u",
-            "i like trains",
-            ":3",
-            "do you like jazz",
-            "hehe",
-        ])
-        .filterable(true)
-        .run();
-    let _ = List::new("long hewo")
-        .description("really long")
+    let _ = List::new("Toppings")
+        .description("List of available toppings")
         .item("Lettuce")
         .item("Tomatoes")
         .item("Charm Sauce")

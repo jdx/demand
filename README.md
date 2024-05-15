@@ -70,6 +70,32 @@ fn main() {
 }
 ```
 
+## List
+
+Shows a list of options. Run example with [`cargo run --example list`](./examples/list.rs).
+
+![List](./assets/list.gif)
+
+```rust
+use demand::List;
+
+fn main() {
+    let list = List::new("Toppings")
+        .description("List of available toppings")
+        .item("Lettuce")
+        .item("Tomatoes")
+        .item("Charm Sauce")
+        .item("Jalapenos")
+        .item("Cheese")
+        .item("Vegan Cheese")
+        .item("Nutella")
+        .item("Peanut Butter")
+        .item("Banana")
+        .filterable(true);
+    list.run().expect("error running list")
+}
+```
+
 ## Select
 
 Select from a list of options.
