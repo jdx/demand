@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.2.2] - 2024-05-15
+
+### Bug Fixes
+
+- Multiselect clear when filtering
+- Multiselect clear when change page
+- Select clear when change page
+- Select clear when filter could change size
+- List clear when stop filtering
+- Select not reseting cur page while filtering
+- List clear when filtering, for running in spinner
+- Multiselect making spinner flicker
+- List help had dot while filtering
+- Select making spinner flicker
+- Input making spinner flicker
+- Confirm making spinner flicker
+- Select name going off screen
+- List name being off screen sometimes
+- Typo
+
+### Features
+
+- Multiselect show pages without description
+- Show pages even when there is no descroption
+- Render help when multiselect filtering
+- Multiselect filter uses custom cursor
+- Select help renders while filtering
+- Select filter uses custom cursor
+- SpinnerActionRunner.title now accepts into<string>
+
+### Miscellaneous Tasks
+
+- Release demand version 1.2.1
+- Update tests
+- Add list to spinner prompts example
+- Remove space that was really annoying me
+
 ## [1.2.0] - 2024-05-15
 
 ### Features
