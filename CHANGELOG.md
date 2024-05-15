@@ -1,6 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2024-05-15
+
+### Features
+
+- Add dialog with variable buttons (#54)
+- List (#51)
+
 ## [1.1.2] - 2024-04-27
+
+### Miscellaneous Tasks
+
+- Release demand version 1.1.2
+
+## [1.1.1] - 2024-04-23
 
 ### Bug Fixes
 
@@ -105,4 +118,5 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
+
 
