@@ -136,11 +136,11 @@ impl<'a> Confirm<'a> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        writeln!(out, " {}", self.title)?;
+        writeln!(out, "{}", self.title)?;
 
         if !self.description.is_empty() {
             out.set_color(&self.theme.description)?;
-            write!(out, " {}", self.description)?;
+            write!(out, "{}", self.description)?;
         }
         writeln!(out, "\n")?;
 
@@ -186,7 +186,7 @@ impl<'a> Confirm<'a> {
     fn render_success(&self) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         if self.selected {
             writeln!(out, " {}", self.affirmative)?;
@@ -219,13 +219,13 @@ mod tests {
 
         assert_eq!(
             indoc! {
-              " Are you sure?
-               This will do a thing.
+              "Are you sure?
+             This will do a thing.
 
-                 Yes!     No.  
+                Yes!     No.  
 
-              ←/→ toggle • y/n/enter submit
-              "
+             ←/→ toggle • y/n/enter submit
+            "
             },
             without_ansi(confirm.render().unwrap().as_str())
         );
