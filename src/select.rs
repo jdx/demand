@@ -249,20 +249,20 @@ impl<'a, T> Select<'a, T> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
 
         writeln!(out)?;
         if !self.description.is_empty() || self.pages > 1 {
             out.set_color(&self.theme.description)?;
-            write!(out, " {}", self.description)?;
+            write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
         for (i, option) in self.visible_options().iter().enumerate() {
             if self.cursor == i {
                 out.set_color(&self.theme.cursor)?;
-                write!(out, " >")?;
+                write!(out, ">")?;
             } else {
-                write!(out, "  ")?;
+                write!(out, " ")?;
             }
             out.set_color(&self.theme.unselected_option)?;
             writeln!(out, " {}", option.label)?;
@@ -321,7 +321,7 @@ impl<'a, T> Select<'a, T> {
     fn render_success(&self, selected: &str) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         writeln!(out, " {}", selected)?;
         out.reset()?;
@@ -354,15 +354,15 @@ mod tests {
 
         assert_eq!(
             indoc! {
-              " Country
-               Select your Country
-               > United States
-                 Germany
-                 Brazil
-                 Canada
-                 Mexico
-              ↑/↓/k/j up/down • enter confirm
-              "
+              "Country
+            Select your Country
+            > United States
+              Germany
+              Brazil
+              Canada
+              Mexico
+            ↑/↓/k/j up/down • enter confirm
+            "
             },
             without_ansi(select.render().unwrap().as_str())
         );
@@ -399,12 +399,12 @@ mod tests {
         );
         assert_eq!(
             indoc! {
-              " things
-               pick a thing
-               > First
-                 2
-              ↑/↓/k/j up/down • enter confirm
-              "
+              "things
+            pick a thing
+            > First
+              2
+            ↑/↓/k/j up/down • enter confirm
+            "
             },
             without_ansi(select.render().unwrap().as_str())
         );
