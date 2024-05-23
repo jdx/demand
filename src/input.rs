@@ -279,14 +279,14 @@ impl<'a> Input<'a> {
         out.set_color(&self.theme.title)?;
         match self.inline {
             true => write!(out, " {}", self.title)?,
-            false => writeln!(out, " {}", self.title)?,
+            false => writeln!(out, "{}", self.title)?,
         }
 
         out.set_color(&self.theme.description)?;
         if !self.description.is_empty() {
             match self.inline {
-                true => write!(out, "{}", self.description)?,
-                false => writeln!(out, " {}", self.description)?,
+                true => write!(out, " {}", self.description)?,
+                false => writeln!(out, "{}", self.description)?,
             }
         }
 
@@ -294,7 +294,7 @@ impl<'a> Input<'a> {
         if !self.prompt.is_empty() {
             match self.inline {
                 true => write!(out, "{}", self.prompt)?,
-                false => write!(out, " {}", self.prompt)?,
+                false => write!(out, "{}", self.prompt)?,
             }
         }
         out.reset()?;
@@ -384,7 +384,7 @@ impl<'a> Input<'a> {
     fn render_success(&mut self) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         writeln!(out, " {}", self.input)?;
         out.reset()?;
