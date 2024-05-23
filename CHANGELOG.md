@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.3] - 2024-05-23
+
+### Miscellaneous Tasks
+
+- Update screen recordings (#58)
+- Add example and docs for list (#56)
+
+### Update
+
+- Remove leading space from rendered output (#57)
+
 ## [1.2.2] - 2024-05-15
 
 ### Bug Fixes
@@ -32,6 +43,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.2.2
 - Release demand version 1.2.1
 - Update tests
 - Add list to spinner prompts example
@@ -159,5 +171,4 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
-
 
