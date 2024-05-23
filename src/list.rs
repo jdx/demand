@@ -284,7 +284,7 @@ impl<'a> List<'a> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
 
         for entry in self.items.iter().take(self.success_items) {
             out.set_color(&self.theme.unselected_option)?;

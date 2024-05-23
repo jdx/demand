@@ -345,7 +345,7 @@ impl<'a, T> MultiSelect<'a, T> {
         let mut out = Buffer::ansi();
 
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
 
         if self.err.is_some() {
             out.set_color(&self.theme.error_indicator)?;
@@ -355,7 +355,7 @@ impl<'a, T> MultiSelect<'a, T> {
         }
         if !self.description.is_empty() || self.pages > 1 {
             out.set_color(&self.theme.description)?;
-            write!(out, " {}", self.description)?;
+            write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
         for (i, option) in self.visible_options().iter().enumerate() {
@@ -436,7 +436,7 @@ impl<'a, T> MultiSelect<'a, T> {
     fn render_success(&self, selected: &[String]) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         writeln!(out, " {}", selected.join(", "))?;
         out.reset()?;
@@ -471,8 +471,8 @@ mod tests {
 
         assert_eq!(
             indoc! {
-              " Toppings
-             Select your toppings
+              "Toppings
+            Select your toppings
              >[•] Lettuce
               [•] Tomatoes
               [ ] Charm Sauce
@@ -524,8 +524,8 @@ mod tests {
             );
         assert_eq!(
             indoc! {
-              " things
-             pick a thing
+              "things
+            pick a thing
              >[ ] First
               [•] 2
               [•] 3

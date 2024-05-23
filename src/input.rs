@@ -278,15 +278,15 @@ impl<'a> Input<'a> {
 
         out.set_color(&self.theme.title)?;
         match self.inline {
-            true => write!(out, " {}", self.title)?,
-            false => writeln!(out, " {}", self.title)?,
+            true => write!(out, "{}", self.title)?,
+            false => writeln!(out, "{}", self.title)?,
         }
 
         out.set_color(&self.theme.description)?;
         if !self.description.is_empty() {
             match self.inline {
-                true => write!(out, "{}", self.description)?,
-                false => writeln!(out, " {}", self.description)?,
+                true => write!(out, " {}", self.description)?,
+                false => writeln!(out, "{}", self.description)?,
             }
         }
 
@@ -294,7 +294,7 @@ impl<'a> Input<'a> {
         if !self.prompt.is_empty() {
             match self.inline {
                 true => write!(out, "{}", self.prompt)?,
-                false => write!(out, " {}", self.prompt)?,
+                false => write!(out, "{}", self.prompt)?,
             }
         }
         out.reset()?;
@@ -305,7 +305,7 @@ impl<'a> Input<'a> {
             out.set_color(&self.theme.error_indicator)?;
             writeln!(out)?;
             writeln!(out)?;
-            write!(out, " * {}", self.err.as_ref().unwrap())?;
+            write!(out, "* {}", self.err.as_ref().unwrap())?;
             out.reset()?;
         }
 
@@ -384,7 +384,7 @@ impl<'a> Input<'a> {
     fn render_success(&mut self) -> io::Result<String> {
         let mut out = Buffer::ansi();
         out.set_color(&self.theme.title)?;
-        write!(out, " {}", self.title)?;
+        write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
         writeln!(out, " {}", self.input)?;
         out.reset()?;
@@ -444,7 +444,7 @@ impl<'a> Input<'a> {
                 let err_count = self.err.as_ref().unwrap().chars().count();
                 self.term.move_cursor_left(err_count + 2)?; // 2 for the error prefix
                 self.term.move_cursor_up(ERR_MSG_HEIGHT)?;
-                let mut offset = 1; // 1 for the column before the title/prompt
+                let mut offset = 0;
                 if self.inline {
                     offset += self.title.chars().count();
                     offset += self.description.chars().count();
@@ -496,7 +496,7 @@ mod tests {
             .placeholder("Placeholder");
 
         assert_eq!(
-            " Title\n Description\n $ Placeholder\n",
+            "Title\nDescription\n$ Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -506,7 +506,7 @@ mod tests {
         let mut input = Input::new("Title");
 
         assert_eq!(
-            " Title\n >  \n",
+            "Title\n>  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -516,7 +516,7 @@ mod tests {
         let mut input = Input::new("Title").description("Description");
 
         assert_eq!(
-            " Title\n Description\n >  \n",
+            "Title\nDescription\n>  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -526,7 +526,7 @@ mod tests {
         let mut input = Input::new("Title").prompt("$ ");
 
         assert_eq!(
-            " Title\n $  \n",
+            "Title\n$  \n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -536,7 +536,7 @@ mod tests {
         let mut input = Input::new("Title").placeholder("Placeholder");
 
         assert_eq!(
-            " Title\n > Placeholder\n",
+            "Title\n> Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -550,7 +550,7 @@ mod tests {
             .inline(true);
 
         assert_eq!(
-            " Title?Description.Prompt:Placeholder\n",
+            "Title? Description.Prompt:Placeholder\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -564,14 +564,14 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title\n Description\n >  \n\n * Name cannot be empty\n",
+            "Title\nDescription\n>  \n\n* Name cannot be empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
 
         input.input = "non empty".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title\n Description\n > non empty\n",
+            "Title\nDescription\n> non empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
@@ -586,14 +586,14 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title?Description.>  \n\n * Name cannot be empty\n",
+            "Title? Description.>  \n\n* Name cannot be empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
 
         input.input = "non empty".to_string();
         input.validate().unwrap();
         assert_eq!(
-            " Title?Description.> non empty\n",
+            "Title? Description.> non empty\n",
             without_ansi(input.render().unwrap().as_str())
         );
     }
