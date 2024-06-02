@@ -1,9 +1,16 @@
 # Changelog
 
+## [1.2.4] - 2024-06-02
+
+### Bug Fixes
+
+- [security] password input renders password on success (#60)
+
 ## [1.2.3] - 2024-05-23
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.2.3
 - Update screen recordings (#58)
 - Add example and docs for list (#56)
 
