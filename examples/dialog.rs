@@ -1,7 +1,7 @@
 use demand::{Dialog, DialogButton};
 
 fn main() {
-    let ms = Dialog::new("Are you sure?")
+    let dialog = Dialog::new("Are you sure?")
         .description("This will do a thing.")
         .buttons(vec![
             DialogButton::new("Ok"),
@@ -9,5 +9,15 @@ fn main() {
             DialogButton::new("Cancel"),
         ])
         .selected_button(1);
-    ms.run().expect("error running confirm");
+    let _ = match dialog.run() {
+        Ok(value) => value,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::Interrupted {
+                println!("Dialog was cancelled");
+                return;
+            } else {
+                panic!("Error: {}", e);
+            }
+        }
+    };
 }

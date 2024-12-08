@@ -11,7 +11,7 @@ fn main() {
         Ok(())
     };
 
-    let t = Input::new("What's your name?")
+    let input = Input::new("What's your name?")
         .description("We'll use this to personalize your experience.")
         .placeholder("Enter your name")
         .prompt("Name: ")
@@ -26,5 +26,15 @@ fn main() {
             "Zack Snyder",
         ])
         .validation(notempty_minlen);
-    t.run().expect("error running input");
+    let _ = match input.run() {
+        Ok(value) => value,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::Interrupted {
+                println!("Input cancelled");
+                return;
+            } else {
+                panic!("Error: {}", e);
+            }
+        }
+    };
 }

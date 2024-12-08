@@ -16,7 +16,17 @@ use crate::theme::Theme;
 /// let confirm = Confirm::new("Are you sure?")
 ///   .affirmative("Yes!")
 ///   .negative("No.");
-/// let yes = confirm.run().expect("error running confirm");
+/// let choice = match confirm.run() {
+///     Ok(confirm) => confirm,
+///     Err(e) => {
+///         if e.kind() == std::io::ErrorKind::Interrupted {
+///             println!("Dialog cancelled");
+///             false
+///         } else {
+///             panic!("Error: {}", e);
+///         }
+///     }
+/// };
 /// ```
 pub struct Confirm<'a> {
     /// The title of the selector
@@ -81,6 +91,9 @@ impl<'a> Confirm<'a> {
     }
 
     /// Displays the dialog to the user and returns their response
+    ///
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<bool> {
         let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
         let negative_char = self.negative.to_lowercase().chars().next().unwrap();
@@ -96,17 +109,18 @@ impl<'a> Confirm<'a> {
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
                 Key::Char(c) if c == affirmative_char => {
                     self.selected = true;
-                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
                 }
                 Key::Char(c) if c == negative_char => {
                     self.selected = false;
-                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
                 }
                 Key::Enter => {
-                    self.term.clear_to_end_of_screen()?;
                     return self.handle_submit();
+                }
+                Key::Escape => {
+                    self.clear()?;
+                    return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                 }
                 _ => {}
             }
@@ -114,6 +128,7 @@ impl<'a> Confirm<'a> {
     }
 
     fn handle_submit(mut self) -> io::Result<bool> {
+        self.term.clear_to_end_of_screen()?;
         self.clear()?;
         let output = self.render_success()?;
         self.term.write_all(output.as_bytes())?;

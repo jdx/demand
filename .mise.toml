@@ -1,7 +1,7 @@
 [tools]
-"cargo:cargo-tarpaulin" = "0.27.3"
-"cargo:git-cliff" = "1.4.0"
-"cargo:cargo-release" = "0.25.4"
+"cargo:cargo-tarpaulin" = "0.27"
+"cargo:git-cliff" = "1.4"
+"cargo:cargo-release" = "0.25"
 
 [tasks.changelog]
 description = "Generate changelog"

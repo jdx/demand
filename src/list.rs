@@ -6,6 +6,36 @@ use termcolor::{Buffer, WriteColor};
 
 use crate::{theme, Theme};
 
+/// Display a list of options
+///
+/// # Example
+/// ```rust
+/// use demand::{DmandOption, List};
+///
+/// let list = List::new("Toppings")
+///   .description("Select your toppings")
+///   .min(1)
+///   .max(4)
+///   .filterable(true)
+///   .option(DemandOption::new("Lettuce").selected(true))
+///   .option(DemandOption::new("Tomatoes").selected(true))
+///   .option(DemandOption::new("Charm Sauce"))
+///   .option(DemandOption::new("Jalapenos").label("Jalapeños"))
+///   .option(DemandOption::new("Cheese"))
+///   .option(DemandOption::new("Vegan Cheese"))
+///   .option(DemandOption::new("Nutella"));
+/// let toppings = match list.run() {
+///   Ok(_) => {},
+///   Err(e) => {
+///       if e.kind() == std::io::ErrorKind::Interrupted {
+///           println!("Input cancelled");
+///           return;
+///       } else {
+///           panic!("Error: {}", e);
+///       }
+///   }
+/// };
+/// ```
 pub struct List<'a> {
     /// Title of the list
     pub title: String,
@@ -91,6 +121,9 @@ impl<'a> List<'a> {
     }
 
     /// Displays the input to the user and returns the response
+    ///
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> Result<(), io::Error> {
         loop {
             self.clear()?;
@@ -99,7 +132,6 @@ impl<'a> List<'a> {
             self.term.flush()?;
             self.height = output.lines().count() - 1;
             if self.filtering {
-                // self.term.show_cursor()?;
                 match self.term.read_key()? {
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
@@ -115,7 +147,10 @@ impl<'a> List<'a> {
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false)?,
+                    Key::Escape => {
+                        self.clear()?;
+                        return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
+                    }
                     Key::Enter => {
                         self.clear()?;
                         self.term.show_cursor()?;
