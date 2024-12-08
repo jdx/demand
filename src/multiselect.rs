@@ -26,7 +26,17 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
 ///   .option(DemandOption::new("Nutella"));
-/// let toppings = multiselect.run().expect("error running multi select");
+/// let toppings = match multiselect.run() {
+///   Ok(toppings) => toppings,
+///   Err(e) => {
+///       if e.kind() == std::io::ErrorKind::Interrupted {
+///           println!("Input cancelled");
+///           return;
+///       } else {
+///           panic!("Error: {}", e);
+///       }
+///   }
+/// };
 /// ```
 pub struct MultiSelect<'a, T> {
     /// The title of the selector
@@ -127,6 +137,9 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     /// Displays the selector to the user and returns their selected options
+    ///
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<Vec<T>> {
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
@@ -155,7 +168,16 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::Char('x') | Key::Char(' ') => self.handle_toggle(),
                     Key::Char('a') => self.handle_toggle_all(),
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false)?,
+                    Key::Escape => {
+                        if self.filter.is_empty() {
+                            self.clear()?;
+                            return Err(io::Error::new(
+                                io::ErrorKind::Interrupted,
+                                "user cancelled",
+                            ));
+                        }
+                        self.handle_stop_filtering(false)?
+                    }
                     Key::Enter => {
                         let selected = self
                             .options

@@ -23,7 +23,17 @@ use crate::{theme, DemandOption};
 ///   .option(DemandOption::new("Cheese"))
 ///   .option(DemandOption::new("Vegan Cheese"))
 ///   .option(DemandOption::new("Nutella"));
-/// let topping = select.run().expect("error running multi select");
+/// let topping = match select.run() {
+///     Ok(value) => value,
+///     Err(e) => {
+///         if e.kind() == std::io::ErrorKind::Interrupted {
+///             println!("Input cancelled");
+///             return;
+///         } else {
+///             panic!("Error: {}", e);
+///         }
+///     }
+/// };
 /// ```
 pub struct Select<'a, T> {
     /// The title of the selector
@@ -105,6 +115,9 @@ impl<'a, T> Select<'a, T> {
     }
 
     /// Displays the selector to the user and returns their selected options
+    ///
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<T> {
         loop {
             self.clear()?;
@@ -128,7 +141,16 @@ impl<'a, T> Select<'a, T> {
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
-                    Key::Escape => self.handle_stop_filtering(false)?,
+                    Key::Escape => {
+                        if self.filter.is_empty() {
+                            self.clear()?;
+                            return Err(io::Error::new(
+                                io::ErrorKind::Interrupted,
+                                "user cancelled",
+                            ));
+                        }
+                        self.handle_stop_filtering(false)?;
+                    }
                     Key::Enter => {
                         self.clear()?;
                         self.term.show_cursor()?;

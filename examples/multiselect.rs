@@ -1,7 +1,7 @@
 use demand::{DemandOption, MultiSelect};
 
 fn main() {
-    let ms = MultiSelect::new("Toppings")
+    let multiselect = MultiSelect::new("Toppings")
         .description("Select your toppings")
         .min(1)
         .max(4)
@@ -13,5 +13,15 @@ fn main() {
         .option(DemandOption::new("Cheese"))
         .option(DemandOption::new("Vegan Cheese"))
         .option(DemandOption::new("Nutella"));
-    ms.run().expect("error running multi select");
+    let _ = match multiselect.run() {
+        Ok(toppings) => toppings,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::Interrupted {
+                println!("Input cancelled");
+                return;
+            } else {
+                panic!("Error: {}", e);
+            }
+        }
+    };
 }

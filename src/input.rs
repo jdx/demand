@@ -17,7 +17,17 @@ use crate::{theme, Theme};
 /// let input = Input::new("What's your name?")
 ///   .description("We'll use this to personalize your experience.")
 ///   .placeholder("Enter your name");
-/// let name = input.run().expect("error running input");
+/// let name = match input.run() {
+///   Ok(value) => value,
+///   Err(e) => {
+///       if e.kind() == std::io::ErrorKind::Interrupted {
+///           println!("Input cancelled");
+///           return;
+///       } else {
+///           panic!("Error: {}", e);
+///       }
+///   }
+/// };
 /// ```
 pub struct Input<'a> {
     /// The title of the input
@@ -139,6 +149,9 @@ impl<'a> Input<'a> {
     }
 
     /// Displays the input to the user and returns the response
+    ///
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
         self.term.hide_cursor()?;
         loop {
@@ -170,6 +183,10 @@ impl<'a> Input<'a> {
                     }
                 }
                 Key::Tab => self.handle_tab()?,
+                Key::Escape => {
+                    self.clear()?;
+                    return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
+                }
                 _ => {}
             }
             if key != Key::Enter {

@@ -45,7 +45,17 @@ impl DialogButton {
 ///      DialogButton::new("Not sure"),
 ///      DialogButton::new("Cancel"),
 ///   ]);
-/// let result = dialog.run().expect("error running confirm");
+/// let choice = match dialog.run() {
+///   Ok(value) => value,
+///   Err(e) => {
+///       if (e.kind() == std::io::ErrorKind::Interrupted) {
+///           println!("Dialog cancelled");
+///           return;
+///       } else {
+///           panic!("Error: {}", e);
+///       }
+///   }
+/// };
 /// ```
 pub struct Dialog<'a> {
     /// The title of the selector
@@ -118,7 +128,8 @@ impl<'a> Dialog<'a> {
     ///
     /// The response will be the label of the selected button.
     ///
-    /// This will block until the user selects a button or presses one of the submit keys.
+    /// This function will block until the user submits the input. If the user cancels the input,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
         loop {
             self.clear()?;
@@ -136,6 +147,10 @@ impl<'a> Dialog<'a> {
                 }
                 Key::Enter => {
                     return self.handle_submit();
+                }
+                Key::Escape => {
+                    self.clear()?;
+                    return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                 }
                 _ => {}
             }

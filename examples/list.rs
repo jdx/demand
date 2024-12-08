@@ -1,7 +1,9 @@
+use std::io;
+
 use demand::List;
 
 fn main() {
-    let _ = List::new("Toppings")
+    let list = List::new("Toppings")
         .description("List of available toppings")
         .item("Lettuce")
         .item("Tomatoes")
@@ -64,6 +66,16 @@ fn main() {
         .item("Starburst")
         .item("Twizzlers")
         .item("Milk Duds")
-        .filterable(true)
-        .run();
+        .filterable(true);
+    let _ = match list.run() {
+        Ok(_) => {}
+        Err(e) => {
+            if e.kind() == io::ErrorKind::Interrupted {
+                println!("Input cancelled");
+                return;
+            } else {
+                panic!("Error: {}", e);
+            }
+        }
+    };
 }

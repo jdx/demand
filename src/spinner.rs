@@ -44,7 +44,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
         &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
         theme: &'spinner Theme,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
-        let theme = unsafe { std::mem::transmute(theme) };
+        let theme = unsafe { std::mem::transmute::<&Theme, &Theme>(theme) };
         self.sender.send(SpinnerAction::Theme(theme))
     }
 
@@ -54,7 +54,7 @@ impl<'spinner> SpinnerActionRunner<'spinner> {
         &mut self, // with just this the compiler assumes that theme might be stored in self so it wont let u mutate it after this fn call
         style: &'spinner SpinnerStyle,
     ) -> Result<(), std::sync::mpsc::SendError<SpinnerAction>> {
-        let style = unsafe { std::mem::transmute(style) };
+        let style = unsafe { std::mem::transmute::<&SpinnerStyle, &SpinnerStyle>(style) };
         self.sender.send(SpinnerAction::Style(style))
     }
 
