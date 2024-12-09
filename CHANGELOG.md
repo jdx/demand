@@ -1,10 +1,24 @@
 # Changelog
 
+## [1.3.0] - 2024-12-09
+
+### Bug Fixes
+
+- Use vhs Docker image to build screencasts (#61)
+
+### Features
+
+- Quit interactive menus with single-key shortcut escape
+
 ## [1.2.4] - 2024-06-02
 
 ### Bug Fixes
 
 - [security] password input renders password on success (#60)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.2.4
 
 ## [1.2.3] - 2024-05-23
 
