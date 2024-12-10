@@ -12,6 +12,8 @@ pub struct DemandOption<T> {
     pub label: String,
     /// Whether this option is initially selected.
     pub selected: bool,
+    /// Optional description shown on the side.
+    pub description: Option<String>,
 }
 
 impl<T: ToString> DemandOption<T> {
@@ -23,6 +25,7 @@ impl<T: ToString> DemandOption<T> {
             label: item.to_string(),
             item,
             selected: false,
+            description: None,
         }
     }
 }
@@ -36,6 +39,7 @@ impl<T> DemandOption<T> {
             label: label.into(),
             item,
             selected: false,
+            description: None,
         }
     }
     pub fn item<I>(self, item: I) -> DemandOption<I> {
@@ -44,6 +48,7 @@ impl<T> DemandOption<T> {
             item,
             label: self.label,
             selected: self.selected,
+            description: None,
         }
     }
     /// Set the display label for this option.
@@ -55,6 +60,11 @@ impl<T> DemandOption<T> {
     /// Set whether this option is initially selected.
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
+        self
+    }
+
+    pub fn description(mut self, description: &str) -> Self {
+        self.description = Some(description.to_string());
         self
     }
 }

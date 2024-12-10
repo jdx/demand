@@ -67,12 +67,11 @@ fn main() {
         .item("Twizzlers")
         .item("Milk Duds")
         .filterable(true);
-    let _ = match list.run() {
+    match list.run() {
         Ok(_) => {}
         Err(e) => {
             if e.kind() == io::ErrorKind::Interrupted {
                 println!("Input cancelled");
-                return;
             } else {
                 panic!("Error: {}", e);
             }

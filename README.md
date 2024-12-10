@@ -111,13 +111,13 @@ fn main() {
     let ms = Select::new("Toppings")
         .description("Select your topping")
         .filterable(true)
-        .option(DemandOption::new("Lettuce"))
-        .option(DemandOption::new("Tomatoes"))
-        .option(DemandOption::new("Charm Sauce"))
-        .option(DemandOption::new("Jalapenos").label("Jalapeños"))
-        .option(DemandOption::new("Cheese"))
-        .option(DemandOption::new("Vegan Cheese"))
-        .option(DemandOption::new("Nutella"));
+        .option(DemandOption::new("Lettuce").description("Fresh and crispy"))
+        .option(DemandOption::new("Tomatoes").description("Juicy and red"))
+        .option(DemandOption::new("Charm Sauce").description("Our secret recipe"))
+        .option(DemandOption::new("Jalapenos").label("Jalapeños").description("Spicy and hot"))
+        .option(DemandOption::new("Cheese").description("Melted and gooey"))
+        .option(DemandOption::new("Vegan Cheese").description("Melted and gooey"))
+        .option(DemandOption::new("Nutella").description("Sweet and creamy"));
     ms.run().expect("error running select");
 }
 ```
