@@ -1,11 +1,13 @@
 use std::io;
 use std::io::Write;
 
-use console::{Key, Term};
-use termcolor::{Buffer, WriteColor};
-
 use crate::theme::Theme;
 use crate::{theme, DemandOption};
+use console::{Alignment, Key, Term};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use itertools::Itertools;
+use termcolor::{Buffer, WriteColor};
 
 /// Select multiple options from a list
 ///
@@ -55,6 +57,7 @@ pub struct Select<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    fuzzy_matcher: SkimMatcherV2,
 }
 
 impl<'a, T> Select<'a, T> {
@@ -74,6 +77,7 @@ impl<'a, T> Select<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
         let max_height = s.term.size().0 as usize;
         s.capacity = max_height.max(8) - 6;
@@ -105,6 +109,12 @@ impl<'a, T> Select<'a, T> {
     /// Set whether the selector can be filtered with a query
     pub fn filterable(mut self, filterable: bool) -> Self {
         self.filterable = filterable;
+        self
+    }
+
+    /// Start filtering immediately
+    pub fn filtering(mut self, filtering: bool) -> Self {
+        self.filtering = filtering;
         self
     }
 
@@ -171,13 +181,17 @@ impl<'a, T> Select<'a, T> {
     fn filtered_options(&self) -> Vec<&DemandOption<T>> {
         self.options
             .iter()
-            .filter(|opt| {
-                self.filter.is_empty()
-                    || opt
-                        .label
-                        .to_lowercase()
-                        .contains(&self.filter.to_lowercase())
+            .filter_map(|opt| {
+                if self.filter.is_empty() {
+                    Some((0, opt))
+                } else {
+                    self.fuzzy_matcher
+                        .fuzzy_match(&opt.label.to_lowercase(), &self.filter.to_lowercase())
+                        .map(|score| (score, opt))
+                }
             })
+            .sorted_by_key(|(score, _opt)| -1 * *score)
+            .map(|(_score, opt)| opt)
             .collect()
     }
 
@@ -279,6 +293,12 @@ impl<'a, T> Select<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
+        let max_label_len = self
+            .visible_options()
+            .iter()
+            .map(|o| console::measure_text_width(&o.label))
+            .max()
+            .unwrap_or(0);
         for (i, option) in self.visible_options().iter().enumerate() {
             if self.cursor == i {
                 out.set_color(&self.theme.cursor)?;
@@ -287,7 +307,14 @@ impl<'a, T> Select<'a, T> {
                 write!(out, " ")?;
             }
             out.set_color(&self.theme.unselected_option)?;
-            writeln!(out, " {}", option.label)?;
+            if let Some(desc) = &option.description {
+                let label = console::pad_str(&option.label, max_label_len, Alignment::Left, None);
+                write!(out, " {label}")?;
+                out.set_color(&self.theme.description)?;
+                writeln!(out, "  {}", desc)?;
+            } else {
+                writeln!(out, " {}", option.label)?;
+            }
         }
         if self.pages > 1 {
             out.set_color(&self.theme.description)?;
