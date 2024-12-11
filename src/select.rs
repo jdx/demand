@@ -312,9 +312,50 @@ impl<'a, T> Select<'a, T> {
             out.set_color(&self.theme.unselected_option)?;
             if let Some(desc) = &option.description {
                 let label = console::pad_str(&option.label, max_label_len, Alignment::Left, None);
-                write!(out, " {label}")?;
+                if self.filtering && !self.filter.is_empty() {
+                    let matches = self
+                        .fuzzy_matcher
+                        .fuzzy_indices(&option.label.to_lowercase(), &self.filter.to_lowercase());
+                    if let Some((_, indices)) = matches {
+                        for (j, c) in label.chars().enumerate() {
+                            if indices.contains(&j) {
+                                out.set_color(&self.theme.selected_option)?;
+                            } else {
+                                out.set_color(&self.theme.unselected_option)?;
+                            }
+                            if j == 0 {
+                                write!(out, " ")?;
+                            }
+                            write!(out, "{}", c)?;
+                        }
+                    } else {
+                        write!(out, " {}", label)?;
+                    }
+                } else {
+                    write!(out, " {}", label)?;
+                }
                 out.set_color(&self.theme.description)?;
                 writeln!(out, "  {}", desc)?;
+            } else if self.filtering && !self.filter.is_empty() {
+                let matches = self
+                    .fuzzy_matcher
+                    .fuzzy_indices(&option.label.to_lowercase(), &self.filter.to_lowercase());
+                if let Some((_, indices)) = matches {
+                    for (j, c) in option.label.chars().enumerate() {
+                        if indices.contains(&j) {
+                            out.set_color(&self.theme.selected_option)?;
+                        } else {
+                            out.set_color(&self.theme.unselected_option)?;
+                        }
+                        if j == 0 {
+                            write!(out, " ")?;
+                        }
+                        write!(out, "{}", c)?;
+                    }
+                    writeln!(out)?;
+                } else {
+                    writeln!(out, " {}", option.label)?;
+                }
             } else {
                 writeln!(out, " {}", option.label)?;
             }
