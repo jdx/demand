@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0] - 2024-12-11
+
+### Features
+
+- Added select descriptions, drop-in filtering, and fuzzy matching
+
 ## [1.3.0] - 2024-12-09
 
 ### Bug Fixes
@@ -9,6 +15,10 @@
 ### Features
 
 - Quit interactive menus with single-key shortcut escape
+
+### Miscellaneous Tasks
+
+- Release demand version 1.3.0
 
 ## [1.2.4] - 2024-06-02
 
@@ -192,4 +202,5 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
+
 
