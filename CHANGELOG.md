@@ -1,10 +1,20 @@
 # Changelog
 
+## [1.4.1] - 2024-12-11
+
+### Bug Fixes
+
+- Allow pressing enter to select
+
 ## [1.4.0] - 2024-12-11
 
 ### Features
 
 - Added select descriptions, drop-in filtering, and fuzzy matching
+
+### Miscellaneous Tasks
+
+- Release demand version 1.4.0
 
 ## [1.3.0] - 2024-12-09
 
