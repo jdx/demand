@@ -135,9 +135,20 @@ impl<'a, T> Select<'a, T> {
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.height = output.lines().count() - 1;
+            let enter = |mut select: Select<T>| {
+                select.clear()?;
+                select.term.show_cursor()?;
+                let id = select.visible_options().get(select.cursor).unwrap().id;
+                let selected = select.options.iter().find(|o| o.id == id).unwrap();
+                let output = select.render_success(&selected.label)?;
+                let selected = select.options.into_iter().find(|o| o.id == id).unwrap();
+                select.term.write_all(output.as_bytes())?;
+                select.term.clear_to_end_of_screen()?;
+                Ok::<T, io::Error>(selected.item)
+            };
             if self.filtering {
                 match self.term.read_key()? {
-                    Key::Enter => self.handle_stop_filtering(true)?,
+                    Key::Enter => return enter(self),
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
                     Key::Char(c) => self.handle_filter_key(c)?,
@@ -162,15 +173,7 @@ impl<'a, T> Select<'a, T> {
                         self.handle_stop_filtering(false)?;
                     }
                     Key::Enter => {
-                        self.clear()?;
-                        self.term.show_cursor()?;
-                        let id = self.visible_options().get(self.cursor).unwrap().id;
-                        let selected = self.options.iter().find(|o| o.id == id).unwrap();
-                        let output = self.render_success(&selected.label)?;
-                        let selected = self.options.into_iter().find(|o| o.id == id).unwrap();
-                        self.term.write_all(output.as_bytes())?;
-                        self.term.clear_to_end_of_screen()?;
-                        return Ok(selected.item);
+                        return enter(self);
                     }
                     _ => {}
                 }
@@ -347,9 +350,7 @@ impl<'a, T> Select<'a, T> {
                 }
             }
         }
-        if !self.filtering {
-            help_keys.push(("enter", "confirm"));
-        }
+        help_keys.push(("enter", "confirm"));
         for (i, (key, desc)) in help_keys.iter().enumerate() {
             if i > 0 || (!self.filtering && !self.filter.is_empty()) {
                 out.set_color(&self.theme.help_sep)?;
