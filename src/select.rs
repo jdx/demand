@@ -148,6 +148,10 @@ impl<'a, T> Select<'a, T> {
             };
             if self.filtering {
                 match self.term.read_key()? {
+                    Key::ArrowDown => self.handle_down()?,
+                    Key::ArrowUp => self.handle_up()?,
+                    Key::ArrowLeft => self.handle_left()?,
+                    Key::ArrowRight => self.handle_right()?,
                     Key::Enter => return enter(self),
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
@@ -233,6 +237,7 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_left(&mut self) -> Result<(), io::Error> {
         if self.cur_page > 0 {
+            self.cursor = 0;
             self.cur_page -= 1;
             self.term.clear_to_end_of_screen()?;
         }
@@ -241,6 +246,7 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_right(&mut self) -> Result<(), io::Error> {
         if self.pages > 0 && self.cur_page < self.pages - 1 {
+            self.cursor = 0;
             self.cur_page += 1;
             self.term.clear_to_end_of_screen()?;
         }
@@ -264,6 +270,7 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_filter_key(&mut self, c: char) -> Result<(), io::Error> {
         self.filter.push(c);
+        self.cursor = 0;
         self.cur_page = 0;
         self.pages = self.get_pages();
         self.term.clear_to_end_of_screen()
@@ -271,6 +278,7 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
         self.filter.pop();
+        self.cursor = 0;
         self.cur_page = 0;
         self.pages = self.get_pages();
         self.term.clear_to_end_of_screen()
