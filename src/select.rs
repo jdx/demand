@@ -320,9 +320,16 @@ impl<'a, T> Select<'a, T> {
             out.set_color(&self.theme.unselected_option)?;
             if let Some(desc) = &option.description {
                 let label = console::pad_str(&option.label, max_label_len, Alignment::Left, None);
-                write!(out, " {label}")?;
+                if self.filtering && !self.filter.is_empty() {
+                    self.highlight_matches(&mut out, &label)?;
+                } else {
+                    write!(out, " {}", label)?;
+                }
                 out.set_color(&self.theme.description)?;
                 writeln!(out, "  {}", desc)?;
+            } else if self.filtering && !self.filter.is_empty() {
+                self.highlight_matches(&mut out, &option.label)?;
+                writeln!(out)?;
             } else {
                 writeln!(out, " {}", option.label)?;
             }
@@ -374,6 +381,32 @@ impl<'a, T> Select<'a, T> {
 
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn highlight_matches(
+        &self,
+        out: &mut dyn WriteColor,
+        label: &str,
+    ) -> Result<(), std::io::Error> {
+        let matches = self
+            .fuzzy_matcher
+            .fuzzy_indices(&label.to_lowercase(), &self.filter.to_lowercase());
+        if let Some((_, indices)) = matches {
+            for (j, c) in label.chars().enumerate() {
+                if indices.contains(&j) {
+                    out.set_color(&self.theme.selected_option)?;
+                } else {
+                    out.set_color(&self.theme.unselected_option)?;
+                }
+                if j == 0 {
+                    write!(out, " ")?;
+                }
+                write!(out, "{}", c)?;
+            }
+        } else {
+            write!(out, " {}", label)?;
+        }
+        Ok(())
     }
 
     fn render_success(&self, selected: &str) -> io::Result<String> {
