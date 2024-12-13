@@ -49,7 +49,8 @@ pub struct Select<'a, T> {
     /// Whether the selector can be filtered with a query
     pub filterable: bool,
 
-    cursor: usize,
+    cursor_x: usize,
+    cursor_y: usize,
     height: usize,
     term: Term,
     filter: String,
@@ -69,7 +70,8 @@ impl<'a, T> Select<'a, T> {
             options: vec![],
             filterable: false,
             theme: &theme::DEFAULT,
-            cursor: 0,
+            cursor_x: 0,
+            cursor_y: 0,
             height: 0,
             term: Term::stderr(),
             filter: String::new(),
@@ -134,11 +136,12 @@ impl<'a, T> Select<'a, T> {
             let output = self.render()?;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
+            self.term.hide_cursor()?;
             self.height = output.lines().count() - 1;
             let enter = |mut select: Select<T>| {
                 select.clear()?;
                 select.term.show_cursor()?;
-                let id = select.visible_options().get(select.cursor).unwrap().id;
+                let id = select.visible_options().get(select.cursor_y).unwrap().id;
                 let selected = select.options.iter().find(|o| o.id == id).unwrap();
                 let output = select.render_success(&selected.label)?;
                 let selected = select.options.into_iter().find(|o| o.id == id).unwrap();
@@ -146,6 +149,7 @@ impl<'a, T> Select<'a, T> {
                 select.term.clear_to_end_of_screen()?;
                 Ok::<T, io::Error>(selected.item)
             };
+
             if self.filtering {
                 match self.term.read_key()? {
                     Key::ArrowDown => self.handle_down()?,
@@ -159,7 +163,6 @@ impl<'a, T> Select<'a, T> {
                     _ => {}
                 }
             } else {
-                self.term.hide_cursor()?;
                 match self.term.read_key()? {
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
@@ -214,30 +217,33 @@ impl<'a, T> Select<'a, T> {
 
     fn handle_down(&mut self) -> Result<(), io::Error> {
         let visible_options = self.visible_options();
-        if self.cursor < visible_options.len().max(1) - 1 {
-            self.cursor += 1;
+        if self.cursor_y < visible_options.len().max(1) - 1 {
+            self.cursor_y += 1;
         } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
-            self.cursor = 0;
+            self.cursor_y = 0;
             self.term.clear_to_end_of_screen()?;
         }
         Ok(())
     }
 
     fn handle_up(&mut self) -> Result<(), io::Error> {
-        if self.cursor > 0 {
-            self.cursor -= 1;
+        if self.cursor_y > 0 {
+            self.cursor_y -= 1;
         } else if self.cur_page > 0 {
             self.cur_page -= 1;
-            self.cursor = self.visible_options().len().max(1) - 1;
+            self.cursor_y = self.visible_options().len().max(1) - 1;
             self.term.clear_to_end_of_screen()?;
         }
         Ok(())
     }
 
     fn handle_left(&mut self) -> Result<(), io::Error> {
-        if self.cur_page > 0 {
-            self.cursor = 0;
+        if self.filtering {
+            if self.cursor_x > 0 {
+                self.cursor_x -= 1;
+            }
+        } else if self.cur_page > 0 {
             self.cur_page -= 1;
             self.term.clear_to_end_of_screen()?;
         }
@@ -245,9 +251,15 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn handle_right(&mut self) -> Result<(), io::Error> {
-        if self.pages > 0 && self.cur_page < self.pages - 1 {
-            self.cursor = 0;
+        if self.filtering {
+            if self.cursor_x < self.filter.chars().count() {
+                self.cursor_x += 1;
+            }
+        } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
+            if self.cursor_y > self.visible_options().len() - 1 {
+                self.cursor_y = self.visible_options().len() - 1;
+            }
             self.term.clear_to_end_of_screen()?;
         }
         Ok(())
@@ -269,27 +281,32 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn handle_filter_key(&mut self, c: char) -> Result<(), io::Error> {
-        self.filter.push(c);
-        self.cursor = 0;
+        let idx = self.get_char_idx(&self.filter, self.cursor_x);
+        self.filter.insert(idx, c);
+        self.cursor_x += 1;
+        self.cursor_y = 0;
         self.cur_page = 0;
         self.pages = self.get_pages();
         self.term.clear_to_end_of_screen()
     }
 
     fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
-        self.filter.pop();
-        self.cursor = 0;
+        let chars_count = self.filter.chars().count();
+        if chars_count > 0 && self.cursor_x > 0 {
+            let idx = self.get_char_idx(&self.filter, self.cursor_x - 1);
+            self.filter.remove(idx);
+        }
+        if self.cursor_x > 0 {
+            self.cursor_x -= 1;
+        }
+        self.cursor_y = 0;
         self.cur_page = 0;
         self.pages = self.get_pages();
         self.term.clear_to_end_of_screen()
     }
 
     fn get_pages(&self) -> usize {
-        if self.filtering {
-            ((self.filtered_options().len() as f64) / self.capacity as f64).ceil() as usize
-        } else {
-            ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
-        }
+        ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
     }
 
     fn render(&self) -> io::Result<String> {
@@ -311,7 +328,7 @@ impl<'a, T> Select<'a, T> {
             .max()
             .unwrap_or(0);
         for (i, option) in self.visible_options().iter().enumerate() {
-            if self.cursor == i {
+            if self.cursor_y == i {
                 out.set_color(&self.theme.cursor)?;
                 write!(out, ">")?;
             } else {
@@ -334,7 +351,8 @@ impl<'a, T> Select<'a, T> {
                 writeln!(out, " {}", option.label)?;
             }
         }
-        if self.pages > 1 {
+
+        if !self.filtering && self.pages > 1 {
             out.set_color(&self.theme.description)?;
             writeln!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
         }
@@ -344,20 +362,42 @@ impl<'a, T> Select<'a, T> {
 
             write!(out, "/")?;
             out.reset()?;
-            write!(out, "{}", self.filter)?;
-            out.set_color(&self.theme.real_cursor_color(None))?;
+
+            let cursor_idx = self.get_char_idx(&self.filter, self.cursor_x);
+            write!(out, "{}", &self.filter[..cursor_idx])?;
+
+            if cursor_idx < self.filter.len() {
+                out.set_color(&self.theme.real_cursor_color(None))?;
+                write!(out, "{}", &self.filter[cursor_idx..cursor_idx + 1])?;
+                out.reset()?;
+            }
+            if cursor_idx + 1 < self.filter.len() {
+                out.reset()?;
+                write!(out, "{}", &self.filter[cursor_idx + 1..])?;
+            }
+            if cursor_idx >= self.filter.len() {
+                out.set_color(&self.theme.real_cursor_color(None))?;
+            }
             writeln!(out, " ")?;
-        } else if !self.filter.is_empty() {
-            out.set_color(&self.theme.description)?;
-            write!(out, "/{}", self.filter)?;
+            out.reset()?;
         }
+
+        self.print_help_keys(&mut out)?;
+
+        writeln!(out)?;
+        out.reset()?;
+
+        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn print_help_keys(&self, out: &mut Buffer) -> io::Result<()> {
         let mut help_keys = vec![("↑/↓/k/j", "up/down")];
         if self.pages > 1 {
             help_keys.push(("←/→/h/l", "prev/next page"));
         }
         if self.filterable {
             if self.filtering {
-                help_keys = vec![("esc", "clear filter"), ("enter", "save filter")];
+                help_keys = vec![("esc", "clear filter")];
             } else {
                 help_keys.push(("/", "filter"));
                 if !self.filter.is_empty() {
@@ -376,11 +416,15 @@ impl<'a, T> Select<'a, T> {
             out.set_color(&self.theme.help_desc)?;
             write!(out, " {}", desc)?;
         }
+        Ok(())
+    }
 
-        writeln!(out)?;
-
-        out.reset()?;
-        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    fn get_char_idx(&self, input: &str, cursor: usize) -> usize {
+        input
+            .char_indices()
+            .nth(cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(input.len())
     }
 
     fn highlight_matches(
