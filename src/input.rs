@@ -444,7 +444,7 @@ impl<'a> Input<'a> {
             .char_indices()
             .nth(cursor)
             .map(|(i, _)| i)
-            .unwrap_or(self.input.len())
+            .unwrap_or(input.len())
     }
 
     fn set_cursor(&mut self) -> io::Result<()> {
