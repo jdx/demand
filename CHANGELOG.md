@@ -1,10 +1,25 @@
 # Changelog
 
+## [1.5.0] - 2024-12-14
+
+### Bug Fixes
+
+- [select] arrow keys should work while filtering
+
+### Features
+
+- [select] allow left/right navigation on filter input
+- [select] highlight matched characters when filtering
+
 ## [1.4.1] - 2024-12-11
 
 ### Bug Fixes
 
 - Allow pressing enter to select
+
+### Miscellaneous Tasks
+
+- Release demand version 1.4.1
 
 ## [1.4.0] - 2024-12-11
 
