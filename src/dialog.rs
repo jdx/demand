@@ -4,8 +4,8 @@ use std::io::Write;
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
-use crate::theme;
 use crate::theme::Theme;
+use crate::{ctrlc, theme};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 /// A button to select in a dialog
@@ -131,6 +131,9 @@ impl<'a> Dialog<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
+        self.term.hide_cursor()?;
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -143,13 +146,16 @@ impl<'a> Dialog<'a> {
                 Key::Char(c) if self.buttons.iter().any(|b| b.key == c) => {
                     self.selected_button_idx =
                         self.buttons.iter().position(|b| b.key == c).unwrap();
+                    ctrlc_handle.close();
                     return self.handle_submit();
                 }
                 Key::Enter => {
+                    ctrlc_handle.close();
                     return self.handle_submit();
                 }
                 Key::Escape => {
-                    self.clear()?;
+                    self.term.show_cursor()?;
+                    ctrlc_handle.close();
                     return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                 }
                 _ => {}
@@ -159,6 +165,7 @@ impl<'a> Dialog<'a> {
 
     fn handle_submit(mut self) -> io::Result<String> {
         self.clear()?;
+        self.term.show_cursor()?;
         let output = self.render_success()?;
         self.term.write_all(output.as_bytes())?;
         let result = if !self.buttons.is_empty() {

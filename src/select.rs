@@ -2,7 +2,7 @@ use std::io;
 use std::io::Write;
 
 use crate::theme::Theme;
-use crate::{theme, DemandOption};
+use crate::{ctrlc, theme, DemandOption};
 use console::{Alignment, Key, Term};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -131,6 +131,8 @@ impl<'a, T> Select<'a, T> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<T> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -171,7 +173,8 @@ impl<'a, T> Select<'a, T> {
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
                         if self.filter.is_empty() {
-                            self.clear()?;
+                            self.term.show_cursor()?;
+                            ctrlc_handle.close();
                             return Err(io::Error::new(
                                 io::ErrorKind::Interrupted,
                                 "user cancelled",
@@ -180,6 +183,7 @@ impl<'a, T> Select<'a, T> {
                         self.handle_stop_filtering(false)?;
                     }
                     Key::Enter => {
+                        ctrlc_handle.close();
                         return enter(self);
                     }
                     _ => {}

@@ -67,11 +67,11 @@ fn main() {
         .option(DemandOption::new("Starburst"))
         .option(DemandOption::new("Twizzlers"))
         .option(DemandOption::new("Milk Duds"));
-    let _ = match multiselect.run() {
+    match multiselect.run() {
         Ok(value) => value,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Input cancelled");
+                println!("{}", e);
                 return;
             } else {
                 panic!("Error: {}", e);

@@ -13,6 +13,8 @@ pub use spinner::SpinnerStyle;
 pub use theme::Theme;
 
 mod confirm;
+#[cfg_attr(any(windows), path = "ctrlc_stub.rs")]
+mod ctrlc;
 mod dialog;
 mod input;
 mod list;

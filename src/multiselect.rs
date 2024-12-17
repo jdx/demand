@@ -6,7 +6,7 @@ use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
 use crate::theme::Theme;
-use crate::{theme, DemandOption};
+use crate::{ctrlc, theme, DemandOption};
 
 /// Select multiple options from a list
 ///
@@ -141,6 +141,8 @@ impl<'a, T> MultiSelect<'a, T> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<Vec<T>> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
 
@@ -170,7 +172,8 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
                         if self.filter.is_empty() {
-                            self.clear()?;
+                            self.term.show_cursor()?;
+                            ctrlc_handle.close();
                             return Err(io::Error::new(
                                 io::ErrorKind::Interrupted,
                                 "user cancelled",
@@ -205,6 +208,7 @@ impl<'a, T> MultiSelect<'a, T> {
                         }
                         self.clear()?;
                         self.term.show_cursor()?;
+                        ctrlc_handle.close();
                         let output = self.render_success(&selected)?;
                         self.term.write_all(output.as_bytes())?;
                         let selected = self

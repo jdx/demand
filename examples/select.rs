@@ -47,11 +47,11 @@ fn main() {
         .option(DemandOption::new("EG").label("Egypt"))
         .option(DemandOption::new("SA").label("Saudi Arabia"))
         .option(DemandOption::new("AE").label("United Arab Emirates"));
-    let _ = match ms.run() {
+    match ms.run() {
         Ok(value) => value,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Input cancelled");
+                println!("{}", e);
                 return;
             } else {
                 panic!("Error: {}", e);

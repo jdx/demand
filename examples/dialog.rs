@@ -9,11 +9,11 @@ fn main() {
             DialogButton::new("Cancel"),
         ])
         .selected_button(1);
-    let _ = match dialog.run() {
+    match dialog.run() {
         Ok(value) => value,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Dialog was cancelled");
+                println!("{}", e);
                 return;
             } else {
                 panic!("Error: {}", e);

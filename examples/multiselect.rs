@@ -13,11 +13,11 @@ fn main() {
         .option(DemandOption::new("Cheese"))
         .option(DemandOption::new("Vegan Cheese"))
         .option(DemandOption::new("Nutella"));
-    let _ = match multiselect.run() {
+    match multiselect.run() {
         Ok(toppings) => toppings,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Input cancelled");
+                println!("{}", e);
                 return;
             } else {
                 panic!("Error: {}", e);

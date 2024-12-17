@@ -2,6 +2,20 @@ use std::env::args;
 
 use demand::{Confirm, DemandOption, Input, MultiSelect, Theme};
 
+fn handle_run<T>(result: Result<T, std::io::Error>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::Interrupted {
+                println!("{}", e);
+                std::process::exit(0);
+            } else {
+                panic!("Error: {}", e);
+            }
+        }
+    }
+}
+
 fn main() {
     let theme = match args().nth(1).unwrap_or_default().as_str() {
         "base16" => Theme::base16(),
@@ -16,7 +30,7 @@ fn main() {
         .description("Please enter your e-mail address.")
         .placeholder("john.doe@acme.com")
         .theme(&theme);
-    i.run().expect("error running input");
+    handle_run(i.run());
 
     let ms = MultiSelect::new("Interests")
         .description("Select your interests")
@@ -31,12 +45,12 @@ fn main() {
         .option(DemandOption::new("Travel"))
         .option(DemandOption::new("Sports"))
         .theme(&theme);
-    ms.run().expect("error running multi select");
+    handle_run(ms.run());
 
     let c = Confirm::new("Confirm privacy policy")
         .description("Do you accept the privacy policy?")
         .affirmative("Yes")
         .negative("No")
         .theme(&theme);
-    c.run().expect("error running confirm");
+    handle_run(c.run());
 }
