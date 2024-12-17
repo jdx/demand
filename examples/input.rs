@@ -26,11 +26,11 @@ fn main() {
             "Zack Snyder",
         ])
         .validation(notempty_minlen);
-    let _ = match input.run() {
+    match input.run() {
         Ok(value) => value,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Input cancelled");
+                println!("{}", e);
                 return;
             } else {
                 panic!("Error: {}", e);

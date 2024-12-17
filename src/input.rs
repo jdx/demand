@@ -6,6 +6,7 @@ use std::{
 use console::{measure_text_width, Key, Term};
 use termcolor::{Buffer, WriteColor};
 
+use crate::ctrlc;
 use crate::{theme, Theme};
 
 /// Single line text input
@@ -153,6 +154,8 @@ impl<'a> Input<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
         self.term.hide_cursor()?;
         loop {
             self.clear()?;
@@ -177,14 +180,16 @@ impl<'a> Input<'a> {
                     self.clear_err()?;
                     self.validate()?;
                     if self.err.is_none() {
-                        self.term.show_cursor()?;
                         self.term.clear_to_end_of_screen()?;
+                        self.term.show_cursor()?;
+                        ctrlc_handle.close();
                         return self.handle_submit();
                     }
                 }
                 Key::Tab => self.handle_tab()?,
                 Key::Escape => {
-                    self.clear()?;
+                    self.term.show_cursor()?;
+                    ctrlc_handle.close();
                     return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                 }
                 _ => {}

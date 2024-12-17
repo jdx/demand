@@ -10,7 +10,7 @@ use console::Term;
 use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{theme, Theme};
+use crate::{ctrlc, theme, Theme};
 
 /// tell a prompt to do something while running
 /// currently its only useful for spinner
@@ -129,6 +129,12 @@ impl<'a> Spinner<'a> {
         F: FnOnce(&mut SpinnerActionRunner<'spinner>) -> T + Send + 'scope,
         T: Send + 'scope,
     {
+        let t = self.term.clone();
+        let _ctrlc_handle = ctrlc::set_ctrlc_handler(move || {
+            t.show_cursor().unwrap();
+            std::process::exit(130);
+        })?;
+
         std::thread::scope(|s| {
             let (sender, receiver) = mpsc::channel();
             let handle = s.spawn(move || {

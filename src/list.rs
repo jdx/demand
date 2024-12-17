@@ -4,7 +4,7 @@ use console::{Key, Term};
 use std::io::Write;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{theme, Theme};
+use crate::{ctrlc, theme, Theme};
 
 /// Display a list of options
 ///
@@ -125,6 +125,8 @@ impl<'a> List<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> Result<(), io::Error> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -148,12 +150,14 @@ impl<'a> List<'a> {
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
-                        self.clear()?;
+                        self.term.show_cursor()?;
+                        ctrlc_handle.close();
                         return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                     }
                     Key::Enter => {
                         self.clear()?;
                         self.term.show_cursor()?;
+                        ctrlc_handle.close();
                         let output = self.render_success()?;
                         self.term.write_all(output.as_bytes())?;
                         return Ok(());

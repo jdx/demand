@@ -4,8 +4,8 @@ use std::io::Write;
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
-use crate::theme;
 use crate::theme::Theme;
+use crate::{ctrlc, theme};
 
 /// Select multiple options from a list
 ///
@@ -95,9 +95,12 @@ impl<'a> Confirm<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<bool> {
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+
         let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
         let negative_char = self.negative.to_lowercase().chars().next().unwrap();
         self.term.clear_line()?;
+        self.term.hide_cursor()?;
         loop {
             self.clear()?;
             let output = self.render()?;
@@ -109,17 +112,21 @@ impl<'a> Confirm<'a> {
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
                 Key::Char(c) if c == affirmative_char => {
                     self.selected = true;
+                    ctrlc_handle.close();
                     return self.handle_submit();
                 }
                 Key::Char(c) if c == negative_char => {
                     self.selected = false;
+                    ctrlc_handle.close();
                     return self.handle_submit();
                 }
                 Key::Enter => {
+                    ctrlc_handle.close();
                     return self.handle_submit();
                 }
                 Key::Escape => {
-                    self.clear()?;
+                    self.term.show_cursor()?;
+                    ctrlc_handle.close();
                     return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                 }
                 _ => {}
@@ -130,6 +137,7 @@ impl<'a> Confirm<'a> {
     fn handle_submit(mut self) -> io::Result<bool> {
         self.term.clear_to_end_of_screen()?;
         self.clear()?;
+        self.term.show_cursor()?;
         let output = self.render_success()?;
         self.term.write_all(output.as_bytes())?;
         Ok(self.selected)

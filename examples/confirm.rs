@@ -5,11 +5,11 @@ fn main() {
         .description("This will do a thing.")
         .affirmative("Yes!")
         .negative("No.");
-    let _ = match confirm.run() {
+    match confirm.run() {
         Ok(confirm) => confirm,
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
-                println!("Dialog was cancelled");
+                println!("{}", e);
                 false
             } else {
                 panic!("Error: {}", e);

@@ -71,7 +71,7 @@ fn main() {
         Ok(_) => {}
         Err(e) => {
             if e.kind() == io::ErrorKind::Interrupted {
-                println!("Input cancelled");
+                println!("{}", e);
             } else {
                 panic!("Error: {}", e);
             }

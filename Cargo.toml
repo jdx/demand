@@ -13,6 +13,7 @@ console = "0.15"
 fuzzy-matcher = "0.3"
 itertools = "0.13"
 once_cell = "1"
+signal-hook = "0.3"
 termcolor = "1"
 
 [dev-dependencies]
