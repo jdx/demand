@@ -1,5 +1,5 @@
 [tools]
-"cargo:git-cliff" = "1.4"
+"cargo:git-cliff" = "2.7"
 "cargo:cargo-release" = "0.25"
 
 [tasks.changelog]
