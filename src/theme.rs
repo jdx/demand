@@ -30,6 +30,8 @@ pub struct Theme {
     pub description: ColorSpec,
     /// Cursor color
     pub cursor: ColorSpec,
+    /// Cursor string e.g. "❯ "
+    pub cursor_str: String,
 
     /// Selected option color
     pub selected_option: ColorSpec,
@@ -96,6 +98,7 @@ impl Theme {
             error_indicator: ColorSpec::new(),
             description: ColorSpec::new(),
             cursor: ColorSpec::new(),
+            cursor_str: String::from("❯"),
             selected_prefix: String::from("[•]"),
             selected_prefix_fg: ColorSpec::new(),
             selected_option: ColorSpec::new(),
@@ -172,6 +175,7 @@ impl Theme {
             error_indicator: make_color(red),
             description: make_color(Color::Ansi256(243)),
             cursor: make_color(fuchsia),
+            cursor_str: String::from("❯"),
 
             selected_prefix: String::from(" ✓"),
             selected_prefix_fg: make_color(Color::Rgb(2, 168, 119)),
@@ -228,6 +232,7 @@ impl Theme {
             error_indicator: make_color(red),
             description: make_color(comment),
             cursor: make_color(yellow),
+            cursor_str: String::from("❯"),
 
             selected_prefix: String::from(" [•]"),
             selected_prefix_fg: make_color(green),
@@ -276,6 +281,7 @@ impl Theme {
             error_indicator: make_color(Color::Ansi256(9)),
             description: make_color(Color::Ansi256(8)),
             cursor: make_color(Color::Ansi256(3)),
+            cursor_str: String::from("❯"),
 
             selected_prefix: String::from(" [•]"),
             selected_prefix_fg: make_color(Color::Ansi256(2)),
@@ -335,6 +341,7 @@ impl Theme {
             error_indicator: make_color(red),
             description: make_color(subtext0),
             cursor: make_color(pink),
+            cursor_str: String::from("❯"),
 
             selected_prefix: String::from(" [•]"),
             selected_prefix_fg: make_color(green),

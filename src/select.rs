@@ -330,9 +330,13 @@ impl<'a, T> Select<'a, T> {
         for (i, option) in self.visible_options().iter().enumerate() {
             if self.cursor_y == i {
                 out.set_color(&self.theme.cursor)?;
-                write!(out, ">")?;
+                write!(out, "{}", self.theme.cursor_str)?;
             } else {
-                write!(out, " ")?;
+                write!(
+                    out,
+                    "{}",
+                    " ".repeat(console::measure_text_width(&self.theme.cursor_str))
+                )?;
             }
             out.set_color(&self.theme.unselected_option)?;
             if let Some(desc) = &option.description {
@@ -491,7 +495,7 @@ mod tests {
             indoc! {
               "Country
             Select your Country
-            > United States
+            ❯ United States
               Germany
               Brazil
               Canada
@@ -536,7 +540,7 @@ mod tests {
             indoc! {
               "things
             pick a thing
-            > First
+            ❯ First
               2
             ↑/↓/k/j up/down • enter confirm
             "
