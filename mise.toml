@@ -1,5 +1,4 @@
 [tools]
-"cargo:cargo-tarpaulin" = "0.27"
 "cargo:git-cliff" = "1.4"
 "cargo:cargo-release" = "0.25"
 
@@ -8,12 +7,10 @@ description = "Generate changelog"
 run = "git cliff -o CHANGELOG.md"
 
 [tasks.coverage]
+tools = { "cargo-tarpaulin" = "0.27" }
+depends = ["lint"]
 description = "Run tests with coverage"
-run = [
-  "cargo clippy -- -D warnings",
-  "cargo fmt -- --check",
-  "cargo tarpaulin --lib --tests"
-]
+run = "cargo tarpaulin --lib --tests"
 
 [tasks."recordings input"]
 description = "Create recordings with vhs"
@@ -56,12 +53,18 @@ done
 """
 
 [tasks.tests]
+depends = ["lint"]
 description = "Run tests"
-run = [
-  "cargo clippy -- -D warnings",
-  "cargo fmt -- --check",
-  "cargo test --lib --tests"
-]
+run = "cargo test --lib --tests"
 
 [tasks.release]
 run = 'cargo release'
+
+[tasks.lint]
+run = [
+  "cargo clippy -- -D warnings",
+  "cargo fmt -- --check"
+]
+
+[tasks.pre-commit]
+depends = ["lint"]
