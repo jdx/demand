@@ -62,10 +62,7 @@ run = "cargo test --lib --tests"
 run = 'cargo release'
 
 [tasks.lint]
-run = [
-  "cargo clippy -- -D warnings",
-  "cargo fmt -- --check"
-]
+run = ["cargo clippy -- -D warnings", "cargo fmt -- --check"]
 
 [tasks.pre-commit]
 depends = ["lint"]

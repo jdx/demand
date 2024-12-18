@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/jdx/demand"
 readme = "README.md"
 keywords = ["cli", "prompt", "console"]
+include = ["src/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependencies]
 console = "0.15"
@@ -24,4 +25,11 @@ indoc = "2"
 allow-branch = ["main"]
 sign-tag = true
 sign-commit = true
-pre-release-hook = ["git", "cliff", "-o", "CHANGELOG.md", "--tag", "{{version}}" ]
+pre-release-hook = [
+  "git",
+  "cliff",
+  "-o",
+  "CHANGELOG.md",
+  "--tag",
+  "{{version}}",
+]
