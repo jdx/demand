@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.6.0] - 2024-12-18
+
+### Bug Fixes
+
+- Ctrl-c doesn't restore cursor
+
+### Features
+
+- Use prettier cursor for select
+
+### Miscellaneous Tasks
+
+- Bump mise tools
+
+### Testing
+
+- Run CI on windows/mac
+
 ## [1.5.0] - 2024-12-14
 
 ### Bug Fixes
@@ -10,6 +28,10 @@
 
 - [select] allow left/right navigation on filter input
 - [select] highlight matched characters when filtering
+
+### Miscellaneous Tasks
+
+- Release demand version 1.5.0
 
 ## [1.4.1] - 2024-12-11
 
