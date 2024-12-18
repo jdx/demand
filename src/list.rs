@@ -10,7 +10,7 @@ use crate::{theme, Theme};
 ///
 /// # Example
 /// ```rust
-/// use demand::{DmandOption, List};
+/// use demand::{DemandOption, List};
 ///
 /// let list = List::new("Toppings")
 ///   .description("Select your toppings")

@@ -52,7 +52,8 @@ for i in $(ls -1 assets/themes/*.tape); do
 done
 """
 
-[tasks.tests]
+[tasks.test]
+alias = ["t", "tests"]
 depends = ["lint"]
 description = "Run tests"
 run = "cargo test --lib --tests"
