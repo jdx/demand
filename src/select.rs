@@ -9,7 +9,9 @@ use fuzzy_matcher::FuzzyMatcher;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 
-/// Select multiple options from a list
+/// Select a single option from a list
+///
+/// If multiple options are marked as selected, only the last one will be shown as selected.
 ///
 /// # Example
 /// ```rust
@@ -19,7 +21,7 @@ use termcolor::{Buffer, WriteColor};
 ///   .description("Select your topping")
 ///   .filterable(true)
 ///   .option(DemandOption::new("Lettuce"))
-///   .option(DemandOption::new("Tomatoes"))
+///   .option(DemandOption::new("Tomatoes").selected(true))
 ///   .option(DemandOption::new("Charm Sauce"))
 ///   .option(DemandOption::new("Jalapenos").label("Jalapeños"))
 ///   .option(DemandOption::new("Cheese"))
@@ -96,6 +98,7 @@ impl<'a, T> Select<'a, T> {
     pub fn option(mut self, option: DemandOption<T>) -> Self {
         self.options.push(option);
         self.pages = self.get_pages();
+        self.cursor_y = self.get_selected_option_idx();
         self
     }
 
@@ -105,6 +108,7 @@ impl<'a, T> Select<'a, T> {
             self.options.push(option);
         }
         self.pages = self.get_pages();
+        self.cursor_y = self.get_selected_option_idx();
         self
     }
 
@@ -313,6 +317,13 @@ impl<'a, T> Select<'a, T> {
         ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
     }
 
+    fn get_selected_option_idx(&mut self) -> usize {
+        self.visible_options()
+            .iter()
+            .rposition(|o| o.selected)
+            .unwrap_or(0)
+    }
+
     fn render(&self) -> io::Result<String> {
         let mut out = Buffer::ansi();
 
@@ -489,9 +500,9 @@ mod tests {
     fn test_render() {
         let select = Select::new("Country")
             .description("Select your Country")
-            .option(DemandOption::new("United States").selected(true))
+            .option(DemandOption::new("United States"))
             .option(DemandOption::new("Germany"))
-            .option(DemandOption::new("Brazil"))
+            .option(DemandOption::new("Brazil").selected(true))
             .option(DemandOption::new("Canada"))
             .option(DemandOption::new("Mexico"));
 
@@ -499,9 +510,9 @@ mod tests {
             indoc! {
               "Country
             Select your Country
-            ❯ United States
+              United States
               Germany
-              Brazil
+            ❯ Brazil
               Canada
               Mexico
             ↑/↓/k/j up/down • enter confirm
