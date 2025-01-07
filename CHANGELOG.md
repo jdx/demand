@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.6.1] - 2025-01-07
+
+### Bug Fixes
+
+- Select with a specific option set as selected is not shown as selected in the output
+- Update rust crate itertools to 0.14 (#79)
+
+### Miscellaneous Tasks
+
+- Include specific files
+
 ## [1.6.0] - 2024-12-18
 
 ### Bug Fixes
@@ -12,6 +23,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.6.0
 - Bump mise tools
 
 ### Testing
