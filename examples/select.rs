@@ -4,13 +4,9 @@ fn main() {
     let ms = Select::new("Country")
         .description("Pick a country")
         .filterable(true)
-        .option(
-            DemandOption::new("US")
-                .label("United States")
-                .selected(true),
-        )
+        .option(DemandOption::new("US").label("United States"))
         .option(DemandOption::new("DE").label("Germany"))
-        .option(DemandOption::new("BR").label("Brazil"))
+        .option(DemandOption::new("BR").label("Brazil").selected(true))
         .option(DemandOption::new("CA").label("Canada"))
         .option(DemandOption::new("MX").label("Mexico"))
         .option(DemandOption::new("FR").label("France"))
