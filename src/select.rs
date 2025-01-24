@@ -396,8 +396,10 @@ impl<'a, T> Select<'a, T> {
             }
             if cursor_idx >= self.filter.len() {
                 out.set_color(&self.theme.real_cursor_color(None))?;
+                write!(out, " ")?;
+                out.reset()?;
             }
-            writeln!(out, " ")?;
+            writeln!(out)?;
             out.reset()?;
         }
 
