@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.2] - 2025-01-24
+
+### Bug Fixes
+
+- White flash in select when filtering: true (#83)
+
+### Features
+
+- Add filtering option for multiselect (#85)
+
 ## [1.6.1] - 2025-01-07
 
 ### Bug Fixes
@@ -9,6 +19,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.6.1
 - Include specific files
 
 ## [1.6.0] - 2024-12-18
