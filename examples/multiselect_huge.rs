@@ -6,8 +6,16 @@ fn main() {
         .min(1)
         .max(4)
         .filterable(true)
-        .option(DemandOption::new("Lettuce").selected(true))
-        .option(DemandOption::new("Tomatoes").selected(true))
+        .option(
+            DemandOption::new("Lettuce")
+                .selected(true)
+                .description("Green leaf"),
+        )
+        .option(
+            DemandOption::new("Tomatoes")
+                .selected(true)
+                .description("Italians call them pomodoro"),
+        )
         .option(DemandOption::new("Charm Sauce"))
         .option(DemandOption::new("Jalapenos").label("Jalapeños"))
         .option(DemandOption::new("Cheese"))
