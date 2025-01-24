@@ -2,7 +2,10 @@ use std::collections::HashSet;
 use std::io;
 use std::io::Write;
 
-use console::{Key, Term};
+use console::{Alignment, Key, Term};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 
 use crate::theme::Theme;
@@ -53,15 +56,21 @@ pub struct MultiSelect<'a, T> {
     pub max: usize,
     /// Whether the selector can be filtered with a query
     pub filterable: bool,
+    /// Whether the selector is currently being filtered
+    pub filtering: bool,
+    /// A filter query to preset when `filtering` is true
+    pub filter: String,
+
     err: Option<String>,
+    cursor_x: usize,
+    cursor_y: usize,
     cursor: usize,
     height: usize,
     term: Term,
-    filter: String,
-    filtering: bool,
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    fuzzy_matcher: SkimMatcherV2,
 }
 
 impl<'a, T> MultiSelect<'a, T> {
@@ -75,6 +84,8 @@ impl<'a, T> MultiSelect<'a, T> {
             max: usize::MAX,
             filterable: false,
             theme: &theme::DEFAULT,
+            cursor_x: 0,
+            cursor_y: 0,
             err: None,
             cursor: 0,
             height: 0,
@@ -84,6 +95,7 @@ impl<'a, T> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
         let max_height = ms.term.size().0 as usize;
         ms.capacity = max_height.max(8) - 6;
@@ -130,6 +142,18 @@ impl<'a, T> MultiSelect<'a, T> {
         self
     }
 
+    pub fn filtering(mut self, filtering: bool) -> Self {
+        self.filtering = filtering;
+        self
+    }
+
+    pub fn filter(mut self, filter: &str) -> Self {
+        self.filter = filter.to_string();
+        self.cursor_x = self.filter.chars().count();
+        self.pages = self.get_pages();
+        self
+    }
+
     /// Set the theme of the selector
     pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
@@ -154,6 +178,8 @@ impl<'a, T> MultiSelect<'a, T> {
             self.height = output.lines().count() - 1;
             if self.filtering {
                 match self.term.read_key()? {
+                    Key::ArrowLeft => self.handle_left()?,
+                    Key::ArrowRight => self.handle_right()?,
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
@@ -229,13 +255,17 @@ impl<'a, T> MultiSelect<'a, T> {
     fn filtered_options(&self) -> Vec<&DemandOption<T>> {
         self.options
             .iter()
-            .filter(|opt| {
-                self.filter.is_empty()
-                    || opt
-                        .label
-                        .to_lowercase()
-                        .contains(&self.filter.to_lowercase())
+            .filter_map(|opt| {
+                if self.filter.is_empty() {
+                    Some((0, opt))
+                } else {
+                    self.fuzzy_matcher
+                        .fuzzy_match(&opt.label.to_lowercase(), &self.filter.to_lowercase())
+                        .map(|score| (score, opt))
+                }
             })
+            .sorted_by_key(|(score, _opt)| -1 * *score)
+            .map(|(_score, opt)| opt)
             .collect()
     }
 
@@ -273,7 +303,11 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn handle_left(&mut self) -> Result<(), io::Error> {
-        if self.cur_page > 0 {
+        if self.filtering {
+            if self.cursor_x > 0 {
+                self.cursor_x -= 1;
+            }
+        } else if self.cur_page > 0 {
             self.cur_page -= 1;
             self.term.clear_to_end_of_screen()?;
         }
@@ -281,8 +315,15 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn handle_right(&mut self) -> Result<(), io::Error> {
-        if self.pages > 0 && self.cur_page < self.pages - 1 {
+        if self.filtering {
+            if self.cursor_x < self.filter.chars().count() {
+                self.cursor_x += 1;
+            }
+        } else if self.pages > 0 && self.cur_page < self.pages - 1 {
             self.cur_page += 1;
+            if self.cursor_y > self.visible_options().len() - 1 {
+                self.cursor_y = self.visible_options().len() - 1;
+            }
             self.term.clear_to_end_of_screen()?;
         }
         Ok(())
@@ -341,15 +382,26 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn handle_filter_key(&mut self, c: char) -> Result<(), io::Error> {
+        let idx = self.get_char_idx(&self.filter, self.cursor_x);
+        self.filter.insert(idx, c);
+        self.cursor_x += 1;
+        self.cursor_y = 0;
         self.err = None;
-        self.filter.push(c);
         self.reset_paging();
         self.term.clear_to_end_of_screen()
     }
 
     fn handle_filter_backspace(&mut self) -> Result<(), io::Error> {
+        let chars_count = self.filter.chars().count();
+        if chars_count > 0 && self.cursor_x > 0 {
+            let idx = self.get_char_idx(&self.filter, self.cursor_x - 1);
+            self.filter.remove(idx);
+        }
+        if self.cursor_x > 0 {
+            self.cursor_x -= 1;
+        }
+        self.cursor_y = 0;
         self.err = None;
-        self.filter.pop();
         self.reset_paging();
         self.term.clear_to_end_of_screen()
     }
@@ -360,7 +412,7 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn get_pages(&self) -> usize {
-        if self.filtering {
+        if self.filtering || !self.filter.is_empty() {
             ((self.filtered_options().len() as f64) / self.capacity as f64).ceil() as usize
         } else {
             ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
@@ -384,7 +436,13 @@ impl<'a, T> MultiSelect<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
-        for (i, option) in self.visible_options().iter().enumerate() {
+        let max_label_len = self
+            .visible_options()
+            .iter()
+            .map(|o| console::measure_text_width(&o.label))
+            .max()
+            .unwrap_or(0);
+        for (i, option) in self.visible_options().into_iter().enumerate() {
             if self.cursor == i {
                 out.set_color(&self.theme.cursor)?;
                 write!(out, " >")?;
@@ -395,12 +453,12 @@ impl<'a, T> MultiSelect<'a, T> {
                 out.set_color(&self.theme.selected_prefix_fg)?;
                 write!(out, "{}", self.theme.selected_prefix)?;
                 out.set_color(&self.theme.selected_option)?;
-                writeln!(out, " {}", option.label)?;
+                self.print_option_label(&mut out, option, max_label_len)?;
             } else {
                 out.set_color(&self.theme.unselected_prefix_fg)?;
                 write!(out, "{}", self.theme.unselected_prefix)?;
                 out.set_color(&self.theme.unselected_option)?;
-                writeln!(out, " {}", option.label)?;
+                self.print_option_label(&mut out, option, max_label_len)?;
             }
         }
         if self.pages > 1 {
@@ -413,9 +471,26 @@ impl<'a, T> MultiSelect<'a, T> {
 
             write!(out, "/")?;
             out.reset()?;
-            write!(out, "{}", self.filter)?;
-            out.set_color(&self.theme.real_cursor_color(None))?;
-            writeln!(out, " ")?;
+
+            let cursor_idx = self.get_char_idx(&self.filter, self.cursor_x);
+            write!(out, "{}", &self.filter[..cursor_idx])?;
+
+            if cursor_idx < self.filter.len() {
+                out.set_color(&self.theme.real_cursor_color(None))?;
+                write!(out, "{}", &self.filter[cursor_idx..cursor_idx + 1])?;
+                out.reset()?;
+            }
+            if cursor_idx + 1 < self.filter.len() {
+                out.reset()?;
+                write!(out, "{}", &self.filter[cursor_idx + 1..])?;
+            }
+            if cursor_idx >= self.filter.len() {
+                out.set_color(&self.theme.real_cursor_color(None))?;
+                write!(out, " ")?;
+                out.reset()?;
+            }
+            writeln!(out)?;
+            out.reset()?;
         } else if !self.filter.is_empty() {
             out.set_color(&self.theme.description)?;
             write!(out, "/{}", self.filter)?;
@@ -423,6 +498,40 @@ impl<'a, T> MultiSelect<'a, T> {
             out.set_color(&self.theme.error_indicator)?;
             write!(out, " {}", err)?;
         }
+
+        self.print_help_keys(&mut out)?;
+
+        writeln!(out)?;
+        out.reset()?;
+
+        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn print_option_label(
+        &self,
+        out: &mut Buffer,
+        option: &DemandOption<T>,
+        max_label_len: usize,
+    ) -> io::Result<()> {
+        if let Some(desc) = &option.description {
+            let label = console::pad_str(&option.label, max_label_len, Alignment::Left, None);
+            if self.filtering && !self.filter.is_empty() {
+                self.highlight_matches(out, &label)?;
+            } else {
+                write!(out, " {}", label)?;
+            }
+            out.set_color(&self.theme.description)?;
+            writeln!(out, "  {}", desc)?;
+        } else if self.filtering && !self.filter.is_empty() {
+            self.highlight_matches(out, &option.label)?;
+            writeln!(out)?;
+        } else {
+            writeln!(out, " {}", option.label)?;
+        }
+        Ok(())
+    }
+
+    fn print_help_keys(&self, out: &mut Buffer) -> io::Result<()> {
         let mut help_keys = vec![("↑/↓/k/j", "up/down")];
         if self.pages > 1 {
             help_keys.push(("←/→/h/l", "prev/next page"));
@@ -452,11 +561,41 @@ impl<'a, T> MultiSelect<'a, T> {
             out.set_color(&self.theme.help_desc)?;
             write!(out, " {}", desc)?;
         }
+        Ok(())
+    }
 
-        writeln!(out)?;
+    fn get_char_idx(&self, input: &str, cursor: usize) -> usize {
+        input
+            .char_indices()
+            .nth(cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(input.len())
+    }
 
-        out.reset()?;
-        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    fn highlight_matches(
+        &self,
+        out: &mut dyn WriteColor,
+        label: &str,
+    ) -> Result<(), std::io::Error> {
+        let matches = self
+            .fuzzy_matcher
+            .fuzzy_indices(&label.to_lowercase(), &self.filter.to_lowercase());
+        if let Some((_, indices)) = matches {
+            for (j, c) in label.chars().enumerate() {
+                if indices.contains(&j) {
+                    out.set_color(&self.theme.selected_option)?;
+                } else {
+                    out.set_color(&self.theme.unselected_option)?;
+                }
+                if j == 0 {
+                    write!(out, " ")?;
+                }
+                write!(out, "{}", c)?;
+            }
+        } else {
+            write!(out, " {}", label)?;
+        }
+        Ok(())
     }
 
     fn render_success(&self, selected: &[String]) -> io::Result<String> {
