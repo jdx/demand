@@ -65,7 +65,6 @@ pub struct MultiSelect<'a, T> {
     cursor_x: usize,
     cursor_y: usize,
     cursor: usize,
-    height: usize,
     term: Term,
     pages: usize,
     cur_page: usize,
@@ -88,7 +87,6 @@ impl<'a, T> MultiSelect<'a, T> {
             cursor_y: 0,
             err: None,
             cursor: 0,
-            height: 0,
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -175,7 +173,6 @@ impl<'a, T> MultiSelect<'a, T> {
             let output = self.render()?;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
-            self.height = output.lines().count() - 1;
             if self.filtering {
                 match self.term.read_key()? {
                     Key::ArrowLeft => self.handle_left()?,
@@ -609,8 +606,7 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        self.term.clear_screen()?;
         Ok(())
     }
 }

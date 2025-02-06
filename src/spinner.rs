@@ -92,7 +92,6 @@ pub struct Spinner<'a> {
 
     term: Term,
     frame: usize,
-    height: usize,
 }
 
 impl<'a> Spinner<'a> {
@@ -104,7 +103,6 @@ impl<'a> Spinner<'a> {
             theme: &theme::DEFAULT,
             term: Term::stderr(),
             frame: 0,
-            height: 0,
         }
     }
 
@@ -159,7 +157,6 @@ impl<'a> Spinner<'a> {
                 }
                 self.clear()?;
                 let output = self.render()?;
-                self.height = output.lines().count() - 1;
                 self.term.write_all(output.as_bytes())?;
                 sleep(self.style.fps);
                 if handle.is_finished() {
@@ -194,12 +191,7 @@ impl<'a> Spinner<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        if self.height == 0 {
-            self.term.clear_line()?;
-        } else {
-            self.term.clear_last_lines(self.height)?;
-        }
-        self.height = 0;
+        self.term.clear_screen()?;
         Ok(())
     }
 }
