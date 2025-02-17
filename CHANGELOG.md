@@ -1,14 +1,20 @@
 # Changelog
 
-## [1.6.2] - 2025-01-24
+## [1.6.3] - 2025-02-17
 
 ### Bug Fixes
 
+- Ctrl-c doesn't restore cursor after Select::run (#90)
+- Add .DS_Store, .vscode to .gitignore (#86)
 - White flash in select when filtering: true (#83)
 
 ### Features
 
 - Add filtering option for multiselect (#85)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.6.2
 
 ## [1.6.1] - 2025-01-07
 
