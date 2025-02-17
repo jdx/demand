@@ -4,17 +4,8 @@ use signal_hook::{
     consts::SIGINT,
     iterator::{Handle, Signals},
 };
-use std::{
-    io::Error,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex, RwLock,
-    },
-    thread,
-};
+use std::{io::Error, sync::RwLock, thread};
 
-static MUTEX: Mutex<()> = Mutex::new(());
-static INIT: AtomicBool = AtomicBool::new(false);
 static HANDLE: Lazy<RwLock<CtrlcHandle>> = Lazy::new(|| RwLock::new(CtrlcHandle(None)));
 
 #[derive(Clone)]
@@ -24,6 +15,10 @@ impl CtrlcHandle {
     pub fn close(&self) {
         if let Some(handle) = &self.0 {
             handle.close();
+            let mut handle_guard = HANDLE.write().unwrap();
+            if handle_guard.0.is_some() {
+                handle_guard.0 = None;
+            }
         }
     }
 }
@@ -70,19 +65,22 @@ pub fn set_ctrlc_handler<F>(handler: F) -> Result<CtrlcHandle, Error>
 where
     F: FnMut() + 'static + Send,
 {
-    let _mutex = MUTEX.lock();
-    if INIT.load(Ordering::Relaxed) {
-        let handle_guard = HANDLE.read().unwrap();
+    let mut handle_guard = HANDLE.write().unwrap();
+    if handle_guard.0.is_some() {
         return Ok(handle_guard.clone());
     }
-    INIT.store(true, Ordering::Relaxed);
 
-    let handle = set_ctrlc_handler_internal(handler)?;
-    {
-        let mut handle_guard = HANDLE.write().unwrap();
-        *handle_guard = CtrlcHandle(Some(handle.clone()));
+    let handle = Some(set_ctrlc_handler_internal(handler).unwrap());
+
+    if let Some(h) = handle {
+        *handle_guard = CtrlcHandle(Some(h.clone()));
+        Ok(CtrlcHandle(Some(h)))
+    } else {
+        Err(Error::new(
+            std::io::ErrorKind::Other,
+            "Failed to set Ctrl+C handler",
+        ))
     }
-    Ok(CtrlcHandle(Some(handle)))
 }
 
 fn set_ctrlc_handler_internal<F>(mut handler: F) -> Result<Handle, Error>
