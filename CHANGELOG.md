@@ -1,10 +1,29 @@
 # Changelog
 
+## [1.6.4] - 2025-02-26
+
+### Bug Fixes
+
+- Clear entire screen instead of removing lines by widget height (#88)
+
+### Documentation
+
+- Align and fix doc comments (#92)
+
 ## [1.6.3] - 2025-02-17
 
 ### Bug Fixes
 
 - Ctrl-c doesn't restore cursor after Select::run (#90)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.6.3
+
+## [1.6.2] - 2025-01-24
+
+### Bug Fixes
+
 - Add .DS_Store, .vscode to .gitignore (#86)
 - White flash in select when filtering: true (#83)
 
