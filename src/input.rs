@@ -54,7 +54,6 @@ pub struct Input<'a> {
 
     // Internal state
     cursor: usize,
-    height: usize,
     term: Term,
     err: Option<String>,
     suggestion: Option<String>,
@@ -82,7 +81,6 @@ impl<'a> Input<'a> {
 
             // Internal state
             cursor: 0,
-            height: 0,
             term: Term::stderr(),
             err: None,
             suggestion: None,
@@ -161,7 +159,6 @@ impl<'a> Input<'a> {
             self.clear()?;
             let output = self.render()?;
 
-            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.set_cursor()?;
@@ -498,8 +495,7 @@ impl<'a> Input<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        self.term.clear_screen()?;
         Ok(())
     }
 }
