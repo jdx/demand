@@ -46,7 +46,7 @@ pub struct MultiSelect<'a, T> {
     pub title: String,
     /// The colors/style of the selector
     pub theme: &'a Theme,
-    /// A description to display above the selector
+    /// A description to display after the title
     pub description: String,
     /// The options which can be selected
     pub options: Vec<DemandOption<T>>,
