@@ -7,7 +7,7 @@ use termcolor::{Buffer, WriteColor};
 use crate::theme::Theme;
 use crate::{ctrlc, theme};
 
-/// Select multiple options from a list
+/// A confirmation dialog
 ///
 /// # Example
 /// ```rust
@@ -29,11 +29,11 @@ use crate::{ctrlc, theme};
 /// };
 /// ```
 pub struct Confirm<'a> {
-    /// The title of the selector
+    /// The title of the dialog
     pub title: String,
-    /// The colors/style of the selector
+    /// The colors/style of the dialog
     pub theme: &'a Theme,
-    /// A description to display above the selector
+    /// A description to display after the title
     pub description: String,
     /// The text to display for the affirmative option
     pub affirmative: String,
@@ -41,11 +41,12 @@ pub struct Confirm<'a> {
     pub negative: String,
     /// If true, the affirmative option is selected by default
     pub selected: bool,
+
     term: Term,
 }
 
 impl<'a> Confirm<'a> {
-    /// Create a new multi select with the given title
+    /// Create a new confirmation dialog with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
@@ -58,7 +59,7 @@ impl<'a> Confirm<'a> {
         }
     }
 
-    /// Set the description of the selector
+    /// Set the description of the dialog
     pub fn description(mut self, description: &str) -> Self {
         self.description = description.to_string();
         self

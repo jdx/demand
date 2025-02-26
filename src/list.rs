@@ -39,11 +39,11 @@ use crate::{ctrlc, theme, Theme};
 pub struct List<'a> {
     /// Title of the list
     pub title: String,
-    /// Description of the list
+    /// A description to display after the title
     pub description: String,
     /// Number of items to show on each page
     pub success_items: usize,
-    /// Colors/style of the input
+    /// Colors/style of the list
     pub theme: &'a Theme,
 
     term: Term,

@@ -48,9 +48,9 @@ pub struct Theme {
 
     /// Char to use for the cursor
     pub cursor_shape: CursorShape,
-    /// the color when there isnt text to get color from
+    /// the color when there isn't text to get color from
     pub cursor_style: ColorSpec,
-    /// use cusor_style even when there is text to get color from
+    /// use cursor_style even when there is text to get color from
     pub force_style: bool,
 
     /// Input cursor color
@@ -67,9 +67,9 @@ pub struct Theme {
     /// Help item separator color
     pub help_sep: ColorSpec,
 
-    /// Focused button
+    /// Focused button color
     pub focused_button: ColorSpec,
-    /// Blurred button
+    /// Blurred button color
     pub blurred_button: ColorSpec,
 
     /// Error indicator color

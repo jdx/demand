@@ -31,7 +31,7 @@ impl DialogButton {
     }
 }
 
-/// A dialog to display to the user
+/// A multi-button dialog
 ///
 /// # Example
 /// ```rust
@@ -58,11 +58,11 @@ impl DialogButton {
 /// };
 /// ```
 pub struct Dialog<'a> {
-    /// The title of the selector
+    /// The title of the dialog
     pub title: String,
-    /// The colors/style of the selector
+    /// The colors/style of the dialog
     pub theme: &'a Theme,
-    /// A description to display above the selector
+    /// A description to display after the title
     pub description: String,
     /// The buttons to display to the user
     pub buttons: Vec<DialogButton>,
