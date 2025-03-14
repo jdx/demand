@@ -68,6 +68,7 @@ pub struct Dialog<'a> {
     pub buttons: Vec<DialogButton>,
 
     term: Term,
+    height: usize,
     selected_button_idx: usize,
 }
 
@@ -82,6 +83,7 @@ impl<'a> Dialog<'a> {
             theme: &*theme::DEFAULT,
             term: Term::stderr(),
             buttons: vec![DialogButton::new("Ok"), DialogButton::new("Cancel")],
+            height: 0,
             selected_button_idx: 0,
         }
     }
@@ -135,6 +137,7 @@ impl<'a> Dialog<'a> {
         loop {
             self.clear()?;
             let output = self.render()?;
+            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             match self.term.read_key()? {
@@ -255,7 +258,9 @@ impl<'a> Dialog<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
+        self.term.clear_last_lines(self.height)?;
         self.term.clear_screen()?;
+        self.height = 0;
         Ok(())
     }
 }

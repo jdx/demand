@@ -53,6 +53,7 @@ pub struct Select<'a, T> {
 
     cursor_x: usize,
     cursor_y: usize,
+    height: usize,
     term: Term,
     filter: String,
     filtering: bool,
@@ -73,6 +74,7 @@ impl<'a, T> Select<'a, T> {
             theme: &theme::DEFAULT,
             cursor_x: 0,
             cursor_y: 0,
+            height: 0,
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -141,6 +143,7 @@ impl<'a, T> Select<'a, T> {
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.term.hide_cursor()?;
+            self.height = output.lines().count() - 1;
             let enter = |mut select: Select<T>| {
                 select.clear()?;
                 select.term.show_cursor()?;
@@ -482,7 +485,9 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
+        self.term.clear_last_lines(self.height)?;
         self.term.clear_screen()?;
+        self.height = 0;
         Ok(())
     }
 }
