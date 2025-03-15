@@ -4,7 +4,7 @@ use console::{Key, Term};
 use std::io::Write;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{ctrlc, theme, Theme};
+use crate::{Theme, ctrlc, theme};
 
 /// Display a list of options
 ///

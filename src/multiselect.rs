@@ -3,13 +3,13 @@ use std::io;
 use std::io::Write;
 
 use console::{Alignment, Key, Term};
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 
 use crate::theme::Theme;
-use crate::{ctrlc, theme, DemandOption};
+use crate::{DemandOption, ctrlc, theme};
 
 /// Select multiple options from a list
 ///
