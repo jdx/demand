@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.5] - 2025-03-15
+
+### Bug Fixes
+
+- Prompt shows input history on every typed character (#95)
+
+### Miscellaneous Tasks
+
+- Edition 2024 (#96)
+
 ## [1.6.4] - 2025-02-26
 
 ### Bug Fixes
@@ -9,6 +19,10 @@
 ### Documentation
 
 - Align and fix doc comments (#92)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.6.4
 
 ## [1.6.3] - 2025-02-17
 
