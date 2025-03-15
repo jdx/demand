@@ -10,7 +10,7 @@ use console::Term;
 use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
-use crate::{ctrlc, theme, Theme};
+use crate::{Theme, ctrlc, theme};
 
 /// tell a prompt to do something while running
 /// currently its only useful for spinner

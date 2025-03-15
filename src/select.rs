@@ -2,10 +2,10 @@ use std::io;
 use std::io::Write;
 
 use crate::theme::Theme;
-use crate::{ctrlc, theme, DemandOption};
+use crate::{DemandOption, ctrlc, theme};
 use console::{Alignment, Key, Term};
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 

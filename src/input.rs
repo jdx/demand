@@ -3,11 +3,11 @@ use std::{
     io::{self, Write},
 };
 
-use console::{measure_text_width, Key, Term};
+use console::{Key, Term, measure_text_width};
 use termcolor::{Buffer, WriteColor};
 
 use crate::ctrlc;
-use crate::{theme, Theme};
+use crate::{Theme, theme};
 
 /// Single line text input
 ///

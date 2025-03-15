@@ -1,7 +1,7 @@
 [package]
 name = "demand"
 version = "1.6.4"
-edition = "2021"
+edition = "2024"
 description = "A CLI prompt library"
 license = "MIT"
 repository = "https://github.com/jdx/demand"
