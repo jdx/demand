@@ -1,5 +1,5 @@
+use std::io;
 use std::io::Write;
-use std::io::{self};
 
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
@@ -43,6 +43,7 @@ pub struct Confirm<'a> {
     pub selected: bool,
 
     term: Term,
+    height: usize,
 }
 
 impl<'a> Confirm<'a> {
@@ -56,6 +57,7 @@ impl<'a> Confirm<'a> {
             affirmative: "Yes".to_string(),
             negative: "No".to_string(),
             selected: true,
+            height: 0,
         }
     }
 
@@ -103,6 +105,7 @@ impl<'a> Confirm<'a> {
         loop {
             self.clear()?;
             let output = self.render()?;
+            self.height = output.lines().count() - 1;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             match self.term.read_key()? {
@@ -219,7 +222,9 @@ impl<'a> Confirm<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
+        self.term.clear_last_lines(self.height)?;
         self.term.clear_screen()?;
+        self.height = 0;
         Ok(())
     }
 }

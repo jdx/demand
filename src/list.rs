@@ -53,6 +53,7 @@ pub struct List<'a> {
     filterable: bool,
     filter: String,
     cur_page: usize,
+    height: usize,
     pages: usize,
     scroll: usize,
 }
@@ -70,6 +71,7 @@ impl<'a> List<'a> {
             filtering: false,
             filterable: false,
             filter: String::new(),
+            height: 0,
             cur_page: 0,
             pages: 0,
             success_items: 4,
@@ -130,6 +132,7 @@ impl<'a> List<'a> {
             let output = self.render()?;
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
+            self.height = output.lines().count() - 1;
             if self.filtering {
                 match self.term.read_key()? {
                     Key::Enter => self.handle_stop_filtering(true)?,
@@ -337,7 +340,13 @@ impl<'a> List<'a> {
     }
 
     fn clear(&mut self) -> Result<(), io::Error> {
+        if self.height > 0 {
+            self.term.clear_last_lines(self.height)?;
+        } else {
+            self.term.clear_line()?;
+        }
         self.term.clear_screen()?;
+        self.height = 0;
         Ok(())
     }
 }
