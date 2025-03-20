@@ -1,13 +1,15 @@
 use std::{
     io::{self, Write},
     marker::PhantomData,
-    sync::mpsc::{self, Sender, TryRecvError},
+    sync::{
+        LazyLock,
+        mpsc::{self, Sender, TryRecvError},
+    },
     thread::sleep,
     time::Duration,
 };
 
 use console::Term;
-use once_cell::sync::Lazy;
 use termcolor::{Buffer, WriteColor};
 
 use crate::{Theme, ctrlc, theme};
@@ -205,7 +207,7 @@ impl<'a> Spinner<'a> {
     }
 }
 
-pub(crate) static DEFAULT: Lazy<SpinnerStyle> = Lazy::new(SpinnerStyle::line);
+pub(crate) static DEFAULT: LazyLock<SpinnerStyle> = LazyLock::new(SpinnerStyle::line);
 
 /// The style of the spinner
 ///
