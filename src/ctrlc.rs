@@ -1,12 +1,15 @@
 use console::Term;
-use once_cell::sync::Lazy;
 use signal_hook::{
     consts::SIGINT,
     iterator::{Handle, Signals},
 };
-use std::{io::Error, sync::RwLock, thread};
+use std::{
+    io::Error,
+    sync::{LazyLock, RwLock},
+    thread,
+};
 
-static HANDLE: Lazy<RwLock<CtrlcHandle>> = Lazy::new(|| RwLock::new(CtrlcHandle(None)));
+static HANDLE: LazyLock<RwLock<CtrlcHandle>> = LazyLock::new(|| RwLock::new(CtrlcHandle(None)));
 
 #[derive(Clone)]
 pub struct CtrlcHandle(Option<Handle>);

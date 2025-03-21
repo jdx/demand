@@ -1,7 +1,8 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use termcolor::{Color, ColorSpec};
 
-pub(crate) static DEFAULT: Lazy<Theme> = Lazy::new(Theme::default);
+pub(crate) static DEFAULT: LazyLock<Theme> = LazyLock::new(Theme::default);
 
 #[derive(Clone, Debug)]
 pub enum CursorShape {

@@ -13,7 +13,6 @@ include = ["src/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
 console = "0.15"
 fuzzy-matcher = "0.3"
 itertools = "0.14"
-once_cell = "1"
 signal-hook = "0.3"
 termcolor = "1"
 
