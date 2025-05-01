@@ -1,4 +1,4 @@
-use demand::{Input, InputValidation};
+use demand::{Input, InputValidator};
 
 fn main() {
     let max_length = Input::new("What is the max. length of a name?")
@@ -10,7 +10,7 @@ fn main() {
     let name_validator = NameValidation { max_length };
 
     let name = Input::new("What's your name?")
-        .validation(name_validator)
+        .validator(name_validator)
         .run()
         .expect("a name");
 
@@ -28,7 +28,7 @@ struct NameValidation {
     max_length: usize,
 }
 
-impl InputValidation for NameValidation {
+impl InputValidator for NameValidation {
     fn check(&self, input: &str) -> Result<(), String> {
         if input.len() > self.max_length {
             return Err(format!(

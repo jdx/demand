@@ -11,7 +11,7 @@ fn main() {
             Input::new("input")
                 .description("go on say something")
                 .suggestions(&["hello there"])
-                .validation(|s: &str| match !s.contains('j') {
+                .validation(|s| match !s.contains('j') {
                     true => Ok(()),
                     false => Err("ew stinky 'j' not welcome here"),
                 })

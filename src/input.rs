@@ -50,7 +50,7 @@ pub struct Input<'a> {
     /// Colors/style of the input
     pub theme: &'a Theme,
     /// Validation function
-    pub validation: Box<dyn InputValidation>,
+    pub validation: Box<dyn InputValidator>,
 
     // Internal state
     cursor: usize,
@@ -144,7 +144,15 @@ impl<'a> Input<'a> {
     /// Sets the validation for the input.
     ///
     /// If the input is valid, the Result is Ok(()). Otherwise, the Result is Err(&str).
-    pub fn validation(mut self, validation: impl InputValidation + 'static) -> Self {
+    pub fn validation(self, validation: fn(&str) -> Result<(), &str>) -> Self {
+        self.validator(FnValidator(validation))
+    }
+
+    /// Sets the validator for the input.
+    ///
+    /// This is similar to the [Input::validation] method, but it's more flexible.
+    /// See [InputValidator] for examples
+    pub fn validator(mut self, validation: impl InputValidator + 'static) -> Self {
         self.validation = Box::new(validation);
         self
     }
@@ -503,25 +511,11 @@ impl<'a> Input<'a> {
     }
 }
 
-/// Input Validation trait
-/// 
-/// ## BREAKING CHANGE
-/// 
-/// The previous validation function use to be `fn(&str) -> Result<(), &str>`
-/// instead of implementing the `InputValidation` trait.
-/// 
-/// This trait is implemented for this function pointer,
-/// and for every `Fn(&str) -> Result<(), impl ToString>` function.
-/// 
-/// BUT it could lead to a compilation error if the compiler isn't able to determine
-/// the trait type.
-/// 
-/// You might need to explicitly set the argument type of the closure,
-/// or the `'static` lifetime of the return type.
+/// Input validator trait
 ///
 /// ## Examples
 ///
-/// Simple validation with a closure
+/// Simple validation with a function pointer
 ///
 /// ```rust
 /// use demand::Input;
@@ -532,7 +526,7 @@ impl<'a> Input<'a> {
 ///      }
 ///      Ok(())
 /// }
-/// 
+///
 /// let name = Input::new("What's your name?")
 ///     .validation(not_empty)
 ///     .run()
@@ -566,7 +560,7 @@ impl<'a> Input<'a> {
 ///     .run()
 ///     .expect("a name");
 /// ```
-pub trait InputValidation {
+pub trait InputValidator {
     fn check(&self, input: &str) -> Result<(), String>;
 }
 
@@ -574,13 +568,20 @@ pub trait InputValidation {
 ///
 /// Every input is accepted
 pub struct NoValidation;
-impl InputValidation for NoValidation {
+impl InputValidator for NoValidation {
     fn check(&self, _input: &str) -> Result<(), String> {
         Ok(())
     }
 }
 
-impl<F, Err> InputValidation for F
+pub struct FnValidator(fn(&str) -> Result<(), &str>);
+impl InputValidator for FnValidator {
+    fn check(&self, input: &str) -> Result<(), String> {
+        (self.0)(input).map_err(str::to_string)
+    }
+}
+
+impl<F, Err> InputValidator for F
 where
     F: Fn(&str) -> Result<(), Err>,
     Err: ToString,
@@ -590,7 +591,7 @@ where
     }
 }
 
-impl InputValidation for fn(&str) -> Result<(), &str> {
+impl InputValidator for fn(&str) -> Result<(), &str> {
     fn check(&self, input: &str) -> Result<(), String> {
         self(input).map_err(str::to_string)
     }
