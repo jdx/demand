@@ -345,7 +345,6 @@ impl<'a> List<'a> {
         } else {
             self.term.clear_line()?;
         }
-        self.term.clear_screen()?;
         self.height = 0;
         Ok(())
     }
