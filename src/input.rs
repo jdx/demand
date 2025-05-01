@@ -50,7 +50,7 @@ pub struct Input<'a> {
     /// Colors/style of the input
     pub theme: &'a Theme,
     /// Validation function
-    pub validation: fn(&str) -> Result<(), &str>,
+    pub validation: Box<dyn InputValidation>,
 
     // Internal state
     cursor: usize,
@@ -78,7 +78,7 @@ impl<'a> Input<'a> {
             inline: false,
             password: false,
             theme: &*theme::DEFAULT,
-            validation: |_| Ok(()),
+            validation: Box::new(NoValidation),
 
             // Internal state
             cursor: 0,
@@ -144,8 +144,8 @@ impl<'a> Input<'a> {
     /// Sets the validation for the input.
     ///
     /// If the input is valid, the Result is Ok(()). Otherwise, the Result is Err(&str).
-    pub fn validation(mut self, validation: fn(&str) -> Result<(), &str>) -> Self {
-        self.validation = validation;
+    pub fn validation(mut self, validation: impl InputValidation + 'static) -> Self {
+        self.validation = Box::new(validation);
         self
     }
 
@@ -438,9 +438,7 @@ impl<'a> Input<'a> {
     }
 
     fn validate(&mut self) -> io::Result<()> {
-        self.err = (self.validation)(&self.input)
-            .map_err(|err| err.to_string())
-            .err();
+        self.err = self.validation.check(&self.input).err();
         Ok(())
     }
 
@@ -502,6 +500,99 @@ impl<'a> Input<'a> {
         self.term.clear_screen()?;
         self.height = 0;
         Ok(())
+    }
+}
+
+/// Input Validation trait
+/// 
+/// ## BREAKING CHANGE
+/// 
+/// The previous validation function use to be `fn(&str) -> Result<(), &str>`
+/// instead of implementing the `InputValidation` trait.
+/// 
+/// This trait is implemented for this function pointer,
+/// and for every `Fn(&str) -> Result<(), impl ToString>` function.
+/// 
+/// BUT it could lead to a compilation error if the compiler isn't able to determine
+/// the trait type.
+/// 
+/// You might need to explicitly set the argument type of the closure,
+/// or the `'static` lifetime of the return type.
+///
+/// ## Examples
+///
+/// Simple validation with a closure
+///
+/// ```rust
+/// use demand::Input;
+///
+/// fn not_empty(s: &str) -> Result<(), &'static str> {
+///      if s.is_empty() {
+///          return Err("Name cannot be empty");
+///      }
+///      Ok(())
+/// }
+/// 
+/// let name = Input::new("What's your name?")
+///     .validation(not_empty)
+///     .run()
+///     .expect("a name");
+/// ```
+///
+/// Dynamic validation
+///
+/// ```rust
+/// use demand::{Input, InputValidation};
+///
+/// struct NameValidation {
+///     max_length: usize,
+/// }
+///
+/// impl InputValidation for NameValidation {
+///     fn check(&self, input: &str) -> Result<(), String> {
+///         if input.len() > self.max_length {
+///             return Err(format!(
+///                 "Name must be at most {} characters, got {}",
+///                 self.max_length,
+///                 input.len()
+///             ));
+///         }
+///         Ok(())
+///     }
+/// }
+///
+/// let name = Input::new("What's your name?")
+///     .validation(name_validator)
+///     .run()
+///     .expect("a name");
+/// ```
+pub trait InputValidation {
+    fn check(&self, input: &str) -> Result<(), String>;
+}
+
+/// No validation
+///
+/// Every input is accepted
+pub struct NoValidation;
+impl InputValidation for NoValidation {
+    fn check(&self, _input: &str) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl<F, Err> InputValidation for F
+where
+    F: Fn(&str) -> Result<(), Err>,
+    Err: ToString,
+{
+    fn check(&self, input: &str) -> Result<(), String> {
+        self(input).map_err(|err| err.to_string())
+    }
+}
+
+impl InputValidation for fn(&str) -> Result<(), &str> {
+    fn check(&self, input: &str) -> Result<(), String> {
+        self(input).map_err(str::to_string)
     }
 }
 
