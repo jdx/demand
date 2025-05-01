@@ -43,6 +43,7 @@ pub struct Confirm<'a> {
     pub selected: bool,
 
     term: Term,
+    clear_screen: bool,
     height: usize,
 }
 
@@ -57,6 +58,7 @@ impl<'a> Confirm<'a> {
             affirmative: "Yes".to_string(),
             negative: "No".to_string(),
             selected: true,
+            clear_screen: false,
             height: 0,
         }
     }
@@ -88,6 +90,12 @@ impl<'a> Confirm<'a> {
     /// Set the theme of the dialog
     pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Clear the screen before the dialog is (re-)rendered
+    pub fn clear_screen(mut self, clear: bool) -> Self {
+        self.clear_screen = clear;
         self
     }
 
@@ -223,7 +231,9 @@ impl<'a> Confirm<'a> {
 
     fn clear(&mut self) -> io::Result<()> {
         self.term.clear_last_lines(self.height)?;
-        self.term.clear_screen()?;
+        if self.clear_screen {
+            self.term.clear_screen()?;
+        }
         self.height = 0;
         Ok(())
     }

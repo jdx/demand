@@ -499,7 +499,6 @@ impl<'a> Input<'a> {
 
     fn clear(&mut self) -> io::Result<()> {
         self.term.clear_last_lines(self.height)?;
-        self.term.clear_screen()?;
         self.height = 0;
         Ok(())
     }

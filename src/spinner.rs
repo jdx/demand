@@ -201,7 +201,6 @@ impl<'a> Spinner<'a> {
         } else {
             self.term.clear_last_lines(self.height)?;
         }
-        self.term.clear_screen()?;
         self.height = 0;
         Ok(())
     }
