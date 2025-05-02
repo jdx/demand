@@ -3,7 +3,7 @@
 pub use confirm::Confirm;
 pub use dialog::Dialog;
 pub use dialog::DialogButton;
-pub use input::Input;
+pub use input::{Input, InputValidator};
 pub use list::List;
 pub use multiselect::MultiSelect;
 pub use option::DemandOption;
