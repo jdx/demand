@@ -135,6 +135,13 @@ impl<'a> Input<'a> {
         self
     }
 
+    /// Sets the default value of the input.
+    pub fn default_value(mut self, default_value: impl Into<String>) -> Self {
+        self.input = default_value.into();
+        self.cursor += self.input.chars().count(); // move cursor to the end of the text
+        self
+    }
+
     /// Sets the theme of the input
     pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
