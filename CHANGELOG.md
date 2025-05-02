@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.7.0] - 2025-05-02
+
+### Bug Fixes
+
+- Demand 1.6.4 clears screen on Select::run (#102)
+
+### Features
+
+- Set input default value (#103)
+- Add validation input trait (#101)
+
+### Refactor
+
+- Remove `once_cell` dependency in favour of `std::sync::LazyLock` (#98)
+
 ## [1.6.5] - 2025-03-15
 
 ### Bug Fixes
@@ -8,6 +23,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.6.5
 - Edition 2024 (#96)
 
 ## [1.6.4] - 2025-02-26
