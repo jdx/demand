@@ -359,10 +359,10 @@ impl<'a, T> Select<'a, T> {
                 if self.filtering && !self.filter.is_empty() {
                     self.highlight_matches(&mut out, &label)?;
                 } else {
-                    write!(out, " {}", label)?;
+                    write!(out, " {label}")?;
                 }
                 out.set_color(&self.theme.description)?;
-                writeln!(out, "  {}", desc)?;
+                writeln!(out, "  {desc}")?;
             } else if self.filtering && !self.filter.is_empty() {
                 self.highlight_matches(&mut out, &option.label)?;
                 writeln!(out)?;
@@ -433,9 +433,9 @@ impl<'a, T> Select<'a, T> {
                 write!(out, " • ")?;
             }
             out.set_color(&self.theme.help_key)?;
-            write!(out, "{}", key)?;
+            write!(out, "{key}")?;
             out.set_color(&self.theme.help_desc)?;
-            write!(out, " {}", desc)?;
+            write!(out, " {desc}")?;
         }
         Ok(())
     }
@@ -466,10 +466,10 @@ impl<'a, T> Select<'a, T> {
                 if j == 0 {
                     write!(out, " ")?;
                 }
-                write!(out, "{}", c)?;
+                write!(out, "{c}")?;
             }
         } else {
-            write!(out, " {}", label)?;
+            write!(out, " {label}")?;
         }
         Ok(())
     }
@@ -479,7 +479,7 @@ impl<'a, T> Select<'a, T> {
         out.set_color(&self.theme.title)?;
         write!(out, "{}", self.title)?;
         out.set_color(&self.theme.selected_option)?;
-        writeln!(out, " {}", selected)?;
+        writeln!(out, " {selected}")?;
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }

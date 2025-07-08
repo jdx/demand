@@ -205,9 +205,9 @@ impl<'a> Confirm<'a> {
                 write!(out, " • ")?;
             }
             out.set_color(&self.theme.help_key)?;
-            write!(out, "{}", key)?;
+            write!(out, "{key}")?;
             out.set_color(&self.theme.help_desc)?;
-            write!(out, " {}", desc)?;
+            write!(out, " {desc}")?;
         }
         writeln!(out)?;
 

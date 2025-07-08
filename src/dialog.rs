@@ -229,7 +229,7 @@ impl<'a> Dialog<'a> {
                 output.push('/');
                 output
             });
-        let submit_keys = format!("{}enter", button_keys);
+        let submit_keys = format!("{button_keys}enter");
         help_keys.push((&submit_keys, "submit"));
         for (i, (key, desc)) in help_keys.iter().enumerate() {
             if i > 0 {
@@ -237,9 +237,9 @@ impl<'a> Dialog<'a> {
                 write!(out, " • ")?;
             }
             out.set_color(&self.theme.help_key)?;
-            write!(out, "{}", key)?;
+            write!(out, "{key}")?;
             out.set_color(&self.theme.help_desc)?;
-            write!(out, " {}", desc)?;
+            write!(out, " {desc}")?;
         }
         writeln!(out)?;
 

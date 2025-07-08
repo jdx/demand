@@ -496,7 +496,7 @@ impl<'a, T> MultiSelect<'a, T> {
             write!(out, "/{}", self.filter)?;
         } else if let Some(err) = &self.err {
             out.set_color(&self.theme.error_indicator)?;
-            write!(out, " {}", err)?;
+            write!(out, " {err}")?;
         }
 
         self.print_help_keys(&mut out)?;
@@ -518,10 +518,10 @@ impl<'a, T> MultiSelect<'a, T> {
             if self.filtering && !self.filter.is_empty() {
                 self.highlight_matches(out, &label)?;
             } else {
-                write!(out, " {}", label)?;
+                write!(out, " {label}")?;
             }
             out.set_color(&self.theme.description)?;
-            writeln!(out, "  {}", desc)?;
+            writeln!(out, "  {desc}")?;
         } else if self.filtering && !self.filter.is_empty() {
             self.highlight_matches(out, &option.label)?;
             writeln!(out)?;
@@ -557,9 +557,9 @@ impl<'a, T> MultiSelect<'a, T> {
                 write!(out, " • ")?;
             }
             out.set_color(&self.theme.help_key)?;
-            write!(out, "{}", key)?;
+            write!(out, "{key}")?;
             out.set_color(&self.theme.help_desc)?;
-            write!(out, " {}", desc)?;
+            write!(out, " {desc}")?;
         }
         Ok(())
     }
@@ -590,10 +590,10 @@ impl<'a, T> MultiSelect<'a, T> {
                 if j == 0 {
                     write!(out, " ")?;
                 }
-                write!(out, "{}", c)?;
+                write!(out, "{c}")?;
             }
         } else {
-            write!(out, " {}", label)?;
+            write!(out, " {label}")?;
         }
         Ok(())
     }

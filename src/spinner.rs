@@ -170,9 +170,9 @@ impl<'a> Spinner<'a> {
                     break;
                 }
             }
-            handle.join().map_err(|e| {
-                io::Error::new(io::ErrorKind::Other, format!("thread panicked: {e:?}"))
-            })
+            handle
+                .join()
+                .map_err(|e| io::Error::other(format!("thread panicked: {e:?}")))
         })
     }
 

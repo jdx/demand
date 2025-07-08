@@ -79,10 +79,7 @@ where
         *handle_guard = CtrlcHandle(Some(h.clone()));
         Ok(CtrlcHandle(Some(h)))
     } else {
-        Err(Error::new(
-            std::io::ErrorKind::Other,
-            "Failed to set Ctrl+C handler",
-        ))
+        Err(Error::other("Failed to set Ctrl+C handler"))
     }
 }
 
