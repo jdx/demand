@@ -10,7 +10,7 @@ keywords = ["cli", "prompt", "console"]
 include = ["src/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependencies]
-console = "0.15"
+console = "0.16"
 fuzzy-matcher = "0.3"
 itertools = "0.14"
 signal-hook = "0.3"
