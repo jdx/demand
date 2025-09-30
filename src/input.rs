@@ -176,7 +176,7 @@ impl<'a> Input<'a> {
             let mut line = String::new();
             stdin.lock().read_line(&mut line)?;
             // Remove trailing newline
-            self.input = line.trim_end().to_string();
+            self.input = line.strip_suffix('\n').unwrap_or(&line).to_string();
             self.validate()?;
             if self.err.is_some() {
                 return Err(io::Error::new(
