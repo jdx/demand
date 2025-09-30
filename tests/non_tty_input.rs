@@ -61,3 +61,33 @@ fn test_piped_stdin_validation_failure() {
         "Example should fail with invalid input (too short)"
     );
 }
+
+#[test]
+fn test_piped_stdin_windows_line_endings() {
+    // Test that Windows line endings (\r\n) are handled correctly
+    let mut child = Command::new("cargo")
+        .args(&["run", "--quiet", "--example", "input"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn example");
+
+    // Write test value with Windows line ending (\r\n)
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(b"TestValue123\r\n")
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child
+        .wait_with_output()
+        .expect("Failed to wait for example");
+
+    // Should exit successfully (validation passed, \r stripped correctly)
+    assert!(
+        output.status.success(),
+        "Example should handle Windows line endings correctly, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}

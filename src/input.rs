@@ -175,8 +175,15 @@ impl<'a> Input<'a> {
             let stdin = io::stdin();
             let mut line = String::new();
             stdin.lock().read_line(&mut line)?;
-            // Remove trailing newline
-            self.input = line.strip_suffix('\n').unwrap_or(&line).to_string();
+            // Remove trailing line endings (handles both \n and \r\n for Windows)
+            let mut input = line.as_str();
+            if let Some(stripped) = input.strip_suffix('\n') {
+                input = stripped;
+            }
+            if let Some(stripped) = input.strip_suffix('\r') {
+                input = stripped;
+            }
+            self.input = input.to_string();
             self.validate()?;
             if self.err.is_some() {
                 return Err(io::Error::new(
