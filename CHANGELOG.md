@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.1] - 2025-09-30
+
+### Bug Fixes
+
+- Support non-TTY input for automated testing (#113)
+- Update rust crate console to 0.16 (#105)
+
+### Miscellaneous Tasks
+
+- Fix uninlined_format_args linter errors
+
 ## [1.7.0] - 2025-05-02
 
 ### Bug Fixes
@@ -10,6 +21,10 @@
 
 - Set input default value (#103)
 - Add validation input trait (#101)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.7.0
 
 ### Refactor
 
@@ -45,15 +60,6 @@
 ### Bug Fixes
 
 - Ctrl-c doesn't restore cursor after Select::run (#90)
-
-### Miscellaneous Tasks
-
-- Release demand version 1.6.3
-
-## [1.6.2] - 2025-01-24
-
-### Bug Fixes
-
 - Add .DS_Store, .vscode to .gitignore (#86)
 - White flash in select when filtering: true (#83)
 
@@ -63,6 +69,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.6.3
 - Release demand version 1.6.2
 
 ## [1.6.1] - 2025-01-07
