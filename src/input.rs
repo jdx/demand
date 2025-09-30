@@ -1,6 +1,6 @@
 use std::{
     char,
-    io::{self, Write},
+    io::{self, IsTerminal, Write},
 };
 
 use console::{Key, Term, measure_text_width};
@@ -170,7 +170,7 @@ impl<'a> Input<'a> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
         // If not a TTY (e.g., piped input), read from stdin directly
-        if !self.term.is_term() {
+        if !io::stdin().is_terminal() {
             use std::io::BufRead;
             let stdin = io::stdin();
             let mut line = String::new();
