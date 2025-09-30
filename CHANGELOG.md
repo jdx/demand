@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.2] - 2025-09-30
+
+### Bug Fixes
+
+- Check stdin instead of stderr for TTY detection
+
 ## [1.7.1] - 2025-09-30
 
 ### Bug Fixes
@@ -9,6 +15,7 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.7.1
 - Fix uninlined_format_args linter errors
 
 ## [1.7.0] - 2025-05-02
