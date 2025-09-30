@@ -6,6 +6,6 @@ fn init() {
     console::set_colors_enabled_stderr(false);
 }
 
-pub fn without_ansi(s: &str) -> Cow<str> {
+pub fn without_ansi(s: &str) -> Cow<'_, str> {
     console::strip_ansi_codes(s)
 }

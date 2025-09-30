@@ -169,6 +169,31 @@ impl<'a> Input<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
+        // If not a TTY (e.g., piped input), read from stdin directly
+        if !self.term.is_term() {
+            use std::io::BufRead;
+            let stdin = io::stdin();
+            let mut line = String::new();
+            stdin.lock().read_line(&mut line)?;
+            // Remove trailing line endings (handles both \n and \r\n for Windows)
+            let mut input = line.as_str();
+            if let Some(stripped) = input.strip_suffix('\n') {
+                input = stripped;
+            }
+            if let Some(stripped) = input.strip_suffix('\r') {
+                input = stripped;
+            }
+            self.input = input.to_string();
+            self.validate()?;
+            if self.err.is_some() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    self.err.unwrap(),
+                ));
+            }
+            return Ok(self.input);
+        }
+
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         self.term.hide_cursor()?;
