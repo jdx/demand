@@ -17,7 +17,7 @@ signal-hook = "0.3"
 termcolor = "1"
 
 [dev-dependencies]
-ctor = "0.5"
+ctor = "0.6"
 indoc = "2"
 
 [package.metadata.release]
