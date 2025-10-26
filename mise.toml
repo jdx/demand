@@ -1,6 +1,9 @@
 [tools]
 "cargo:git-cliff" = "2.7"
 "cargo:cargo-release" = "0.25"
+hk = "1"
+cargo-binstall = "latest"
+pkl = "latest"
 
 [tasks.changelog]
 description = "Generate changelog"
