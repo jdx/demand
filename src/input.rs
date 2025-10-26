@@ -337,9 +337,26 @@ impl<'a> Input<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
-        // If not a TTY (e.g., piped input), read from stdin directly
-        if !io::stdin().is_terminal() {
+        // If not a TTY (e.g., piped input or non-interactive environment),
+        // write a simple prompt and read from stdin
+        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
             use std::io::BufRead;
+
+            // Write a simple text prompt to stderr (no terminal control sequences)
+            let mut stderr = io::stderr();
+            if !self.title.is_empty() {
+                writeln!(stderr, "{}", self.title)?;
+            }
+            if !self.description.is_empty() {
+                writeln!(stderr, "{}", self.description)?;
+            }
+            if !self.prompt.is_empty() {
+                write!(stderr, "{}", self.prompt)?;
+            } else {
+                write!(stderr, "> ")?;
+            }
+            stderr.flush()?;
+
             let stdin = io::stdin();
             let mut line = String::new();
             stdin.lock().read_line(&mut line)?;
