@@ -122,3 +122,96 @@ fn test_input_prompt_visible_in_non_tty() {
 
     assert!(output.status.success(), "Example should exit successfully");
 }
+
+#[test]
+fn test_confirm_custom_labels_respect_first_char() {
+    // Test that custom labels work with their first character
+    let output = run_example_with_input("confirm_custom", b"c\n");
+
+    assert!(
+        output.status.success(),
+        "Example should accept 'c' for Confirm, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Confirmed!"),
+        "Should confirm with 'c', got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_reject_hardcoded_yes() {
+    // Test that hardcoded "yes" is rejected when using custom labels
+    let output = run_example_with_input("confirm_custom", b"yes\n");
+
+    assert!(
+        !output.status.success(),
+        "Example should reject 'yes' when using custom labels (Confirm/Cancel)"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Invalid input"),
+        "Should show invalid input error, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_reject_hardcoded_y() {
+    // Test that hardcoded "y" is rejected when using custom labels
+    let output = run_example_with_input("confirm_custom", b"y\n");
+
+    assert!(
+        !output.status.success(),
+        "Example should reject 'y' when using custom labels (Confirm/Cancel)"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Invalid input"),
+        "Should show invalid input error, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_accept_full_word() {
+    // Test that full custom label word works
+    let output = run_example_with_input("confirm_custom", b"confirm\n");
+
+    assert!(
+        output.status.success(),
+        "Example should accept 'confirm', stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Confirmed!"),
+        "Should confirm with 'confirm', got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_accept_partial_match() {
+    // Test that partial match of custom label works
+    let output = run_example_with_input("confirm_custom", b"conf\n");
+
+    assert!(
+        output.status.success(),
+        "Example should accept 'conf' as partial match, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Confirmed!"),
+        "Should confirm with 'conf', got: {}",
+        stdout
+    );
+}
