@@ -104,6 +104,51 @@ impl<'a> Confirm<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<bool> {
+        // If not a TTY (e.g., piped input or non-interactive environment),
+        // write a simple prompt and read from stdin
+        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
+            use io::{BufRead, IsTerminal};
+
+            // Write a simple text prompt to stderr (no terminal control sequences)
+            let mut stderr = io::stderr();
+            if !self.title.is_empty() {
+                writeln!(stderr, "{}", self.title)?;
+            }
+            if !self.description.is_empty() {
+                writeln!(stderr, "{}", self.description)?;
+            }
+            write!(stderr, "{} / {} ", self.affirmative, self.negative)?;
+            if self.selected {
+                write!(stderr, "[{}/{}]: ", self.affirmative.to_lowercase().chars().next().unwrap(), self.negative.to_lowercase().chars().next().unwrap())?;
+            } else {
+                write!(stderr, "[{}/{}]: ", self.affirmative.to_lowercase().chars().next().unwrap(), self.negative.to_lowercase().chars().next().unwrap())?;
+            }
+            stderr.flush()?;
+
+            let stdin = io::stdin();
+            let mut line = String::new();
+            stdin.lock().read_line(&mut line)?;
+            let input = line.trim().to_lowercase();
+
+            // Parse response
+            let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
+            let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+
+            if input.is_empty() {
+                // Empty input uses default
+                return Ok(self.selected);
+            } else if input.starts_with(affirmative_char) || input == "y" || input == "yes" {
+                return Ok(true);
+            } else if input.starts_with(negative_char) || input == "n" || input == "no" {
+                return Ok(false);
+            } else {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("Invalid input: expected {}/{}", affirmative_char, negative_char),
+                ));
+            }
+        }
+
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
