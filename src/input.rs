@@ -1,6 +1,6 @@
 use std::{
     char,
-    io::{self, IsTerminal, Write},
+    io::{self, Write},
 };
 
 use console::{Key, Term, measure_text_width};
@@ -339,37 +339,17 @@ impl<'a> Input<'a> {
     pub fn run(mut self) -> io::Result<String> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
-        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
-            use std::io::BufRead;
-
-            // Write a simple text prompt to stderr (no terminal control sequences)
-            let mut stderr = io::stderr();
-            if !self.title.is_empty() {
-                writeln!(stderr, "{}", self.title)?;
-            }
-            if !self.description.is_empty() {
-                writeln!(stderr, "{}", self.description)?;
-            }
-            if !self.prompt.is_empty() {
-                write!(stderr, "{}", self.prompt)?;
+        if !crate::tty::is_tty() {
+            let prompt = if !self.prompt.is_empty() {
+                &self.prompt
             } else {
-                write!(stderr, "> ")?;
-            }
-            stderr.flush()?;
+                "> "
+            };
 
-            let stdin = io::stdin();
-            let mut line = String::new();
-            stdin.lock().read_line(&mut line)?;
-            // Remove trailing line endings (handles both \n and \r\n for Windows)
-            let mut input = line.as_str();
-            if let Some(stripped) = input.strip_suffix('\n') {
-                input = stripped;
-            }
-            if let Some(stripped) = input.strip_suffix('\r') {
-                input = stripped;
-            }
-            self.input = input.to_string();
+            crate::tty::write_prompt(&self.title, &self.description, prompt)?;
+            self.input = crate::tty::read_line()?;
             self.validate()?;
+
             if self.err.is_some() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,

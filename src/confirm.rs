@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{IsTerminal, Write};
+use std::io::Write;
 
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
@@ -106,34 +106,17 @@ impl<'a> Confirm<'a> {
     pub fn run(mut self) -> io::Result<bool> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
-        if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
-            use io::BufRead;
-
-            // Write a simple text prompt to stderr (no terminal control sequences)
-            let mut stderr = io::stderr();
-            if !self.title.is_empty() {
-                writeln!(stderr, "{}", self.title)?;
-            }
-            if !self.description.is_empty() {
-                writeln!(stderr, "{}", self.description)?;
-            }
-            write!(stderr, "{} / {} ", self.affirmative, self.negative)?;
-            if self.selected {
-                write!(stderr, "[{}/{}]: ", self.affirmative.to_lowercase().chars().next().unwrap(), self.negative.to_lowercase().chars().next().unwrap())?;
-            } else {
-                write!(stderr, "[{}/{}]: ", self.affirmative.to_lowercase().chars().next().unwrap(), self.negative.to_lowercase().chars().next().unwrap())?;
-            }
-            stderr.flush()?;
-
-            let stdin = io::stdin();
-            let mut line = String::new();
-            stdin.lock().read_line(&mut line)?;
-            let input = line.trim().to_lowercase();
-
-            // Parse response
+        if !crate::tty::is_tty() {
             let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
             let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+            let prompt = format!("{} / {} [{}/{}]: ",
+                self.affirmative, self.negative,
+                affirmative_char, negative_char);
 
+            crate::tty::write_prompt(&self.title, &self.description, &prompt)?;
+            let input = crate::tty::read_line()?.trim().to_lowercase();
+
+            // Parse response
             if input.is_empty() {
                 // Empty input uses default
                 return Ok(self.selected);
