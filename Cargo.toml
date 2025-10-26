@@ -19,6 +19,7 @@ termcolor = "1"
 [dev-dependencies]
 ctor = "0.6"
 indoc = "2"
+insta = "1"
 
 [package.metadata.release]
 allow-branch = ["main"]

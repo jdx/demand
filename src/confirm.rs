@@ -333,6 +333,7 @@ impl<'a> Confirm<'a> {
 mod tests {
     use super::*;
     use crate::test::without_ansi;
+    use insta::assert_snapshot;
 
     #[test]
     fn test_render() {
@@ -343,8 +344,14 @@ mod tests {
 
         let rendered = confirm.render().unwrap();
         let actual = without_ansi(rendered.as_str());
-        let expected = "Are you sure?\nThis will do a thing.\n\n   Yes!     No.  \n\n←/→ toggle • y/n/enter submit\n";
-        assert_eq!(expected, actual.as_ref());
+        assert_snapshot!(actual.as_ref(), @r"
+        Are you sure?
+        This will do a thing.
+
+           Yes!     No.  
+
+        ←/→ toggle • y/n/enter submit
+        ");
     }
 
     #[test]
@@ -355,9 +362,14 @@ mod tests {
 
         let rendered = confirm.render().unwrap();
         let actual = without_ansi(rendered.as_str());
-        let expected =
-            "Deploy to production?\n\n\n   Confirm     Cancel  \n\n←/→ toggle • enter submit\n";
-        assert_eq!(expected, actual.as_ref());
+        assert_snapshot!(actual.as_ref(), @r"
+        Deploy to production?
+
+
+           Confirm     Cancel  
+
+        ←/→ toggle • enter submit
+        ");
     }
 
     #[test]
@@ -368,9 +380,14 @@ mod tests {
 
         let rendered = confirm.render().unwrap();
         let actual = without_ansi(rendered.as_str());
-        let expected =
-            "Delete file?\n\n\n   Proceed     Abort  \n\n←/→ toggle • p/a/enter submit\n";
-        assert_eq!(expected, actual.as_ref());
+        assert_snapshot!(actual.as_ref(), @r"
+        Delete file?
+
+
+           Proceed     Abort  
+
+        ←/→ toggle • p/a/enter submit
+        ");
     }
 
     #[test]
