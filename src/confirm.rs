@@ -63,6 +63,45 @@ impl<'a> Confirm<'a> {
         }
     }
 
+    /// Calculate hint strings and shortcut characters for affirmative/negative options
+    /// Returns (affirmative_hint, negative_hint, affirmative_char, negative_char, has_conflict)
+    fn calculate_hints(&self) -> (String, String, char, char, bool) {
+        let affirmative_lower = self.affirmative.to_lowercase();
+        let negative_lower = self.negative.to_lowercase();
+
+        let affirmative_char = affirmative_lower.chars().next().unwrap_or('y');
+        let negative_char = negative_lower.chars().next().unwrap_or('n');
+
+        let has_conflict = affirmative_char == negative_char;
+
+        // Find minimum unique prefixes when first characters are the same
+        let (affirmative_hint, negative_hint) = if has_conflict {
+            // Find shortest unique prefixes
+            let mut prefix_len = 1;
+            loop {
+                let aff_prefix: String = affirmative_lower.chars().take(prefix_len).collect();
+                let neg_prefix: String = negative_lower.chars().take(prefix_len).collect();
+
+                if aff_prefix != neg_prefix
+                    || prefix_len >= affirmative_lower.len().max(negative_lower.len())
+                {
+                    break (aff_prefix, neg_prefix);
+                }
+                prefix_len += 1;
+            }
+        } else {
+            (affirmative_char.to_string(), negative_char.to_string())
+        };
+
+        (
+            affirmative_hint,
+            negative_hint,
+            affirmative_char,
+            negative_char,
+            has_conflict,
+        )
+    }
+
     /// Set the description of the dialog
     pub fn description(mut self, description: &str) -> Self {
         self.description = description.to_string();
@@ -107,38 +146,47 @@ impl<'a> Confirm<'a> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
         if !crate::tty::is_tty() {
-            let affirmative_char = self
-                .affirmative
-                .to_lowercase()
-                .chars()
-                .next()
-                .unwrap_or('y');
-            let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
+            let (affirmative_hint, negative_hint, _, _, _) = self.calculate_hints();
+            let affirmative_lower = self.affirmative.to_lowercase();
+            let negative_lower = self.negative.to_lowercase();
+
             let prompt = format!(
                 "{} / {} [{}/{}]: ",
-                self.affirmative, self.negative, affirmative_char, negative_char
+                self.affirmative, self.negative, affirmative_hint, negative_hint
             );
 
             crate::tty::write_prompt(&self.title, &self.description, &prompt)?;
             let input = crate::tty::read_line()?.trim().to_lowercase();
 
             // Parse response
-            let affirmative_lower = self.affirmative.to_lowercase();
-            let negative_lower = self.negative.to_lowercase();
-
             if input.is_empty() {
                 // Empty input uses default
                 return Ok(self.selected);
-            } else if input.starts_with(affirmative_char) || affirmative_lower.starts_with(&input) {
+            }
+
+            // Check for exact prefix matches first (more specific)
+            let aff_matches = affirmative_lower.starts_with(&input);
+            let neg_matches = negative_lower.starts_with(&input);
+
+            if aff_matches && !neg_matches {
                 return Ok(true);
-            } else if input.starts_with(negative_char) || negative_lower.starts_with(&input) {
+            } else if neg_matches && !aff_matches {
                 return Ok(false);
+            } else if aff_matches && neg_matches {
+                // Ambiguous - require more characters
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "Ambiguous input: please use at least '{}/{}' to disambiguate",
+                        affirmative_hint, negative_hint
+                    ),
+                ));
             } else {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!(
                         "Invalid input: expected {}/{}",
-                        affirmative_char, negative_char
+                        affirmative_hint, negative_hint
                     ),
                 ));
             }
@@ -146,13 +194,7 @@ impl<'a> Confirm<'a> {
 
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
-        let affirmative_char = self
-            .affirmative
-            .to_lowercase()
-            .chars()
-            .next()
-            .unwrap_or('y');
-        let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
+        let (_, _, affirmative_char, negative_char, has_conflict) = self.calculate_hints();
         self.term.clear_line()?;
         self.term.hide_cursor()?;
         loop {
@@ -164,12 +206,12 @@ impl<'a> Confirm<'a> {
             match self.term.read_key()? {
                 Key::ArrowLeft | Key::Char('h') => self.handle_left(),
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
-                Key::Char(c) if c == affirmative_char => {
+                Key::Char(c) if !has_conflict && c == affirmative_char => {
                     self.selected = true;
                     ctrlc_handle.close();
                     return self.handle_submit();
                 }
-                Key::Char(c) if c == negative_char => {
+                Key::Char(c) if !has_conflict && c == negative_char => {
                     self.selected = false;
                     ctrlc_handle.close();
                     return self.handle_submit();
@@ -240,14 +282,12 @@ impl<'a> Confirm<'a> {
         writeln!(out, "\n")?;
 
         let mut help_keys = vec![("←/→", "toggle")];
-        let affirmative_char = self
-            .affirmative
-            .to_lowercase()
-            .chars()
-            .next()
-            .unwrap_or('y');
-        let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
-        let submit_keys = format!("{affirmative_char}/{negative_char}/enter");
+        let (affirmative_hint, negative_hint, _, _, has_conflict) = self.calculate_hints();
+        let submit_keys = if has_conflict {
+            "enter".to_string()
+        } else {
+            format!("{}/{}/enter", affirmative_hint, negative_hint)
+        };
         help_keys.push((&submit_keys, "submit"));
         for (i, (key, desc)) in help_keys.iter().enumerate() {
             if i > 0 {
@@ -317,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_custom_labels() {
+    fn test_render_custom_labels_with_conflict() {
         let confirm = Confirm::new("Deploy to production?")
             .affirmative("Confirm")
             .negative("Cancel");
@@ -328,10 +368,68 @@ mod tests {
 
                 Confirm     Cancel
 
-             ←/→ toggle • c/c/enter submit
+             ←/→ toggle • enter submit
             "
             },
             without_ansi(confirm.render().unwrap().as_str())
         );
+    }
+
+    #[test]
+    fn test_render_custom_labels_no_conflict() {
+        let confirm = Confirm::new("Delete file?")
+            .affirmative("Proceed")
+            .negative("Abort");
+
+        assert_eq!(
+            indoc! {
+              "Delete file?
+
+                Proceed     Abort
+
+             ←/→ toggle • p/a/enter submit
+            "
+            },
+            without_ansi(confirm.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_calculate_hints_no_conflict() {
+        let confirm = Confirm::new("Test").affirmative("Yes").negative("No");
+        let (aff_hint, neg_hint, aff_char, neg_char, has_conflict) = confirm.calculate_hints();
+
+        assert_eq!(aff_hint, "y");
+        assert_eq!(neg_hint, "n");
+        assert_eq!(aff_char, 'y');
+        assert_eq!(neg_char, 'n');
+        assert!(!has_conflict);
+    }
+
+    #[test]
+    fn test_calculate_hints_with_conflict() {
+        let confirm = Confirm::new("Test")
+            .affirmative("Confirm")
+            .negative("Cancel");
+        let (aff_hint, neg_hint, aff_char, neg_char, has_conflict) = confirm.calculate_hints();
+
+        assert_eq!(aff_hint, "co");
+        assert_eq!(neg_hint, "ca");
+        assert_eq!(aff_char, 'c');
+        assert_eq!(neg_char, 'c');
+        assert!(has_conflict);
+    }
+
+    #[test]
+    fn test_calculate_hints_identical_prefixes() {
+        let confirm = Confirm::new("Test")
+            .affirmative("Complete")
+            .negative("Completed");
+        let (aff_hint, neg_hint, _, _, has_conflict) = confirm.calculate_hints();
+
+        // Should find minimum unique prefix
+        assert_eq!(aff_hint, "complete");
+        assert_eq!(neg_hint, "completed");
+        assert!(has_conflict);
     }
 }

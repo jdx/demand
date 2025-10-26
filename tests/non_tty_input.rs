@@ -124,21 +124,20 @@ fn test_input_prompt_visible_in_non_tty() {
 }
 
 #[test]
-fn test_confirm_custom_labels_respect_first_char() {
-    // Test that custom labels work with their first character
+fn test_confirm_custom_labels_ambiguous_single_char() {
+    // Test that single char 'c' is rejected when both labels start with 'c' (Confirm/Cancel)
     let output = run_example_with_input("confirm_custom", b"c\n");
 
     assert!(
-        output.status.success(),
-        "Example should accept 'c' for Confirm, stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        !output.status.success(),
+        "Example should reject ambiguous 'c' when both labels start with 'c'"
     );
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stdout.contains("Confirmed!"),
-        "Should confirm with 'c', got: {}",
-        stdout
+        stderr.contains("Ambiguous input"),
+        "Should show ambiguous input error, got: {}",
+        stderr
     );
 }
 
@@ -199,7 +198,7 @@ fn test_confirm_custom_labels_accept_full_word() {
 
 #[test]
 fn test_confirm_custom_labels_accept_partial_match() {
-    // Test that partial match of custom label works
+    // Test that partial match of custom label works (beyond the unique prefix)
     let output = run_example_with_input("confirm_custom", b"conf\n");
 
     assert!(
@@ -213,5 +212,56 @@ fn test_confirm_custom_labels_accept_partial_match() {
         stdout.contains("Confirmed!"),
         "Should confirm with 'conf', got: {}",
         stdout
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_unique_prefix_affirmative() {
+    // Test that 'co' (unique prefix for Confirm) works
+    let output = run_example_with_input("confirm_custom", b"co\n");
+
+    assert!(
+        output.status.success(),
+        "Example should accept 'co' as unique prefix for Confirm, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Confirmed!"),
+        "Should confirm with 'co', got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_unique_prefix_negative() {
+    // Test that 'ca' (unique prefix for Cancel) works
+    let output = run_example_with_input("confirm_custom", b"ca\n");
+
+    assert!(
+        output.status.success(),
+        "Example should accept 'ca' as unique prefix for Cancel, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Cancelled!"),
+        "Should cancel with 'ca', got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_confirm_custom_labels_prompt_shows_unique_prefix() {
+    // Verify that the prompt shows [co/ca] instead of [c/c]
+    let output = run_example_with_input("confirm_custom", b"\n");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("[co/ca]"),
+        "Prompt should show unique prefixes [co/ca], got: {}",
+        stderr
     );
 }
