@@ -123,12 +123,15 @@ impl<'a> Confirm<'a> {
             let input = crate::tty::read_line()?.trim().to_lowercase();
 
             // Parse response
+            let affirmative_lower = self.affirmative.to_lowercase();
+            let negative_lower = self.negative.to_lowercase();
+
             if input.is_empty() {
                 // Empty input uses default
                 return Ok(self.selected);
-            } else if input.starts_with(affirmative_char) || input == "y" || input == "yes" {
+            } else if input.starts_with(affirmative_char) || affirmative_lower.starts_with(&input) {
                 return Ok(true);
-            } else if input.starts_with(negative_char) || input == "n" || input == "no" {
+            } else if input.starts_with(negative_char) || negative_lower.starts_with(&input) {
                 return Ok(false);
             } else {
                 return Err(io::Error::new(
@@ -304,9 +307,28 @@ mod tests {
               "Are you sure?
              This will do a thing.
 
-                Yes!     No.  
+                Yes!     No.
 
              ←/→ toggle • y/n/enter submit
+            "
+            },
+            without_ansi(confirm.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_custom_labels() {
+        let confirm = Confirm::new("Deploy to production?")
+            .affirmative("Confirm")
+            .negative("Cancel");
+
+        assert_eq!(
+            indoc! {
+              "Deploy to production?
+
+                Confirm     Cancel
+
+             ←/→ toggle • c/c/enter submit
             "
             },
             without_ansi(confirm.render().unwrap().as_str())
