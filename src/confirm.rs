@@ -1,5 +1,5 @@
 use std::io;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
@@ -107,7 +107,7 @@ impl<'a> Confirm<'a> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
         if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
-            use io::{BufRead, IsTerminal};
+            use io::BufRead;
 
             // Write a simple text prompt to stderr (no terminal control sequences)
             let mut stderr = io::stderr();
