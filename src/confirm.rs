@@ -107,8 +107,8 @@ impl<'a> Confirm<'a> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
         if !crate::tty::is_tty() {
-            let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
-            let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+            let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap_or('y');
+            let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
             let prompt = format!(
                 "{} / {} [{}/{}]: ",
                 self.affirmative, self.negative, affirmative_char, negative_char
@@ -138,8 +138,8 @@ impl<'a> Confirm<'a> {
 
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
-        let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
-        let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+        let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap_or('y');
+        let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
         self.term.clear_line()?;
         self.term.hide_cursor()?;
         loop {
@@ -227,8 +227,8 @@ impl<'a> Confirm<'a> {
         writeln!(out, "\n")?;
 
         let mut help_keys = vec![("←/→", "toggle")];
-        let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
-        let negative_char = self.negative.to_lowercase().chars().next().unwrap();
+        let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap_or('y');
+        let negative_char = self.negative.to_lowercase().chars().next().unwrap_or('n');
         let submit_keys = format!("{affirmative_char}/{negative_char}/enter");
         help_keys.push((&submit_keys, "submit"));
         for (i, (key, desc)) in help_keys.iter().enumerate() {
