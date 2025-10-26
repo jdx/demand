@@ -109,9 +109,10 @@ impl<'a> Confirm<'a> {
         if !crate::tty::is_tty() {
             let affirmative_char = self.affirmative.to_lowercase().chars().next().unwrap();
             let negative_char = self.negative.to_lowercase().chars().next().unwrap();
-            let prompt = format!("{} / {} [{}/{}]: ",
-                self.affirmative, self.negative,
-                affirmative_char, negative_char);
+            let prompt = format!(
+                "{} / {} [{}/{}]: ",
+                self.affirmative, self.negative, affirmative_char, negative_char
+            );
 
             crate::tty::write_prompt(&self.title, &self.description, &prompt)?;
             let input = crate::tty::read_line()?.trim().to_lowercase();
@@ -127,7 +128,10 @@ impl<'a> Confirm<'a> {
             } else {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Invalid input: expected {}/{}", affirmative_char, negative_char),
+                    format!(
+                        "Invalid input: expected {}/{}",
+                        affirmative_char, negative_char
+                    ),
                 ));
             }
         }

@@ -20,7 +20,9 @@ fn run_example_with_input(example: &str, input: &[u8]) -> Output {
         stdin.write_all(input).expect("Failed to write to stdin");
     }
 
-    child.wait_with_output().expect("Failed to wait for example")
+    child
+        .wait_with_output()
+        .expect("Failed to wait for example")
 }
 
 /// Helper to assert no escape sequences in output
