@@ -861,22 +861,21 @@ impl<'a> Input<'a> {
 ///      Ok(())
 /// }
 ///
-/// let name = Input::new("What's your name?")
-///     .validation(not_empty)
-///     .run()
-///     .expect("a name");
+/// let input = Input::new("What's your name?")
+///     .validation(not_empty);
+/// // input.run() would block waiting for user input
 /// ```
 ///
 /// Dynamic validation
 ///
 /// ```rust
-/// use demand::{Input, InputValidation};
+/// use demand::{Input, InputValidator};
 ///
 /// struct NameValidation {
 ///     max_length: usize,
 /// }
 ///
-/// impl InputValidation for NameValidation {
+/// impl InputValidator for NameValidation {
 ///     fn check(&self, input: &str) -> Result<(), String> {
 ///         if input.len() > self.max_length {
 ///             return Err(format!(
@@ -889,10 +888,9 @@ impl<'a> Input<'a> {
 ///     }
 /// }
 ///
-/// let name = Input::new("What's your name?")
-///     .validation(name_validator)
-///     .run()
-///     .expect("a name");
+/// let input = Input::new("What's your name?")
+///     .validator(NameValidation { max_length: 50 });
+/// // input.run() would block waiting for user input
 /// ```
 pub trait InputValidator {
     fn check(&self, input: &str) -> Result<(), String>;
