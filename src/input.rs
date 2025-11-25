@@ -1020,7 +1020,7 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            "Title\nDescription\n>  \n\n* Name cannot be empty",
+            "Title\nDescription\n>  \n\n\n✗ Name cannot be empty",
             without_ansi(input.render().unwrap().as_str())
         );
 
@@ -1042,7 +1042,7 @@ mod tests {
         input.input = "".to_string();
         input.validate().unwrap();
         assert_eq!(
-            "Title? Description.>  \n\n* Name cannot be empty",
+            "Title? Description.>  \n\n\n✗ Name cannot be empty",
             without_ansi(input.render().unwrap().as_str())
         );
 
