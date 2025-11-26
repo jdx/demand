@@ -389,18 +389,14 @@ impl<'a> Input<'a> {
                 Key::Home => self.handle_home()?,
                 Key::End => self.handle_end()?,
                 Key::Enter => {
-                    if self.show_suggestions && self.selected_suggestion_idx.is_some() {
-                        self.handle_tab()?;
-                    } else {
-                        self.clear_err()?;
-                        self.validate()?;
-                        if self.err.is_none() {
-                            self.reset_cursor_to_end()?;
-                            self.term.clear_to_end_of_screen()?;
-                            self.term.show_cursor()?;
-                            ctrlc_handle.close();
-                            return self.handle_submit();
-                        }
+                    self.clear_err()?;
+                    self.validate()?;
+                    if self.err.is_none() {
+                        self.reset_cursor_to_end()?;
+                        self.term.clear_to_end_of_screen()?;
+                        self.term.show_cursor()?;
+                        ctrlc_handle.close();
+                        return self.handle_submit();
                     }
                 }
                 Key::Tab => self.handle_tab()?,
