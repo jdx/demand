@@ -12,7 +12,8 @@ A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracel
 ## Input
 
 * Single-line text input with variable prompt and placeholder
-* Auto-complete suggestions with `TAB`
+* Complete suggestions with `TAB`
+* Auto-complete API for custom suggestions
 * Validate input with a custom closure
 
 Run example with [`cargo run --example input`](./examples/input.rs).
@@ -52,23 +53,17 @@ fn main() {
 }
 ```
 
+### Autocomplete
+
+Run example with [`cargo run --example autocomplete_basic`](./examples/autocomplete_basic.rs).
+
+![Autocomplete Input](./assets/input-autocomplete.gif)
+
 ### Password
 
 Run example with [`cargo run --example input-password`](./examples/input-password.rs).
 
 ![Input](./assets/input-password.gif)
-
-```rust
-use demand::Input;
-
-fn main() {
-    let t = Input::new("Set a password")
-        .placeholder("Enter password")
-        .prompt("Password: ")
-        .password(true);
-    let i = t.run().expect("error running input");
-}
-```
 
 ## List
 
