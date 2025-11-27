@@ -8,12 +8,26 @@ run = "git cliff -o CHANGELOG.md"
 
 [tasks.coverage]
 tools = { "cargo-tarpaulin" = "0.27" }
-depends = ["lint"]
+depends = [ "lint" ]
 description = "Run tests with coverage"
 run = "cargo tarpaulin --lib --tests"
 
+[tasks."build-docker-vhs"]
+description = "Build the vhs docker image"
+run = """
+#!/usr/bin/env bash
+
+if ! docker info > /dev/null 2>&1; then
+  echo "This script uses docker, and it isn't running - please start docker and try again!"
+  exit 1
+fi
+
+docker build -t vhs ./assets/vhs/
+"""
+
 [tasks."recordings input"]
 description = "Create recordings with vhs"
+depends = [ "build-docker-vhs" ]
 run = """
 #!/usr/bin/env bash
 
@@ -23,7 +37,7 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 vhs() {
-    docker run --rm -v $(pwd):/data -w /data ghcr.io/charmbracelet/vhs "$@"
+    docker run --rm -v $(pwd):/data -w /data vhs "$@"
 }
 
 # Create VHS recordings of all tape files in the assets directory
@@ -32,8 +46,12 @@ for i in $(ls -1 assets/*.tape); do
 done
 """
 
-[tasks."recordings themes"]
-description = "Create theme recordings with vhs"
+[tasks."recording"]
+description = "Create a single tape recording with vhs"
+depends = [ "build-docker-vhs" ]
+usage = """
+arg "<recording>" help="VHS tape file"
+"""
 run = """
 #!/usr/bin/env bash
 
@@ -43,12 +61,30 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 vhs() {
-    docker run --rm -v $(pwd):/data -w /data ghcr.io/charmbracelet/vhs "$@"
+    docker run --rm -v $(pwd):/data -w /data vhs "$@"
+}
+
+vhs "${usage_recording?}"
+"""
+
+[tasks."recordings themes"]
+description = "Create theme recordings with vhs"
+depends = [ "build-docker-vhs" ]
+run = """
+#!/usr/bin/env bash
+
+if ! docker info > /dev/null 2>&1; then
+  echo "This script uses docker, and it isn't running - please start docker and try again!"
+  exit 1
+fi
+
+vhs() {
+    docker run --rm -v $(pwd):/data -w /data vhs "$@"
 }
 
 # Create VHS recordings of all tape files in the themes directory
 for i in $(ls -1 assets/themes/*.tape); do
-    vhs $i
+    vhs "$i"
 done
 """
 

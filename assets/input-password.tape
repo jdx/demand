@@ -57,6 +57,8 @@
 
 Output assets/input-password.gif
 
+Require cargo
+
 Set Shell "fish"
 Set Padding 10
 Set FontSize 16
