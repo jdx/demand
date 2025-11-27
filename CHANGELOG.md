@@ -1,20 +1,26 @@
 # Changelog
 
-## [1.7.2] - 2025-09-30
+## [1.8.0] - 2025-11-27
 
 ### Bug Fixes
 
+- Add custom vhs Docker image and fix tasks for vhs recordings
 - Check stdin instead of stderr for TTY detection
-
-## [1.7.1] - 2025-09-30
-
-### Bug Fixes
-
 - Support non-TTY input for automated testing (#113)
 - Update rust crate console to 0.16 (#105)
 
+### Documentation
+
+- Add example for input autocompletion
+
+### Features
+
+- Add custom autocompleter api (#116)
+
 ### Miscellaneous Tasks
 
+- Losen git-cliff version
+- Release demand version 1.7.2
 - Release demand version 1.7.1
 - Fix uninlined_format_args linter errors
 
@@ -67,6 +73,15 @@
 ### Bug Fixes
 
 - Ctrl-c doesn't restore cursor after Select::run (#90)
+
+### Miscellaneous Tasks
+
+- Release demand version 1.6.3
+
+## [1.6.2] - 2025-01-24
+
+### Bug Fixes
+
 - Add .DS_Store, .vscode to .gitignore (#86)
 - White flash in select when filtering: true (#83)
 
@@ -76,7 +91,6 @@
 
 ### Miscellaneous Tasks
 
-- Release demand version 1.6.3
 - Release demand version 1.6.2
 
 ## [1.6.1] - 2025-01-07
@@ -341,5 +355,7 @@
 ### Miscellaneous Tasks
 
 - Release demand version 0.1.1
+
+## [0.1.0] - 2023-12-21
 
 
