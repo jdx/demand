@@ -25,6 +25,7 @@ mod option;
 mod select;
 mod spinner;
 mod theme;
+mod tty;
 
 #[cfg(test)]
 mod test;

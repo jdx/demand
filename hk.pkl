@@ -1,0 +1,30 @@
+amends "package://github.com/jdx/hk/releases/download/v1.19.0/hk@1.19.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.19.0/hk@1.19.0#/Builtins.pkl"
+
+local linters = new Mapping<String, Step> {
+    ["cargo-fmt"] = Builtins.cargo_fmt
+    ["cargo-clippy"] = (Builtins.cargo_clippy) {
+        check = "cargo clippy -- -D warnings"
+        fix = "cargo clippy --fix --allow-dirty -- -D warnings"
+    }
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true    // automatically modify files with available linter fixes
+        stash = "git" // stashes unstaged changes while running fix steps
+        steps = linters
+    }
+    // instead of pre-commit, you can instead define pre-push hooks
+    ["pre-push"] {
+        steps = linters
+    }
+    // "fix" and "check" are special steps for `hk fix` and `hk check` commands
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps = linters
+    }
+}

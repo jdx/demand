@@ -15,6 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
-      - run: cargo clippy -- -D warnings
-      - run: cargo fmt -- --check
+      - uses: jdx/mise-action@v3
       - run: cargo test --lib --tests
+      - run: hk check --all
