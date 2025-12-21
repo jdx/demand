@@ -162,7 +162,11 @@ impl<'a, T> Select<'a, T> {
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
                     Key::ArrowRight => self.handle_right()?,
-                    Key::Enter => return enter(self),
+                    Key::Enter => {
+                        if !self.visible_options().is_empty() {
+                            return enter(self);
+                        }
+                    }
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
                     Key::Char(c) => self.handle_filter_key(c)?,
@@ -187,8 +191,10 @@ impl<'a, T> Select<'a, T> {
                         self.handle_stop_filtering(false)?;
                     }
                     Key::Enter => {
-                        ctrlc_handle.close();
-                        return enter(self);
+                        if !self.visible_options().is_empty() {
+                            ctrlc_handle.close();
+                            return enter(self);
+                        }
                     }
                     _ => {}
                 }
