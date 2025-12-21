@@ -1,13 +1,16 @@
 # Changelog
 
+## [1.8.1] - 2025-12-21
+
+### Bug Fixes
+
+- Select panics when ENTER is pressed with all options filtered out (#122)
+
 ## [1.8.0] - 2025-11-27
 
 ### Bug Fixes
 
 - Add custom vhs Docker image and fix tasks for vhs recordings
-- Check stdin instead of stderr for TTY detection
-- Support non-TTY input for automated testing (#113)
-- Update rust crate console to 0.16 (#105)
 
 ### Documentation
 
@@ -19,8 +22,28 @@
 
 ### Miscellaneous Tasks
 
+- Release demand version 1.8.0
 - Losen git-cliff version
+
+## [1.7.2] - 2025-09-30
+
+### Bug Fixes
+
+- Check stdin instead of stderr for TTY detection
+
+### Miscellaneous Tasks
+
 - Release demand version 1.7.2
+
+## [1.7.1] - 2025-09-30
+
+### Bug Fixes
+
+- Support non-TTY input for automated testing (#113)
+- Update rust crate console to 0.16 (#105)
+
+### Miscellaneous Tasks
+
 - Release demand version 1.7.1
 - Fix uninlined_format_args linter errors
 
