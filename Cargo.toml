@@ -13,7 +13,7 @@ include = ["src/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
 console = "0.16"
 fuzzy-matcher = "0.3"
 itertools = "0.14"
-signal-hook = "0.3"
+signal-hook = "0.4"
 termcolor = "1"
 
 [dev-dependencies]
