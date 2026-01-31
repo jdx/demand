@@ -199,7 +199,10 @@ impl<'a, S> Wizard<'a, S> {
 
     /// Render the breadcrumb navigation bar as a string.
     ///
-    /// Sections can call this to include the breadcrumb in their output if desired.
+    /// This method is available for consumers who want to display the breadcrumb
+    /// in custom UI layouts. Note that sections receive only `(&mut S, &Theme)`
+    /// and don't have direct access to the Wizard instance.
+    ///
     /// Returns the rendered breadcrumb as a string that can be printed.
     pub fn render_breadcrumb(&self) -> io::Result<String> {
         let mut out = Buffer::ansi();

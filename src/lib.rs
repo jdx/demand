@@ -13,7 +13,7 @@ pub use select::Select;
 pub use spinner::Spinner;
 pub use spinner::SpinnerStyle;
 pub use theme::Theme;
-pub use wizard::{Navigation, Section, SectionFn, Wizard, handle_navigation_key};
+pub use wizard::{Navigation, Wizard, handle_navigation_key};
 
 mod confirm;
 #[cfg_attr(any(windows), path = "ctrlc_stub.rs")]
