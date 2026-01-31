@@ -20,16 +20,3 @@ termcolor = "1"
 ctor = "0.6"
 indoc = "2"
 insta = "1"
-
-[package.metadata.release]
-allow-branch = ["main"]
-sign-tag = true
-sign-commit = true
-pre-release-hook = [
-  "git",
-  "cliff",
-  "-o",
-  "CHANGELOG.md",
-  "--tag",
-  "{{version}}",
-]
