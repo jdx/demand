@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.0](https://github.com/jdx/demand/compare/v1.8.2...v2.0.0) - 2026-01-31
+
+### Added
+
+- add Wizard component for multi-step wizard flows ([#127](https://github.com/jdx/demand/pull/127))
+
 ## [1.8.2](https://github.com/jdx/demand/compare/v1.8.1...v1.8.2) - 2026-01-31
 
 ### Fixed
