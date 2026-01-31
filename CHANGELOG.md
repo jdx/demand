@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.2](https://github.com/jdx/demand/compare/v1.8.1...v1.8.2) - 2026-01-31
+
+### Fixed
+
+- improve non-TTY support, input parsing, and ambiguous key handling for confirm dialog ([#115](https://github.com/jdx/demand/pull/115))
+- *(deps)* update rust crate signal-hook to 0.4 ([#124](https://github.com/jdx/demand/pull/124))
+
+### Other
+
+- add release-plz for automated releases ([#125](https://github.com/jdx/demand/pull/125))
+
 ## [1.8.1] - 2025-12-21
 
 ### Bug Fixes
