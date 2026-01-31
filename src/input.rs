@@ -1,6 +1,6 @@
 use std::{
     char,
-    io::{self, IsTerminal, Write},
+    io::{self, Write},
 };
 
 use console::{Key, Term, measure_text_width};
@@ -337,27 +337,21 @@ impl<'a> Input<'a> {
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<String> {
-        // If not a TTY (e.g., piped input), read from stdin directly
-        if !io::stdin().is_terminal() {
-            use std::io::BufRead;
-            let stdin = io::stdin();
-            let mut line = String::new();
-            stdin.lock().read_line(&mut line)?;
-            // Remove trailing line endings (handles both \n and \r\n for Windows)
-            let mut input = line.as_str();
-            if let Some(stripped) = input.strip_suffix('\n') {
-                input = stripped;
-            }
-            if let Some(stripped) = input.strip_suffix('\r') {
-                input = stripped;
-            }
-            self.input = input.to_string();
+        // If not a TTY (e.g., piped input or non-interactive environment),
+        // write a simple prompt and read from stdin
+        if !crate::tty::is_tty() {
+            let prompt = if !self.prompt.is_empty() {
+                &self.prompt
+            } else {
+                "> "
+            };
+
+            crate::tty::write_prompt(&self.title, &self.description, prompt)?;
+            self.input = crate::tty::read_line()?;
             self.validate()?;
-            if self.err.is_some() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    self.err.unwrap(),
-                ));
+
+            if let Some(err) = self.err {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
             }
             return Ok(self.input);
         }
@@ -546,8 +540,8 @@ impl<'a> Input<'a> {
                 self.update_suggestions()?;
             }
             Ok(None) => {
-                if self.suggestion.is_some() {
-                    self.input.push_str(self.suggestion.as_ref().unwrap());
+                if let Some(suggestion) = &self.suggestion {
+                    self.input.push_str(suggestion);
                     self.cursor = self.input.chars().count();
                     self.update_suggestions()?;
                 }
@@ -637,11 +631,11 @@ impl<'a> Input<'a> {
             out.reset()?;
         }
 
-        if self.err.is_some() {
+        if let Some(err) = &self.err {
             out.set_color(&self.theme.error_indicator)?;
             writeln!(out)?;
             writeln!(out)?;
-            write!(out, "✗ {}", self.err.as_ref().unwrap())?;
+            write!(out, "✗ {err}")?;
             out.reset()?;
         }
 
