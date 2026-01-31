@@ -350,11 +350,8 @@ impl<'a> Input<'a> {
             self.input = crate::tty::read_line()?;
             self.validate()?;
 
-            if self.err.is_some() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    self.err.unwrap(),
-                ));
+            if let Some(err) = self.err {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
             }
             return Ok(self.input);
         }
@@ -543,8 +540,8 @@ impl<'a> Input<'a> {
                 self.update_suggestions()?;
             }
             Ok(None) => {
-                if self.suggestion.is_some() {
-                    self.input.push_str(self.suggestion.as_ref().unwrap());
+                if let Some(suggestion) = &self.suggestion {
+                    self.input.push_str(suggestion);
                     self.cursor = self.input.chars().count();
                     self.update_suggestions()?;
                 }
@@ -634,11 +631,11 @@ impl<'a> Input<'a> {
             out.reset()?;
         }
 
-        if self.err.is_some() {
+        if let Some(err) = &self.err {
             out.set_color(&self.theme.error_indicator)?;
             writeln!(out)?;
             writeln!(out)?;
-            write!(out, "✗ {}", self.err.as_ref().unwrap())?;
+            write!(out, "✗ {err}")?;
             out.reset()?;
         }
 
