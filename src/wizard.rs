@@ -93,8 +93,6 @@ pub struct Wizard<'a, S> {
     visited: Vec<bool>,
     /// Terminal handle
     term: Term,
-    /// Height of rendered content (for clearing)
-    height: usize,
 }
 
 impl<'a, S> Wizard<'a, S> {
@@ -107,7 +105,6 @@ impl<'a, S> Wizard<'a, S> {
             theme: &theme::DEFAULT,
             visited: Vec::new(),
             term: Term::stderr(),
-            height: 0,
         }
     }
 
@@ -143,16 +140,6 @@ impl<'a, S> Wizard<'a, S> {
         self.visited[0] = true;
 
         loop {
-            // Render breadcrumb
-            self.clear()?;
-            let output = self.render_breadcrumb()?;
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
-            self.height = output.lines().count();
-
-            // Check for breadcrumb navigation key before running section
-            // We'll handle this after the section runs since sections use the terminal
-
             // Run the current section
             let section = &self.sections[self.current];
             let result = (section.run)(state, self.theme);
@@ -167,6 +154,8 @@ impl<'a, S> Wizard<'a, S> {
                 Ok(Navigation::Back) => {
                     if self.current > 0 {
                         self.current -= 1;
+                        // Mark as visited in case we jumped over this section
+                        self.visited[self.current] = true;
                     }
                 }
                 Ok(Navigation::Jump(idx)) => {
@@ -183,7 +172,7 @@ impl<'a, S> Wizard<'a, S> {
                     // Stay on current section, just re-render
                 }
                 Ok(Navigation::Done) => {
-                    self.clear()?;
+                    self.term.show_cursor()?;
                     ctrlc_handle.close();
                     return Ok(());
                 }
@@ -191,15 +180,15 @@ impl<'a, S> Wizard<'a, S> {
                     // Escape pressed - go back if possible, otherwise cancel
                     if self.current > 0 {
                         self.current -= 1;
+                        // Mark as visited in case we jumped over this section
+                        self.visited[self.current] = true;
                     } else {
-                        self.clear()?;
                         self.term.show_cursor()?;
                         ctrlc_handle.close();
                         return Err(e);
                     }
                 }
                 Err(e) => {
-                    self.clear()?;
                     self.term.show_cursor()?;
                     ctrlc_handle.close();
                     return Err(e);
@@ -208,8 +197,11 @@ impl<'a, S> Wizard<'a, S> {
         }
     }
 
-    /// Render the breadcrumb navigation bar
-    fn render_breadcrumb(&self) -> io::Result<String> {
+    /// Render the breadcrumb navigation bar as a string.
+    ///
+    /// Sections can call this to include the breadcrumb in their output if desired.
+    /// Returns the rendered breadcrumb as a string that can be printed.
+    pub fn render_breadcrumb(&self) -> io::Result<String> {
         let mut out = Buffer::ansi();
 
         // Title
@@ -249,18 +241,26 @@ impl<'a, S> Wizard<'a, S> {
         out.reset()?;
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
-
-    /// Clear the rendered content
-    fn clear(&mut self) -> io::Result<()> {
-        if self.height > 0 {
-            self.term.clear_last_lines(self.height)?;
-            self.height = 0;
-        }
-        Ok(())
-    }
 }
 
-/// Helper to check if a key is a navigation key and return the navigation action
+/// Helper to check if a key is a navigation key and return the navigation action.
+///
+/// This utility function is provided for library consumers who want to implement
+/// custom widgets that support wizard navigation shortcuts. It checks for:
+/// - Number keys (1-9): Jump to that section
+/// - Escape: Go back to the previous section (returns `None` if at first section)
+///
+/// # Example
+/// ```ignore
+/// use demand::{handle_navigation_key, Navigation};
+/// use console::Key;
+///
+/// // In your custom widget's key handling loop:
+/// if let Some(nav) = handle_navigation_key(key, current_section, total_sections) {
+///     return Ok(nav);
+/// }
+/// // ... handle other keys
+/// ```
 pub fn handle_navigation_key(key: Key, current: usize, section_count: usize) -> Option<Navigation> {
     match key {
         Key::Escape => {
