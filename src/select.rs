@@ -181,6 +181,7 @@ impl<'a, T> Select<'a, T> {
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
                         if self.filter.is_empty() {
+                            self.clear()?;
                             self.term.show_cursor()?;
                             ctrlc_handle.close();
                             return Err(io::Error::new(

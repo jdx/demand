@@ -395,6 +395,7 @@ impl<'a> Input<'a> {
                 }
                 Key::Tab => self.handle_tab()?,
                 Key::Escape => {
+                    self.clear()?;
                     self.term.show_cursor()?;
                     ctrlc_handle.close();
                     return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));

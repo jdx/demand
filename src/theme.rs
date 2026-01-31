@@ -75,6 +75,16 @@ pub struct Theme {
 
     /// Error indicator color
     pub error_indicator: ColorSpec,
+
+    // Breadcrumb navigation (for Wizard)
+    /// Active/current breadcrumb section color
+    pub breadcrumb_active: ColorSpec,
+    /// Clickable/visited breadcrumb section color
+    pub breadcrumb_clickable: ColorSpec,
+    /// Future/not-yet-visited breadcrumb section color
+    pub breadcrumb_future: ColorSpec,
+    /// Breadcrumb separator string (e.g., " > " or " → ")
+    pub breadcrumb_separator: String,
 }
 
 impl Theme {
@@ -119,6 +129,12 @@ impl Theme {
             cursor_shape: CursorShape::Block,
             cursor_style,
             force_style: true,
+
+            // Breadcrumb navigation
+            breadcrumb_active: make_color(Color::Ansi256(7)),
+            breadcrumb_clickable: make_color(Color::Ansi256(8)),
+            breadcrumb_future: make_color(Color::Ansi256(8)),
+            breadcrumb_separator: String::from(" > "),
         }
     }
 
@@ -200,6 +216,12 @@ impl Theme {
             cursor_shape: CursorShape::Block,
             cursor_style,
             force_style: true,
+
+            // Breadcrumb navigation
+            breadcrumb_active: make_color(fuchsia),
+            breadcrumb_clickable: make_color(indigo),
+            breadcrumb_future: make_color(Color::Ansi256(243)),
+            breadcrumb_separator: String::from(" > "),
         }
     }
 
@@ -257,6 +279,12 @@ impl Theme {
             cursor_shape: CursorShape::Block,
             cursor_style,
             force_style: true,
+
+            // Breadcrumb navigation
+            breadcrumb_active: make_color(yellow),
+            breadcrumb_clickable: make_color(purple),
+            breadcrumb_future: make_color(comment),
+            breadcrumb_separator: String::from(" > "),
         }
     }
 
@@ -306,6 +334,12 @@ impl Theme {
             cursor_shape: CursorShape::Block,
             cursor_style,
             force_style: true,
+
+            // Breadcrumb navigation
+            breadcrumb_active: make_color(Color::Ansi256(3)),
+            breadcrumb_clickable: make_color(Color::Ansi256(6)),
+            breadcrumb_future: make_color(Color::Ansi256(8)),
+            breadcrumb_separator: String::from(" > "),
         }
     }
 
@@ -366,6 +400,12 @@ impl Theme {
             cursor_shape: CursorShape::Block,
             cursor_style,
             force_style: true,
+
+            // Breadcrumb navigation
+            breadcrumb_active: make_color(pink),
+            breadcrumb_clickable: make_color(mauve),
+            breadcrumb_future: make_color(overlay0),
+            breadcrumb_separator: String::from(" > "),
         }
     }
 

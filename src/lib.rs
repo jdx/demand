@@ -13,6 +13,7 @@ pub use select::Select;
 pub use spinner::Spinner;
 pub use spinner::SpinnerStyle;
 pub use theme::Theme;
+pub use wizard::{Navigation, Wizard, handle_navigation_key};
 
 mod confirm;
 #[cfg_attr(any(windows), path = "ctrlc_stub.rs")]
@@ -26,6 +27,7 @@ mod select;
 mod spinner;
 mod theme;
 mod tty;
+mod wizard;
 
 #[cfg(test)]
 mod test;
