@@ -65,7 +65,7 @@ pub struct MultiSelect<'a, T> {
     cursor_x: usize,
     cursor_y: usize,
     cursor: usize,
-    height: usize,
+    last_line_count: usize,
     term: Term,
     pages: usize,
     cur_page: usize,
@@ -88,7 +88,7 @@ impl<'a, T> MultiSelect<'a, T> {
             cursor_y: 0,
             err: None,
             cursor: 0,
-            height: 0,
+            last_line_count: 0,
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -171,11 +171,11 @@ impl<'a, T> MultiSelect<'a, T> {
         self.min = self.min.min(self.max);
 
         loop {
-            self.clear()?;
             let output = self.render()?;
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
-            self.height = output.lines().count() - 1;
+            let line_count = output.lines().count();
+
+            self.reposition_and_write(&output, line_count)?;
+
             if self.filtering {
                 match self.term.read_key()? {
                     Key::ArrowLeft => self.handle_left()?,
@@ -198,7 +198,7 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
                         if self.filter.is_empty() {
-                            self.clear()?;
+                            self.cleanup()?;
                             self.term.show_cursor()?;
                             ctrlc_handle.close();
                             return Err(io::Error::new(
@@ -233,7 +233,7 @@ impl<'a, T> MultiSelect<'a, T> {
                             }
                             continue;
                         }
-                        self.clear()?;
+                        self.cleanup()?;
                         self.term.show_cursor()?;
                         ctrlc_handle.close();
                         let output = self.render_success(&selected)?;
@@ -462,6 +462,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 self.print_option_label(&mut out, option, max_label_len)?;
             }
         }
+
         if self.pages > 1 {
             out.set_color(&self.theme.description)?;
             writeln!(out, " (page {}/{})", self.cur_page + 1, self.pages)?;
@@ -609,9 +610,46 @@ impl<'a, T> MultiSelect<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+    fn reposition_and_write(&mut self, output: &str, line_count: usize) -> io::Result<()> {
+        if self.last_line_count > 0 {
+            self.term.move_cursor_up(self.last_line_count)?;
+        }
+
+        self.term.move_cursor_left(usize::MAX)?;
+
+        let lines: Vec<&str> = output.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            self.term.move_cursor_left(usize::MAX)?;
+            self.term.clear_line()?;
+            write!(self.term, "{}", line)?;
+            if i < lines.len() - 1 {
+                writeln!(self.term)?;
+            }
+        }
+
+        if line_count < self.last_line_count {
+            writeln!(self.term)?;
+            for i in 0..(self.last_line_count - line_count) {
+                self.term.move_cursor_left(usize::MAX)?;
+                self.term.clear_line()?;
+                if i < (self.last_line_count - line_count - 1) {
+                    writeln!(self.term)?;
+                }
+            }
+            self.term
+                .move_cursor_up(self.last_line_count - line_count)?;
+        }
+
+        self.last_line_count = line_count;
+        self.term.flush()?;
+        Ok(())
+    }
+
+    fn cleanup(&mut self) -> io::Result<()> {
+        if self.last_line_count > 0 {
+            self.term.move_cursor_up(self.last_line_count)?;
+            self.term.move_cursor_left(usize::MAX)?;
+        }
         Ok(())
     }
 }
@@ -646,7 +684,7 @@ mod tests {
               [ ] Cheese
               [ ] Vegan Cheese
               [ ] Nutella
-            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
+            ↑/↓/k/j up/down • ←/→/h/l prev/next page • x/space toggle • a toggle all • enter confirm
             "
             },
             without_ansi(select.render().unwrap().as_str())
