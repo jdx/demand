@@ -684,7 +684,7 @@ mod tests {
               [ ] Cheese
               [ ] Vegan Cheese
               [ ] Nutella
-            ↑/↓/k/j up/down • ←/→/h/l prev/next page • x/space toggle • a toggle all • enter confirm
+            ↑/↓/k/j up/down • x/space toggle • a toggle all • enter confirm
             "
             },
             without_ansi(select.render().unwrap().as_str())
