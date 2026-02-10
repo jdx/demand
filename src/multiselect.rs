@@ -617,12 +617,14 @@ impl<'a, T> MultiSelect<'a, T> {
 
         self.term.move_cursor_left(usize::MAX)?;
 
-        let lines: Vec<&str> = output.lines().collect();
-        for (i, line) in lines.iter().enumerate() {
+        let mut lines = output.lines().peekable();
+        while let Some(line) = lines.next() {
             self.term.move_cursor_left(usize::MAX)?;
             self.term.clear_line()?;
+
             write!(self.term, "{}", line)?;
-            if i < lines.len() - 1 {
+
+            if lines.peek().is_some() {
                 writeln!(self.term)?;
             }
         }
@@ -647,8 +649,7 @@ impl<'a, T> MultiSelect<'a, T> {
 
     fn cleanup(&mut self) -> io::Result<()> {
         if self.last_line_count > 0 {
-            self.term.move_cursor_up(self.last_line_count)?;
-            self.term.move_cursor_left(usize::MAX)?;
+            self.term.clear_last_lines(self.last_line_count)?;
         }
         Ok(())
     }
