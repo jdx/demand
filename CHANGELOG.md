@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.0](https://github.com/jdx/demand/compare/v1.8.2...v2.0.0) - 2026-02-20
+
+### Added
+
+- add Wizard component for multi-step wizard flows ([#127](https://github.com/jdx/demand/pull/127))
+
+### Other
+
+- *(deps)* update dependency cargo:cargo-release to v1 ([#135](https://github.com/jdx/demand/pull/135))
+- *(deps)* update release-plz/action digest to f708778 ([#134](https://github.com/jdx/demand/pull/134))
+- *(deps)* update actions/checkout action to v6 ([#133](https://github.com/jdx/demand/pull/133))
+- *(deps)* update dependency hk to v1.36.0 ([#132](https://github.com/jdx/demand/pull/132))
+- *(deps)* update actions/checkout digest to de0fac2 ([#131](https://github.com/jdx/demand/pull/131))
+- *(deps)* pin dependencies ([#130](https://github.com/jdx/demand/pull/130))
+
 ## [1.8.2](https://github.com/jdx/demand/compare/v1.8.1...v1.8.2) - 2026-01-31
 
 ### Fixed
