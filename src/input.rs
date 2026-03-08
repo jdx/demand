@@ -726,8 +726,10 @@ impl<'a> Input<'a> {
         writeln!(
             out,
             " {}",
-            if self.password || self.mask_on_submit {
-                "*".repeat(self.input.len().max(1))
+            if self.password {
+                "*".repeat(12)
+            } else if self.mask_on_submit {
+                "*".repeat(self.input.len())
             } else {
                 self.input.to_string()
             }
