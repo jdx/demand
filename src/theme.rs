@@ -4,6 +4,7 @@ use termcolor::{Color, ColorSpec};
 
 pub(crate) static DEFAULT: LazyLock<Theme> = LazyLock::new(Theme::default);
 
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum CursorShape {
     Block,
