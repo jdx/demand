@@ -261,7 +261,8 @@ impl<'a> Input<'a> {
 
     /// Sets the mask_on_submit flag of the input.
     ///
-    /// If true, the input is visible while typing but masked with asterisks after submit
+    /// If true, the input is visible while typing but masked with asterisks after submit.
+    /// Note: has no effect when `password` is also `true` (password masking takes precedence).
     pub fn mask_on_submit(mut self, mask_on_submit: bool) -> Self {
         self.mask_on_submit = mask_on_submit;
         self
@@ -1054,6 +1055,36 @@ mod tests {
         assert_eq!(
             "Title? Description.> non empty\n",
             without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_mask_on_submit() {
+        let mut input = Input::new("PIN").mask_on_submit(true);
+        input.input = "1234".to_string();
+        assert_eq!(
+            "PIN ****\n",
+            without_ansi(input.render_success().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_mask_on_submit_empty() {
+        let mut input = Input::new("PIN").mask_on_submit(true);
+        input.input = "".to_string();
+        assert_eq!(
+            "PIN \n",
+            without_ansi(input.render_success().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_password() {
+        let mut input = Input::new("Password").password(true);
+        input.input = "short".to_string();
+        assert_eq!(
+            "Password ************\n",
+            without_ansi(input.render_success().unwrap().as_str())
         );
     }
 }
