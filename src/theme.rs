@@ -17,11 +17,9 @@ pub enum CursorShape {
 /// ```
 /// use demand::Theme;
 ///
-/// let custom_theme = Theme {
-///   selected_prefix: String::from(" •"),
-///   unselected_prefix: String::from("  "),
-/// ..Theme::default()
-/// };
+/// let mut custom_theme = Theme::default();
+/// custom_theme.selected_prefix = String::from(" •");
+/// custom_theme.unselected_prefix = String::from("  ");
 /// ```
 #[non_exhaustive]
 #[derive(Clone, Debug)]
