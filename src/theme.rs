@@ -23,6 +23,7 @@ pub enum CursorShape {
 /// ..Theme::default()
 /// };
 /// ```
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub struct Theme {
     /// Prompt title color
