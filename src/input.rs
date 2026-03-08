@@ -174,8 +174,10 @@ pub struct Input<'a> {
     pub suggestions: Option<&'a [&'a str]>,
     /// Show the input inline
     pub inline: bool,
-    /// Whether to mask the input
+    /// Whether to mask the input while typing and after submit
     pub password: bool,
+    /// Whether to mask the input only after submit (visible while typing)
+    pub mask_on_submit: bool,
     /// Input entered by the user
     pub input: String,
     /// Colors/style of the input
@@ -213,6 +215,7 @@ impl<'a> Input<'a> {
             input: String::new(),
             inline: false,
             password: false,
+            mask_on_submit: false,
             theme: &*theme::DEFAULT,
             validation: Box::new(NoValidation),
 
@@ -250,9 +253,18 @@ impl<'a> Input<'a> {
 
     /// Sets the password flag of the input.
     ///
-    /// If true, the input is masked with asterisks
+    /// If true, the input is masked with asterisks while typing and after submit
     pub fn password(mut self, password: bool) -> Self {
         self.password = password;
+        self
+    }
+
+    /// Sets the mask_on_submit flag of the input.
+    ///
+    /// If true, the input is visible while typing but masked with asterisks after submit.
+    /// Note: has no effect when `password` is also `true` (password masking takes precedence).
+    pub fn mask_on_submit(mut self, mask_on_submit: bool) -> Self {
+        self.mask_on_submit = mask_on_submit;
         self
     }
 
@@ -715,9 +727,12 @@ impl<'a> Input<'a> {
         writeln!(
             out,
             " {}",
-            match self.password {
-                true => (1..13).map(|_| '*').collect::<String>(),
-                false => self.input.to_string(),
+            if self.password {
+                "*".repeat(12)
+            } else if self.mask_on_submit {
+                "*".repeat(self.input.chars().count())
+            } else {
+                self.input.to_string()
             }
         )?;
         out.reset()?;
@@ -1040,6 +1055,36 @@ mod tests {
         assert_eq!(
             "Title? Description.> non empty\n",
             without_ansi(input.render().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_mask_on_submit() {
+        let mut input = Input::new("PIN").mask_on_submit(true);
+        input.input = "1234".to_string();
+        assert_eq!(
+            "PIN ****\n",
+            without_ansi(input.render_success().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_mask_on_submit_empty() {
+        let mut input = Input::new("PIN").mask_on_submit(true);
+        input.input = "".to_string();
+        assert_eq!(
+            "PIN \n",
+            without_ansi(input.render_success().unwrap().as_str())
+        );
+    }
+
+    #[test]
+    fn test_render_success_password() {
+        let mut input = Input::new("Password").password(true);
+        input.input = "short".to_string();
+        assert_eq!(
+            "Password ************\n",
+            without_ansi(input.render_success().unwrap().as_str())
         );
     }
 }
