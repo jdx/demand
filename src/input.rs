@@ -174,8 +174,10 @@ pub struct Input<'a> {
     pub suggestions: Option<&'a [&'a str]>,
     /// Show the input inline
     pub inline: bool,
-    /// Whether to mask the input
+    /// Whether to mask the input while typing and after submit
     pub password: bool,
+    /// Whether to mask the input only after submit (visible while typing)
+    pub mask_on_submit: bool,
     /// Input entered by the user
     pub input: String,
     /// Colors/style of the input
@@ -213,6 +215,7 @@ impl<'a> Input<'a> {
             input: String::new(),
             inline: false,
             password: false,
+            mask_on_submit: false,
             theme: &*theme::DEFAULT,
             validation: Box::new(NoValidation),
 
@@ -250,9 +253,17 @@ impl<'a> Input<'a> {
 
     /// Sets the password flag of the input.
     ///
-    /// If true, the input is masked with asterisks
+    /// If true, the input is masked with asterisks while typing and after submit
     pub fn password(mut self, password: bool) -> Self {
         self.password = password;
+        self
+    }
+
+    /// Sets the mask_on_submit flag of the input.
+    ///
+    /// If true, the input is visible while typing but masked with asterisks after submit
+    pub fn mask_on_submit(mut self, mask_on_submit: bool) -> Self {
+        self.mask_on_submit = mask_on_submit;
         self
     }
 
@@ -715,9 +726,10 @@ impl<'a> Input<'a> {
         writeln!(
             out,
             " {}",
-            match self.password {
-                true => (1..13).map(|_| '*').collect::<String>(),
-                false => self.input.to_string(),
+            if self.password || self.mask_on_submit {
+                "*".repeat(self.input.len().max(1))
+            } else {
+                self.input.to_string()
             }
         )?;
         out.reset()?;
