@@ -729,7 +729,7 @@ impl<'a> Input<'a> {
             if self.password {
                 "*".repeat(12)
             } else if self.mask_on_submit {
-                "*".repeat(self.input.len())
+                "*".repeat(self.input.chars().count())
             } else {
                 self.input.to_string()
             }
