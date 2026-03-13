@@ -1,4 +1,4 @@
-FROM ghcr.io/charmbracelet/vhs@sha256:e88ed3faa06183a197fd44ded83e706098d9e4038b72da94bcdb9cb9b67e3527
+FROM ghcr.io/charmbracelet/vhs@sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93
 USER root
 # Allow apt to accept a release codename change (eg. bookworm -> trixie)
 # and install non-interactively with minimal extras.
