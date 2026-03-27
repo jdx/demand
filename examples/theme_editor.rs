@@ -533,6 +533,15 @@ fn confirm_discard_if_dirty(state: &PaletteEditorState) -> io::Result<bool> {
 
 fn render_preview_showcase(out: &mut Buffer, theme: &Theme, theme_name: &str) -> io::Result<()> {
     const WIDTH: usize = 62;
+    let breadcrumb_sep = format!(" {} ", theme.breadcrumb_separator.trim());
+    let breadcrumb_full_width = measure_text_width("Themes")
+        + measure_text_width(&breadcrumb_sep)
+        + measure_text_width("Preview")
+        + measure_text_width(&breadcrumb_sep)
+        + measure_text_width("Save");
+    let breadcrumb_partial_width = measure_text_width("Themes")
+        + measure_text_width(&breadcrumb_sep)
+        + measure_text_width("Preview");
 
     write_box_top(out, &theme.help_sep, WIDTH, "")?;
     write_box_line_single(
@@ -656,15 +665,15 @@ fn render_preview_showcase(out: &mut Buffer, theme: &Theme, theme_name: &str) ->
     out.set_color(&theme.breadcrumb_clickable)?;
     write!(out, "Themes")?;
     out.set_color(&theme.help_sep)?;
-    write!(out, " {} ", theme.breadcrumb_separator.trim())?;
+    write!(out, "{breadcrumb_sep}")?;
     out.set_color(&theme.breadcrumb_active)?;
     write!(out, "Preview")?;
     out.set_color(&theme.help_sep)?;
-    write!(out, " {} ", theme.breadcrumb_separator.trim())?;
+    write!(out, "{breadcrumb_sep}")?;
     out.set_color(&theme.breadcrumb_future)?;
     write!(out, "Save")?;
     out.reset()?;
-    write_box_fill(out, WIDTH, "Themes > Preview > Save".len())?;
+    write_box_fill(out, WIDTH, breadcrumb_full_width)?;
     out.set_color(&theme.help_sep)?;
     writeln!(out, " │")?;
 
@@ -673,11 +682,11 @@ fn render_preview_showcase(out: &mut Buffer, theme: &Theme, theme_name: &str) ->
     out.set_color(&theme.breadcrumb_clickable)?;
     write!(out, "Themes")?;
     out.set_color(&theme.help_sep)?;
-    write!(out, " {} ", theme.breadcrumb_separator.trim())?;
+    write!(out, "{breadcrumb_sep}")?;
     out.set_color(&theme.breadcrumb_active)?;
     write!(out, "Preview")?;
     out.reset()?;
-    write_box_fill(out, WIDTH, measure_text_width("Themes > Preview"))?;
+    write_box_fill(out, WIDTH, breadcrumb_partial_width)?;
     out.set_color(&theme.help_sep)?;
     writeln!(out, " │")?;
 
@@ -1191,6 +1200,8 @@ impl StoredColor {
             Color::White => Self::White,
             Color::Ansi256(value) => Self::Ansi256(*value),
             Color::Rgb(r, g, b) => Self::Rgb(*r, *g, *b),
+            // `termcolor::Color` is non-exhaustive; any future variant not
+            // handled here is conservatively mapped to `White`.
             _ => Self::White,
         }
     }
@@ -1554,12 +1565,11 @@ fn contrasting_color(color: StoredColor) -> StoredColor {
 }
 
 fn preview_palette(theme_def: &ThemeDefinition) -> io::Result<()> {
-    clear_screen()?;
-
     let output = render_theme_preview(theme_def)?;
-    let mut stdout = io::stdout();
-    stdout.write_all(output.as_bytes())?;
-    stdout.flush()?;
+    let mut term = Term::stderr();
+    term.clear_screen()?;
+    term.write_all(output.as_bytes())?;
+    term.flush()?;
 
     let theme = theme_def.to_theme();
     pause(
@@ -2679,10 +2689,6 @@ fn pause(theme: &Theme, title: &str, description: &str) -> io::Result<()> {
         .theme(theme)
         .run()?;
     Ok(())
-}
-
-fn clear_screen() -> io::Result<()> {
-    Term::stdout().clear_screen()
 }
 
 fn store_path() -> io::Result<PathBuf> {
