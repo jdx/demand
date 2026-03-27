@@ -253,6 +253,10 @@ Default if colors are NOT enabled in the console.
 
 ![new](./assets/themes/new.gif)
 
+### Theme Editor Example
+
+Run with `cargo run --example theme_editor`.
+
 ## "demand"
 
 The name of this library is inspired by a great [mistranslation](https://www.bbc.com/culture/article/20150202-the-greatest-mistranslations-ever)
