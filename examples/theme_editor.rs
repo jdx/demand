@@ -624,7 +624,7 @@ fn render_preview_showcase(out: &mut Buffer, theme: &Theme, theme_name: &str) ->
     out.set_color(&theme.help_desc)?;
     write!(out, " cancel")?;
     out.reset()?;
-    write_box_fill(out, WIDTH, "enter confirm • esc cancel".len())?;
+    write_box_fill(out, WIDTH, measure_text_width("enter confirm • esc cancel"))?;
     out.set_color(&theme.help_sep)?;
     writeln!(out, " │")?;
 
