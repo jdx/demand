@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1](https://github.com/jdx/demand/compare/v2.0.0...v2.0.1) - 2026-04-17
+
+### Other
+
+- *(deps)* update dependency hk to v1.43.0 ([#152](https://github.com/jdx/demand/pull/152))
+- *(deps)* update rust crate ctor to 0.10 ([#153](https://github.com/jdx/demand/pull/153))
+- *(deps)* update rust crate ctor to 0.9 ([#150](https://github.com/jdx/demand/pull/150))
+
 ## [2.0.0](https://github.com/jdx/demand/compare/v1.8.2...v2.0.0) - 2026-03-08
 
 ### Added
