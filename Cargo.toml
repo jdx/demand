@@ -20,3 +20,6 @@ termcolor = "1"
 ctor = "0.10"
 indoc = "2"
 insta = "1"
+
+[profile.dev]
+debug = 1
