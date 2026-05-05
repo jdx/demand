@@ -10,14 +10,13 @@ fn main() {
         ])
         .selected_button(1);
     match dialog.run() {
-        Ok(value) => value,
+        Ok(_) => {}
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
                 println!("{}", e);
-                return;
             } else {
                 panic!("Error: {}", e);
             }
         }
-    };
+    }
 }
