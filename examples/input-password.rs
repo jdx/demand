@@ -6,14 +6,13 @@ fn main() {
         .prompt("Password: ")
         .password(true);
     match input.run() {
-        Ok(value) => value,
+        Ok(_) => {}
         Err(e) => {
             if e.kind() == std::io::ErrorKind::Interrupted {
                 println!("{}", e);
-                return;
             } else {
                 panic!("Error: {}", e);
             }
         }
-    };
+    }
 }

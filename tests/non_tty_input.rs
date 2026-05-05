@@ -9,7 +9,7 @@ fn has_escape_sequences(text: &str) -> bool {
 /// Helper to run an example with piped I/O and return the output
 fn run_example_with_input(example: &str, input: &[u8]) -> Output {
     let mut child = Command::new("cargo")
-        .args(&["run", "--quiet", "--example", example])
+        .args(["run", "--quiet", "--example", example])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
