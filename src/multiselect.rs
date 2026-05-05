@@ -611,8 +611,11 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn reposition_and_write(&mut self, output: &str, line_count: usize) -> io::Result<()> {
+        // The previous render leaves the cursor at the end of its last line
+        // (no trailing newline), so row `last_line_count - 1` of that render.
+        // Moving up by the full count would land one row above the top.
         if self.last_line_count > 0 {
-            self.term.move_cursor_up(self.last_line_count)?;
+            self.term.move_cursor_up(self.last_line_count - 1)?;
         }
 
         self.term.move_cursor_left(usize::MAX)?;
@@ -630,16 +633,15 @@ impl<'a, T> MultiSelect<'a, T> {
         }
 
         if line_count < self.last_line_count {
-            writeln!(self.term)?;
-            for i in 0..(self.last_line_count - line_count) {
+            let extra = self.last_line_count - line_count;
+            for _ in 0..extra {
+                writeln!(self.term)?;
                 self.term.move_cursor_left(usize::MAX)?;
                 self.term.clear_line()?;
-                if i < (self.last_line_count - line_count - 1) {
-                    writeln!(self.term)?;
-                }
             }
-            self.term
-                .move_cursor_up(self.last_line_count - line_count)?;
+            // Leave the cursor on the last line of the new render so the
+            // invariant above (cursor at end of row N-1) still holds.
+            self.term.move_cursor_up(extra)?;
         }
 
         self.last_line_count = line_count;
@@ -661,6 +663,63 @@ mod tests {
 
     use super::*;
     use indoc::indoc;
+
+    // The redraw regression tests below use `Term::read_write_pair`, which is
+    // `#[cfg(unix)]` in the console crate. CI also runs on Windows, where this
+    // module simply has no test seam — the bug was reported on Linux/macOS and
+    // the fix is platform-agnostic, so the unix-only tests are sufficient.
+    #[cfg(unix)]
+    use std::fs::{File, OpenOptions};
+    #[cfg(unix)]
+    use std::os::fd::{AsRawFd, RawFd};
+    #[cfg(unix)]
+    use std::sync::{Arc, Mutex};
+
+    /// `Term::read_write_pair` is bounded by `Write + Debug + AsRawFd + Send +
+    /// 'static`. It only uses the fd for its own `AsRawFd` impl — the actual
+    /// I/O goes through `Write::write_all` — so we can satisfy the trait by
+    /// holding a throwaway `/dev/null` handle and capture bytes into a shared
+    /// `Vec` without any kernel round-trip.
+    #[cfg(unix)]
+    #[derive(Debug)]
+    struct CaptureWriter {
+        _fd: File,
+        bytes: Arc<Mutex<Vec<u8>>>,
+    }
+
+    #[cfg(unix)]
+    impl Write for CaptureWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.bytes.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[cfg(unix)]
+    impl AsRawFd for CaptureWriter {
+        fn as_raw_fd(&self) -> RawFd {
+            self._fd.as_raw_fd()
+        }
+    }
+
+    #[cfg(unix)]
+    fn capture_term() -> (Term, Arc<Mutex<Vec<u8>>>) {
+        let bytes = Arc::new(Mutex::new(Vec::new()));
+        let writer = CaptureWriter {
+            _fd: OpenOptions::new().write(true).open("/dev/null").unwrap(),
+            bytes: Arc::clone(&bytes),
+        };
+        let reader = File::open("/dev/null").unwrap();
+        (Term::read_write_pair(reader, writer), bytes)
+    }
+
+    #[cfg(unix)]
+    fn snapshot(buf: &Arc<Mutex<Vec<u8>>>) -> Vec<u8> {
+        buf.lock().unwrap().clone()
+    }
 
     #[test]
     fn test_render() {
@@ -739,5 +798,113 @@ mod tests {
             },
             without_ansi(select.render().unwrap().as_str())
         );
+    }
+
+    /// Regression for the off-by-one in `reposition_and_write` (jdx/demand#129):
+    /// a previous version moved the cursor up by `last_line_count` instead of
+    /// `last_line_count - 1`, causing the menu to drift up by one row on every
+    /// keypress in `mise up -i` and any other multi-iteration redraw.
+    ///
+    /// Drives the redraw path through a `Term::read_write_pair` whose writer is
+    /// a `SharedBuf`, replays the captured bytes through a vt100 emulator, and
+    /// asserts that the cursor row is stable across iterations (i.e. the render
+    /// origin doesn't drift).
+    #[cfg(unix)]
+    #[test]
+    fn reposition_does_not_drift_upward() {
+        let (term, buf) = capture_term();
+        let mut ms = MultiSelect::new("Toppings")
+            .option(DemandOption::new("Lettuce"))
+            .option(DemandOption::new("Tomatoes"))
+            .option(DemandOption::new("Cheese"))
+            .option(DemandOption::new("Nutella"));
+        ms.term = term;
+
+        // Start the vt100 cursor well below the top of the screen, so that an
+        // upward off-by-one would actually shift the rendered area visibly
+        // rather than getting silently clamped at row 0.
+        let mut parser = vt100::Parser::new(40, 120, 0);
+        parser.process(&b"\n".repeat(20));
+
+        let mut cursor_rows = Vec::new();
+        for _ in 0..6 {
+            let before = snapshot(&buf).len();
+            let output = ms.render().unwrap();
+            let line_count = output.lines().count();
+            ms.reposition_and_write(&output, line_count).unwrap();
+
+            let new_bytes = snapshot(&buf)[before..].to_vec();
+            parser.process(&new_bytes);
+            cursor_rows.push(parser.screen().cursor_position().0);
+
+            // Move the in-menu cursor so the renders aren't byte-identical and
+            // the redraw path actually has work to do (clear + rewrite).
+            ms.handle_down().unwrap();
+        }
+
+        // After iter 1 the vt100 cursor settles at row (start + line_count - 1).
+        // With the bug, every subsequent iter pulls it up by another row; with
+        // the fix it stays put.
+        let first = cursor_rows[0];
+        for (i, &row) in cursor_rows.iter().enumerate().skip(1) {
+            assert_eq!(
+                row, first,
+                "iteration {i}: cursor row drifted from {first} to {row} (full trace: {cursor_rows:?})",
+            );
+        }
+    }
+
+    /// Companion to `reposition_does_not_drift_upward`: when the rendered
+    /// output shrinks, the new last-line-count must keep the same "cursor at
+    /// end of last row" invariant so the next iteration's `move_cursor_up`
+    /// still lands on row 0 of the new render.
+    #[cfg(unix)]
+    #[test]
+    fn reposition_handles_shrinking_render() {
+        let (term, buf) = capture_term();
+        let mut ms = MultiSelect::new("T")
+            .option(DemandOption::new("a"))
+            .option(DemandOption::new("b"))
+            .option(DemandOption::new("c"));
+        ms.term = term;
+
+        let mut parser = vt100::Parser::new(40, 120, 0);
+        parser.process(&b"\n".repeat(20));
+
+        // First render with all 3 options.
+        let before = snapshot(&buf).len();
+        let output = ms.render().unwrap();
+        let line_count_full = output.lines().count();
+        ms.reposition_and_write(&output, line_count_full).unwrap();
+        parser.process(&snapshot(&buf)[before..]);
+        let row_after_full = parser.screen().cursor_position().0;
+
+        // Drop two options, forcing the next render to shrink.
+        ms.options.truncate(1);
+
+        let before = snapshot(&buf).len();
+        let output = ms.render().unwrap();
+        let line_count = output.lines().count();
+        ms.reposition_and_write(&output, line_count).unwrap();
+        parser.process(&snapshot(&buf)[before..]);
+        let row_after_short = parser.screen().cursor_position().0;
+
+        assert!(line_count < line_count_full, "render must actually shrink");
+        // Cursor should land on the last row of the shorter render — i.e. it
+        // should have moved up by the difference, not stayed at the old depth.
+        assert_eq!(
+            row_after_short,
+            row_after_full - (line_count_full - line_count) as u16,
+            "cursor didn't reposition correctly after shrink"
+        );
+
+        // The third render must again be stable — a fresh redraw on top of
+        // the shrunken state without further drift.
+        let before = snapshot(&buf).len();
+        let output = ms.render().unwrap();
+        let line_count = output.lines().count();
+        ms.reposition_and_write(&output, line_count).unwrap();
+        parser.process(&snapshot(&buf)[before..]);
+        assert_eq!(parser.screen().cursor_position().0, row_after_short);
     }
 }

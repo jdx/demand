@@ -290,7 +290,7 @@ mod test {
 
     #[test]
     fn test_render() {
-        for t in vec![
+        for t in [
             SpinnerStyle::dots(),
             SpinnerStyle::jump(),
             SpinnerStyle::line(),
