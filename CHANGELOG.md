@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.1](https://github.com/jdx/demand/compare/v2.0.0...v2.0.1) - 2026-05-05
+
+### Fixed
+
+- *(multiselect)* stop menu from drifting up on each keypress ([#156](https://github.com/jdx/demand/pull/156))
+
+### Other
+
+- *(deps)* update dependency hk to v1.43.0 ([#152](https://github.com/jdx/demand/pull/152))
+- *(deps)* update rust crate ctor to 0.10 ([#153](https://github.com/jdx/demand/pull/153))
+- *(deps)* update rust crate ctor to 0.9 ([#150](https://github.com/jdx/demand/pull/150))
+
 ## [2.0.0](https://github.com/jdx/demand/compare/v1.8.2...v2.0.0) - 2026-03-08
 
 ### Added
