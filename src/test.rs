@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn init() {
     console::set_colors_enabled(false);
     console::set_colors_enabled_stderr(false);
