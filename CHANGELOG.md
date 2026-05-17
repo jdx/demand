@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.2](https://github.com/jdx/demand/compare/v2.0.1...v2.0.2) - 2026-05-17
+
+### Fixed
+
+- allow ArrowUp/ArrowDown/Space during filtering in multiselect ([#164](https://github.com/jdx/demand/pull/164))
+
+### Other
+
+- *(deps)* update rust crate ctor to v1 ([#163](https://github.com/jdx/demand/pull/163))
+- *(deps)* update release-plz/action digest to 064f4d1 ([#160](https://github.com/jdx/demand/pull/160))
+- *(deps)* update dependency hk to v1.45.0 ([#161](https://github.com/jdx/demand/pull/161))
+- *(deps)* update rust crate ctor to 0.12 ([#159](https://github.com/jdx/demand/pull/159))
+
 ## [2.0.1](https://github.com/jdx/demand/compare/v2.0.0...v2.0.1) - 2026-05-05
 
 ### Fixed
