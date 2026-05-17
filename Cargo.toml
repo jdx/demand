@@ -17,7 +17,7 @@ signal-hook = "0.4"
 termcolor = "1"
 
 [dev-dependencies]
-ctor = "0.12"
+ctor = "0.13"
 indoc = "2"
 insta = "1"
 vt100 = "0.16"
