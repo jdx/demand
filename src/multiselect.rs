@@ -60,6 +60,8 @@ pub struct MultiSelect<'a, T> {
     pub filtering: bool,
     /// A filter query to preset when `filtering` is true
     pub filter: String,
+    /// The key used to toggle selection (default: Space)
+    pub toggle_key: Key,
 
     err: Option<String>,
     cursor_x: usize,
@@ -95,6 +97,7 @@ impl<'a, T> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            toggle_key: Key::Char(' '),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
         let max_height = ms.term.size().0 as usize;
@@ -154,6 +157,12 @@ impl<'a, T> MultiSelect<'a, T> {
         self
     }
 
+    /// Set the key used to toggle selection (default: Space)
+    pub fn toggle_key(mut self, key: Key) -> Self {
+        self.toggle_key = key;
+        self
+    }
+
     /// Set the theme of the selector
     pub fn theme(mut self, theme: &'a Theme) -> Self {
         self.theme = theme;
@@ -178,11 +187,14 @@ impl<'a, T> MultiSelect<'a, T> {
 
             if self.filtering {
                 match self.term.read_key()? {
+                    Key::ArrowDown => self.handle_down()?,
+                    Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
                     Key::ArrowRight => self.handle_right()?,
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
+                    key if key == self.toggle_key => self.handle_toggle(),
                     Key::Char(c) => self.handle_filter_key(c)?,
                     _ => {}
                 }
@@ -193,7 +205,7 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
-                    Key::Char('x') | Key::Char(' ') => self.handle_toggle(),
+                    key if key == self.toggle_key || key == Key::Char('x') => self.handle_toggle(),
                     Key::Char('a') => self.handle_toggle_all(),
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),
                     Key::Escape => {
@@ -336,8 +348,11 @@ impl<'a, T> MultiSelect<'a, T> {
         if visible_options.is_empty() {
             return;
         }
-        let id = visible_options[self.cursor].id;
-        let selected = visible_options[self.cursor].selected;
+        let cursor = self.cursor.min(visible_options.len().saturating_sub(1));
+        let id = visible_options[cursor].id;
+        let selected = visible_options[cursor].selected;
+        drop(visible_options);
+        self.cursor = cursor;
         self.options
             .iter_mut()
             .find(|o| o.id == id)
@@ -386,6 +401,7 @@ impl<'a, T> MultiSelect<'a, T> {
         let idx = self.get_char_idx(&self.filter, self.cursor_x);
         self.filter.insert(idx, c);
         self.cursor_x += 1;
+        self.cursor = 0;
         self.cursor_y = 0;
         self.err = None;
         self.reset_paging();
@@ -401,6 +417,7 @@ impl<'a, T> MultiSelect<'a, T> {
         if self.cursor_x > 0 {
             self.cursor_x -= 1;
         }
+        self.cursor = 0;
         self.cursor_y = 0;
         self.err = None;
         self.reset_paging();
@@ -533,25 +550,40 @@ impl<'a, T> MultiSelect<'a, T> {
         Ok(())
     }
 
-    fn print_help_keys(&self, out: &mut Buffer) -> io::Result<()> {
-        let mut help_keys = vec![("↑/↓/k/j", "up/down")];
-        if self.pages > 1 {
-            help_keys.push(("←/→/h/l", "prev/next page"));
+    fn toggle_key_label(&self) -> String {
+        match self.toggle_key {
+            Key::Char(' ') => "space".to_string(),
+            Key::Tab => "tab".to_string(),
+            Key::Char(c) => c.to_string(),
+            _ => "?".to_string(),
         }
-        help_keys.push(("x/space", "toggle"));
-        help_keys.push(("a", "toggle all"));
+    }
+
+    fn print_help_keys(&self, out: &mut Buffer) -> io::Result<()> {
+        let toggle_label = self.toggle_key_label();
+        let mut help_keys: Vec<(String, &str)> = vec![("↑/↓/k/j".to_string(), "up/down")];
+        if self.pages > 1 {
+            help_keys.push(("←/→/h/l".to_string(), "prev/next page"));
+        }
+        help_keys.push((format!("x/{}", toggle_label), "toggle"));
+        help_keys.push(("a".to_string(), "toggle all"));
         if self.filterable {
             if self.filtering {
-                help_keys = vec![("esc", "clear filter"), ("enter", "save filter")];
+                help_keys = vec![
+                    ("↑/↓".to_string(), "up/down"),
+                    (toggle_label, "toggle"),
+                    ("esc".to_string(), "clear filter"),
+                    ("enter".to_string(), "save filter"),
+                ];
             } else {
-                help_keys.push(("/", "filter"));
+                help_keys.push(("/".to_string(), "filter"));
                 if !self.filter.is_empty() {
-                    help_keys.push(("esc", "clear filter"));
+                    help_keys.push(("esc".to_string(), "clear filter"));
                 }
             }
         }
         if !self.filtering {
-            help_keys.push(("enter", "confirm"));
+            help_keys.push(("enter".to_string(), "confirm"));
         }
         for (i, (key, desc)) in help_keys.iter().enumerate() {
             if i > 0 || (!self.filtering && !self.filter.is_empty()) {
