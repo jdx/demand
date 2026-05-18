@@ -191,7 +191,23 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
                     Key::ArrowRight => self.handle_right()?,
-                    Key::Enter => self.handle_stop_filtering(true)?,
+                    Key::Enter => {
+                        if let Some(selected) = self.try_confirm() {
+                            self.cleanup()?;
+                            self.term.show_cursor()?;
+                            ctrlc_handle.close();
+                            let output = self.render_success(&selected)?;
+                            self.term.write_all(output.as_bytes())?;
+                            let selected = self
+                                .options
+                                .into_iter()
+                                .filter(|o| o.selected)
+                                .map(|o| o.item)
+                                .collect::<Vec<_>>();
+                            self.term.clear_to_end_of_screen()?;
+                            return Ok(selected);
+                        }
+                    }
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
                     key if key == self.toggle_key => self.handle_toggle(),
@@ -221,43 +237,21 @@ impl<'a, T> MultiSelect<'a, T> {
                         self.handle_stop_filtering(false)?
                     }
                     Key::Enter => {
-                        let selected = self
-                            .options
-                            .iter()
-                            .filter(|o| o.selected)
-                            .map(|o| o.label.to_string())
-                            .collect::<Vec<_>>();
-                        if selected.len() < self.min {
-                            if self.min == 1 {
-                                self.err = Some("Please select an option".to_string());
-                            } else {
-                                self.err =
-                                    Some(format!("Please select at least {} options", self.min));
-                            }
-                            continue;
+                        if let Some(selected) = self.try_confirm() {
+                            self.cleanup()?;
+                            self.term.show_cursor()?;
+                            ctrlc_handle.close();
+                            let output = self.render_success(&selected)?;
+                            self.term.write_all(output.as_bytes())?;
+                            let selected = self
+                                .options
+                                .into_iter()
+                                .filter(|o| o.selected)
+                                .map(|o| o.item)
+                                .collect::<Vec<_>>();
+                            self.term.clear_to_end_of_screen()?;
+                            return Ok(selected);
                         }
-                        if selected.len() > self.max {
-                            if self.max == 1 {
-                                self.err = Some("Please select only one option".to_string());
-                            } else {
-                                self.err =
-                                    Some(format!("Please select at most {} options", self.max));
-                            }
-                            continue;
-                        }
-                        self.cleanup()?;
-                        self.term.show_cursor()?;
-                        ctrlc_handle.close();
-                        let output = self.render_success(&selected)?;
-                        self.term.write_all(output.as_bytes())?;
-                        let selected = self
-                            .options
-                            .into_iter()
-                            .filter(|o| o.selected)
-                            .map(|o| o.item)
-                            .collect::<Vec<_>>();
-                        self.term.clear_to_end_of_screen()?;
-                        return Ok(selected);
                     }
                     _ => {}
                 }
@@ -381,6 +375,32 @@ impl<'a, T> MultiSelect<'a, T> {
     fn handle_start_filtering(&mut self) {
         self.err = None;
         self.filtering = true;
+    }
+
+    fn try_confirm(&mut self) -> Option<Vec<String>> {
+        let selected = self
+            .options
+            .iter()
+            .filter(|o| o.selected)
+            .map(|o| o.label.to_string())
+            .collect::<Vec<_>>();
+        if selected.len() < self.min {
+            if self.min == 1 {
+                self.err = Some("Please select an option".to_string());
+            } else {
+                self.err = Some(format!("Please select at least {} options", self.min));
+            }
+            return None;
+        }
+        if selected.len() > self.max {
+            if self.max == 1 {
+                self.err = Some("Please select only one option".to_string());
+            } else {
+                self.err = Some(format!("Please select at most {} options", self.max));
+            }
+            return None;
+        }
+        Some(selected)
     }
 
     fn handle_stop_filtering(&mut self, save: bool) -> Result<(), io::Error> {
@@ -573,7 +593,7 @@ impl<'a, T> MultiSelect<'a, T> {
                     ("↑/↓".to_string(), "up/down"),
                     (toggle_label, "toggle"),
                     ("esc".to_string(), "clear filter"),
-                    ("enter".to_string(), "save filter"),
+                    ("enter".to_string(), "confirm"),
                 ];
             } else {
                 help_keys.push(("/".to_string(), "filter"));
