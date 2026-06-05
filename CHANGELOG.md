@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.3](https://github.com/jdx/demand/compare/v2.0.2...v2.0.3) - 2026-06-05
+
+### Fixed
+
+- Enter in filtering mode now confirms selection in MultiSelect ([#165](https://github.com/jdx/demand/pull/165))
+
+### Other
+
+- *(deps)* update dependency hk to v1.46.0 ([#169](https://github.com/jdx/demand/pull/169))
+
 ## [2.0.2](https://github.com/jdx/demand/compare/v2.0.1...v2.0.2) - 2026-05-17
 
 ### Fixed
