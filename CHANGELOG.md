@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.3](https://github.com/jdx/demand/compare/v2.0.2...v2.0.3) - 2026-06-13
+
+### Fixed
+
+- Enter in filtering mode now confirms selection in MultiSelect ([#165](https://github.com/jdx/demand/pull/165))
+
+### Other
+
+- link to all sponsors ([#172](https://github.com/jdx/demand/pull/172))
+- *(deps)* update release-plz/action digest to e879257 ([#171](https://github.com/jdx/demand/pull/171))
+- *(deps)* update jdx/mise-action digest to dba1968 ([#168](https://github.com/jdx/demand/pull/168))
+- *(deps)* update actions/checkout digest to df4cb1c ([#167](https://github.com/jdx/demand/pull/167))
+- *(deps)* update dependency hk to v1.46.0 ([#169](https://github.com/jdx/demand/pull/169))
+
 ## [2.0.2](https://github.com/jdx/demand/compare/v2.0.1...v2.0.2) - 2026-05-17
 
 ### Fixed
