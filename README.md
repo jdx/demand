@@ -9,6 +9,10 @@
 
 A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracelet/huh). Maintained by [@jdx](https://github.com/jdx) and [@roele](https://github.com/roele).
 
+## Sponsors
+
+[View all sponsors](https://en.dev/sponsors.html).
+
 ## Input
 
 * Single-line text input with variable prompt and placeholder
