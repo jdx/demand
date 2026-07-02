@@ -11,7 +11,9 @@ A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracel
 
 ## Sponsors
 
-[View all sponsors](https://en.dev/sponsors.html).
+demand is sponsored by [entire.io](https://entire.io), [37signals](https://37signals.com), [CodeRabbit](https://coderabbit.link/mise), and [Supabase](https://supabase.com).
+
+[View all sponsors](https://jdx.dev/sponsors.html).
 
 ## Input
 
