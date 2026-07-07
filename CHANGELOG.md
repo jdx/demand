@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.3](https://github.com/jdx/demand/compare/v2.0.2...v2.0.3) - 2026-07-03
+
+### Fixed
+
+- *(deps)* update rust crate itertools to 0.15 ([#176](https://github.com/jdx/demand/pull/176))
+- Enter in filtering mode now confirms selection in MultiSelect ([#165](https://github.com/jdx/demand/pull/165))
+
+### Other
+
+- *(deps)* update dependency hk to v1.49.0 ([#180](https://github.com/jdx/demand/pull/180))
+- *(deps)* update dtolnay/rust-toolchain digest to 4be7066 ([#179](https://github.com/jdx/demand/pull/179))
+- Update sponsor references for jdx.dev ([#178](https://github.com/jdx/demand/pull/178))
+- *(deps)* update actions/checkout action to v7 ([#177](https://github.com/jdx/demand/pull/177))
+- Enable Entire for Codex ([#175](https://github.com/jdx/demand/pull/175))
+- *(deps)* update dependency hk to v1.48.0 ([#174](https://github.com/jdx/demand/pull/174))
+- *(deps)* update jdx/mise-action digest to e6a8b39 ([#173](https://github.com/jdx/demand/pull/173))
+- link to all sponsors ([#172](https://github.com/jdx/demand/pull/172))
+- *(deps)* update release-plz/action digest to e879257 ([#171](https://github.com/jdx/demand/pull/171))
+- *(deps)* update jdx/mise-action digest to dba1968 ([#168](https://github.com/jdx/demand/pull/168))
+- *(deps)* update actions/checkout digest to df4cb1c ([#167](https://github.com/jdx/demand/pull/167))
+- *(deps)* update dependency hk to v1.46.0 ([#169](https://github.com/jdx/demand/pull/169))
+
 ## [2.0.2](https://github.com/jdx/demand/compare/v2.0.1...v2.0.2) - 2026-05-17
 
 ### Fixed
