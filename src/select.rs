@@ -1,6 +1,7 @@
 use std::io;
 use std::io::Write;
 
+use crate::keys::{CTRL_N, CTRL_P};
 use crate::theme::Theme;
 use crate::{DemandOption, ctrlc, theme};
 use console::{Alignment, Key, Term};
@@ -188,8 +189,8 @@ impl<'a, T> Select<'a, T> {
                 }
             } else {
                 match key {
-                    Key::ArrowDown | Key::Char('j') => self.handle_down()?,
-                    Key::ArrowUp | Key::Char('k') => self.handle_up()?,
+                    Key::ArrowDown | Key::Char('j') | Key::Char(CTRL_N) => self.handle_down()?,
+                    Key::ArrowUp | Key::Char('k') | Key::Char(CTRL_P) => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     Key::Char('/') if self.filterable => self.handle_start_filtering(),

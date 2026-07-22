@@ -8,6 +8,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 
+use crate::keys::{CTRL_N, CTRL_P};
 use crate::theme::Theme;
 use crate::{DemandOption, ctrlc, theme};
 
@@ -218,8 +219,8 @@ impl<'a, T> MultiSelect<'a, T> {
             } else {
                 self.term.hide_cursor()?;
                 match key {
-                    Key::ArrowDown | Key::Char('j') => self.handle_down()?,
-                    Key::ArrowUp | Key::Char('k') => self.handle_up()?,
+                    Key::ArrowDown | Key::Char('j') | Key::Char(CTRL_N) => self.handle_down()?,
+                    Key::ArrowUp | Key::Char('k') | Key::Char(CTRL_P) => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     key if key == self.toggle_key || key == Key::Char('x') => self.handle_toggle(),
