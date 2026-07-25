@@ -377,7 +377,7 @@ impl<'a> Input<'a> {
             self.clear()?;
             let output = self.render()?;
 
-            self.height = output.lines().count() - 1;
+            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.set_cursor()?;

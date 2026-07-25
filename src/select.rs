@@ -139,11 +139,8 @@ impl<'a, T> Select<'a, T> {
 
         loop {
             self.clear()?;
-            let output = self.render()?;
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
+            self.draw()?;
             self.term.hide_cursor()?;
-            self.height = output.lines().count() - 1;
             let enter = |mut select: Select<T>| {
                 select.clear()?;
                 select.term.show_cursor()?;
@@ -487,6 +484,16 @@ impl<'a, T> Select<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    /// Render a frame, write it out, and record how many rows it took so
+    /// the next `clear` erases exactly that much.
+    fn draw(&mut self) -> io::Result<()> {
+        let output = self.render()?;
+        self.term.write_all(output.as_bytes())?;
+        self.term.flush()?;
+        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        Ok(())
+    }
+
     fn clear(&mut self) -> io::Result<()> {
         self.term.clear_last_lines(self.height)?;
         self.height = 0;
@@ -497,6 +504,8 @@ impl<'a, T> Select<'a, T> {
 #[cfg(test)]
 mod tests {
     use crate::test::without_ansi;
+    #[cfg(unix)]
+    use crate::test::{capture_term, snapshot};
 
     use super::*;
     use indoc::indoc;
@@ -566,6 +575,56 @@ mod tests {
             "
             },
             without_ansi(select.render().unwrap().as_str())
+        );
+    }
+
+    /// Regression for the wrapped-line redraw bug (jdx/aube#1107): an
+    /// option wider than the terminal wraps into physical rows that
+    /// `clear_last_lines` never erased, because the height was counted in
+    /// logical lines. Every keypress then drew a fresh frame below the
+    /// leftovers, so the prompt visibly duplicated itself.
+    ///
+    /// Drives three redraw cycles through a captured `Term`, replays the
+    /// bytes through a vt100 emulator, and asserts the screen holds one
+    /// copy of the prompt.
+    #[cfg(unix)]
+    #[test]
+    fn a_wrapped_option_does_not_stack_copies_of_the_frame() {
+        let (term, buf) = capture_term();
+        let mut select = Select::new("Pick a script")
+            .option(DemandOption::new("long").label(&"x".repeat(140)))
+            .option(DemandOption::new("short"));
+        select.term = term;
+        let width = select.term.size().1 as usize;
+        // The label has to actually exceed the terminal for this to test
+        // anything.
+        assert!(width < 140, "test needs a label wider than the terminal");
+
+        for i in 0..3 {
+            select.clear().unwrap();
+            select.draw().unwrap();
+            // Move the cursor so consecutive frames differ and the redraw
+            // path has real work to do.
+            select.cursor_y = i % select.options.len();
+        }
+
+        let mut parser = vt100::Parser::new(24, width as u16, 0);
+        // A real terminal maps the widget's `\n` to CR+LF (ONLCR); the
+        // emulator doesn't, and without it the cursor keeps its column and
+        // the row math is meaningless.
+        let mut bytes = Vec::new();
+        for b in snapshot(&buf) {
+            if b == b'\n' {
+                bytes.push(b'\r');
+            }
+            bytes.push(b);
+        }
+        parser.process(&bytes);
+        let screen = parser.screen().contents();
+        assert_eq!(
+            screen.matches("Pick a script").count(),
+            1,
+            "prompt drawn more than once:\n{screen}"
         );
     }
 }
