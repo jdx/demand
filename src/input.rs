@@ -377,7 +377,7 @@ impl<'a> Input<'a> {
             self.clear()?;
             let output = self.render()?;
 
-            self.height = output.lines().count() - 1;
+            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
             self.term.write_all(output.as_bytes())?;
             self.term.flush()?;
             self.set_cursor()?;
@@ -600,15 +600,17 @@ impl<'a> Input<'a> {
         }
         out.reset()?;
 
-        self.input_line_offset = if self.inline {
-            0
-        } else {
-            let mut offset = 1;
-            if !self.description.is_empty() {
-                offset += 1;
-            }
-            offset
-        };
+        // Rows above the input row. Everything written so far is the
+        // header plus the prompt, and the prompt shares the input's row —
+        // which is exactly what `rendered_height` excludes, so it gives
+        // the header's height directly. Counting rows rather than lines
+        // matters because `self.height` is in rows: subtracting a logical
+        // line count from it would put the caret on the wrong row as soon
+        // as a title or description wrapped. Inline mode writes no
+        // newline at all and correctly comes out as 0.
+        let header = std::str::from_utf8(out.as_slice()).unwrap_or_default();
+        self.input_line_offset =
+            crate::height::rendered_height(header, self.term.size().1 as usize);
 
         self.render_input(&mut out)?;
         writeln!(out)?;
@@ -1086,5 +1088,28 @@ mod tests {
             "Password ************\n",
             without_ansi(input.render_success().unwrap().as_str())
         );
+    }
+
+    /// `input_line_offset` is subtracted from `self.height`, which counts
+    /// physical rows — so it has to count rows too. A title that wraps
+    /// occupies two of them, and counting it as one logical line would
+    /// put the caret a row above where the input actually is.
+    #[test]
+    fn input_line_offset_counts_rows_not_lines() {
+        let mut input = Input::new("t".repeat(200)).description("d");
+        input.render().unwrap();
+        let width = input.term.size().1 as usize;
+        let title_rows = 200_usize.div_ceil(width);
+        assert!(title_rows > 1, "test needs a title wider than the terminal");
+        assert_eq!(input.input_line_offset, title_rows + 1);
+    }
+
+    /// Inline mode writes no newline before the input, so nothing sits
+    /// above it.
+    #[test]
+    fn inline_input_has_no_rows_above_it() {
+        let mut input = Input::new("Name").inline(true);
+        input.render().unwrap();
+        assert_eq!(input.input_line_offset, 0);
     }
 }

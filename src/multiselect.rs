@@ -712,66 +712,11 @@ impl<'a, T> MultiSelect<'a, T> {
 #[cfg(test)]
 mod tests {
     use crate::test::without_ansi;
+    #[cfg(unix)]
+    use crate::test::{capture_term, snapshot};
 
     use super::*;
     use indoc::indoc;
-
-    // The redraw regression tests below use `Term::read_write_pair`, which is
-    // `#[cfg(unix)]` in the console crate. CI also runs on Windows, where this
-    // module simply has no test seam — the bug was reported on Linux/macOS and
-    // the fix is platform-agnostic, so the unix-only tests are sufficient.
-    #[cfg(unix)]
-    use std::fs::{File, OpenOptions};
-    #[cfg(unix)]
-    use std::os::fd::{AsRawFd, RawFd};
-    #[cfg(unix)]
-    use std::sync::{Arc, Mutex};
-
-    /// `Term::read_write_pair` is bounded by `Write + Debug + AsRawFd + Send +
-    /// 'static`. It only uses the fd for its own `AsRawFd` impl — the actual
-    /// I/O goes through `Write::write_all` — so we can satisfy the trait by
-    /// holding a throwaway `/dev/null` handle and capture bytes into a shared
-    /// `Vec` without any kernel round-trip.
-    #[cfg(unix)]
-    #[derive(Debug)]
-    struct CaptureWriter {
-        _fd: File,
-        bytes: Arc<Mutex<Vec<u8>>>,
-    }
-
-    #[cfg(unix)]
-    impl Write for CaptureWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.bytes.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    #[cfg(unix)]
-    impl AsRawFd for CaptureWriter {
-        fn as_raw_fd(&self) -> RawFd {
-            self._fd.as_raw_fd()
-        }
-    }
-
-    #[cfg(unix)]
-    fn capture_term() -> (Term, Arc<Mutex<Vec<u8>>>) {
-        let bytes = Arc::new(Mutex::new(Vec::new()));
-        let writer = CaptureWriter {
-            _fd: OpenOptions::new().write(true).open("/dev/null").unwrap(),
-            bytes: Arc::clone(&bytes),
-        };
-        let reader = File::open("/dev/null").unwrap();
-        (Term::read_write_pair(reader, writer), bytes)
-    }
-
-    #[cfg(unix)]
-    fn snapshot(buf: &Arc<Mutex<Vec<u8>>>) -> Vec<u8> {
-        buf.lock().unwrap().clone()
-    }
 
     #[test]
     fn test_render() {
