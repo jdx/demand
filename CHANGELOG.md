@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.4](https://github.com/jdx/demand/compare/v2.0.3...v2.0.4) - 2026-07-25
+
+### Fixed
+
+- clear wrapped lines when redrawing a prompt ([#190](https://github.com/jdx/demand/pull/190))
+
 ## [2.0.3](https://github.com/jdx/demand/compare/v2.0.2...v2.0.3) - 2026-07-03
 
 ### Fixed
