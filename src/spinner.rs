@@ -161,7 +161,10 @@ impl<'a> Spinner<'a> {
                 }
                 self.clear()?;
                 let output = self.render()?;
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                // `rendered_rows`, not `rendered_height`: the spinner frame
+                // has no trailing newline, so the cursor sits on its last
+                // row and that row counts.
+                self.height = crate::height::rendered_rows(&output, self.term.size().1 as usize);
                 self.term.write_all(output.as_bytes())?;
                 sleep(self.style.fps);
                 if handle.is_finished() {
@@ -195,12 +198,18 @@ impl<'a> Spinner<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    /// Wipe the frame the cursor is currently sitting in.
+    ///
+    /// Not `clear_last_lines`: that clears the rows *above* the cursor,
+    /// and the spinner's cursor is inside its own frame rather than below
+    /// it. So walk up from the last row, clearing as we go. A frame that
+    /// didn't wrap is a single `clear_line`, exactly as before.
     fn clear(&mut self) -> io::Result<()> {
-        if self.height == 0 {
+        for _ in 0..self.height.saturating_sub(1) {
             self.term.clear_line()?;
-        } else {
-            self.term.clear_last_lines(self.height)?;
+            self.term.move_cursor_up(1)?;
         }
+        self.term.clear_line()?;
         self.height = 0;
         Ok(())
     }

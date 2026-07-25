@@ -21,6 +21,15 @@ pub(crate) fn rendered_height(output: &str, width: usize) -> usize {
     lines.iter().map(|line| rows_for(line, width)).sum()
 }
 
+/// Every row a frame occupies, including the one the cursor rests on.
+///
+/// For widgets whose frame ends without a newline — the spinner writes a
+/// single line and leaves the cursor at the end of it — the last row is
+/// part of the frame and has to be cleared like any other.
+pub(crate) fn rendered_rows(output: &str, width: usize) -> usize {
+    output.split('\n').map(|line| rows_for(line, width)).sum()
+}
+
 /// Rows one logical line wraps into. A line exactly `width` wide still
 /// occupies a single row — terminals defer the wrap until the next
 /// character arrives.
@@ -71,5 +80,16 @@ mod tests {
     #[test]
     fn treats_zero_width_as_one_row_per_line() {
         assert_eq!(rendered_height("aaaa\nbbbb\n\x1b[0m", 0), 2);
+    }
+
+    /// A frame with no trailing newline — the spinner — is entirely above
+    /// nothing: `rendered_height` sees no rows to clear, `rendered_rows`
+    /// counts the row the cursor is sitting in.
+    #[test]
+    fn rendered_rows_counts_a_frame_the_cursor_sits_inside() {
+        use super::rendered_rows;
+        assert_eq!(rendered_height("/ Loading", 80), 0);
+        assert_eq!(rendered_rows("/ Loading", 80), 1);
+        assert_eq!(rendered_rows(&format!("/ {}", "x".repeat(100)), 80), 2);
     }
 }
