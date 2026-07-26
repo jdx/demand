@@ -18,7 +18,7 @@ pub fn without_ansi(s: &str) -> Cow<'_, str> {
 /// these cover were reported on Linux/macOS and the fixes are
 /// platform-agnostic, so unix-only coverage is sufficient.
 #[cfg(unix)]
-pub use capture::{capture_term, snapshot};
+pub use capture::{capture_term, replay, snapshot};
 
 #[cfg(unix)]
 mod capture {
@@ -67,5 +67,20 @@ mod capture {
 
     pub fn snapshot(buf: &Arc<Mutex<Vec<u8>>>) -> Vec<u8> {
         buf.lock().unwrap().clone()
+    }
+
+    /// Replay captured terminal output with the newline translation a real
+    /// Unix TTY performs. The emulator does not apply ONLCR itself, so feeding
+    /// raw `\n` bytes would leave the cursor column unchanged and make redraw
+    /// assertions model a pipe rather than a terminal.
+    pub fn replay(parser: &mut vt100::Parser, output: &[u8]) {
+        let mut tty_output = Vec::with_capacity(output.len());
+        for &byte in output {
+            if byte == b'\n' {
+                tty_output.push(b'\r');
+            }
+            tty_output.push(byte);
+        }
+        parser.process(&tty_output);
     }
 }
