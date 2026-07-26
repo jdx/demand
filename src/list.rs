@@ -53,7 +53,7 @@ pub struct List<'a> {
     filterable: bool,
     filter: String,
     cur_page: usize,
-    height: usize,
+    last_frame: String,
     pages: usize,
     scroll: usize,
 }
@@ -71,7 +71,7 @@ impl<'a> List<'a> {
             filtering: false,
             filterable: false,
             filter: String::new(),
-            height: 0,
+            last_frame: String::new(),
             cur_page: 0,
             pages: 0,
             success_items: 4,
@@ -126,19 +126,32 @@ impl<'a> List<'a> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> Result<(), io::Error> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         loop {
+            self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
-                self.clear()?;
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                } else {
+                    self.clear()?;
+                }
                 let output = self.render()?;
                 self.term.write_all(output.as_bytes())?;
                 self.term.flush()?;
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                self.last_frame = output;
                 Ok(())
             })?;
+            let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
+                continue;
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
@@ -147,7 +160,7 @@ impl<'a> List<'a> {
                 }
             } else {
                 self.term.hide_cursor()?;
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowUp | Key::Char('k') => self.handle_up(),
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
@@ -254,6 +267,24 @@ impl<'a> List<'a> {
         }
     }
 
+    fn refresh_layout(&mut self) {
+        self.resize_layout(self.term.size().0 as usize);
+    }
+
+    fn resize_layout(&mut self, rows: usize) {
+        let capacity = rows.max(8) - 5;
+        if capacity == self.capacity {
+            return;
+        }
+        let entry_count = self.filtered_entries().len();
+        let start =
+            (self.cur_page * self.capacity + self.scroll).min(entry_count.saturating_sub(capacity));
+        self.capacity = capacity;
+        self.cur_page = start / self.capacity;
+        self.scroll = start % self.capacity;
+        self.pages = self.get_pages();
+    }
+
     fn visible_entries(&self) -> Vec<&&'a str> {
         let filtered = self.filtered_entries();
         let start = (self.cur_page * self.capacity) + self.scroll;
@@ -347,12 +378,14 @@ impl<'a> List<'a> {
     }
 
     fn clear(&mut self) -> Result<(), io::Error> {
-        if self.height > 0 {
-            self.term.clear_last_lines(self.height)?;
-        } else {
+        if self.last_frame.is_empty() {
             self.term.clear_line()?;
+        } else {
+            let height =
+                crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
+            self.term.clear_last_lines(height)?;
         }
-        self.height = 0;
+        self.last_frame.clear();
         Ok(())
     }
 }
@@ -386,5 +419,35 @@ mod tests {
             },
             without_ansi(list.render().unwrap().as_str())
         )
+    }
+
+    #[test]
+    fn resize_preserves_first_visible_entry() {
+        let items = (0..20).map(|value| value.to_string()).collect::<Vec<_>>();
+        let item_refs = items.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut list = List::new("Items").items(&item_refs);
+        list.capacity = 10;
+        list.cur_page = 1;
+        list.scroll = 2;
+
+        list.resize_layout(9);
+
+        assert_eq!(list.capacity, 4);
+        assert_eq!(*list.visible_entries()[0], "12");
+    }
+
+    #[test]
+    fn resize_clamps_scroll_to_last_full_view() {
+        let items = (0..20).map(|value| value.to_string()).collect::<Vec<_>>();
+        let item_refs = items.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut list = List::new("Items").items(&item_refs);
+        list.capacity = 4;
+        list.cur_page = 4;
+        list.scroll = 2;
+
+        list.resize_layout(20);
+
+        assert_eq!(list.capacity, 15);
+        assert_eq!(*list.visible_entries()[0], "5");
     }
 }

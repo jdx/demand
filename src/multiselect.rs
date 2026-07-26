@@ -67,7 +67,7 @@ pub struct MultiSelect<'a, T> {
     cursor_x: usize,
     cursor_y: usize,
     cursor: usize,
-    height: usize,
+    last_frame: String,
     term: Term,
     pages: usize,
     cur_page: usize,
@@ -90,7 +90,7 @@ impl<'a, T> MultiSelect<'a, T> {
             cursor_y: 0,
             err: None,
             cursor: 0,
-            height: 0,
+            last_frame: String::new(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -175,16 +175,30 @@ impl<'a, T> MultiSelect<'a, T> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<Vec<T>> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
 
         loop {
+            self.refresh_layout();
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || self.redraw())?;
+            crate::synchronized_output::run(&term, || {
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                }
+                self.redraw()
+            })?;
 
+            let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
+                continue;
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown => self.handle_down()?,
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
@@ -203,7 +217,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 }
             } else {
                 self.term.hide_cursor()?;
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
@@ -442,6 +456,24 @@ impl<'a, T> MultiSelect<'a, T> {
         self.pages = self.get_pages();
     }
 
+    fn refresh_layout(&mut self) {
+        self.resize_layout(self.term.size().0 as usize);
+    }
+
+    fn resize_layout(&mut self, rows: usize) {
+        let capacity = rows.max(8) - 6;
+        if capacity == self.capacity {
+            return;
+        }
+        let option_count = self.filtered_options().len();
+        let cursor =
+            (self.cur_page * self.capacity + self.cursor).min(option_count.saturating_sub(1));
+        self.capacity = capacity;
+        self.pages = self.get_pages();
+        self.cur_page = cursor / self.capacity;
+        self.cursor = cursor % self.capacity;
+    }
+
     fn get_pages(&self) -> usize {
         if self.filtering || !self.filter.is_empty() {
             ((self.filtered_options().len() as f64) / self.capacity as f64).ceil() as usize
@@ -661,15 +693,16 @@ impl<'a, T> MultiSelect<'a, T> {
     fn redraw(&mut self) -> io::Result<()> {
         self.cleanup()?;
         let output = self.render()?;
-        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
         self.term.write_all(output.as_bytes())?;
         self.term.flush()?;
+        self.last_frame = output;
         Ok(())
     }
 
     fn cleanup(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
+        self.term.clear_last_lines(height)?;
+        self.last_frame.clear();
         Ok(())
     }
 }
@@ -885,5 +918,26 @@ mod tests {
             1,
             "prompt drawn more than once:\n{screen}"
         );
+    }
+
+    #[test]
+    fn resize_preserves_focused_option() {
+        let mut select = MultiSelect::new("Pick").options(
+            (0..20)
+                .map(|value| DemandOption::new(value.to_string()))
+                .collect(),
+        );
+        select.capacity = 10;
+        select.pages = 2;
+        select.cur_page = 1;
+        select.cursor = 5;
+
+        select.resize_layout(10);
+
+        assert_eq!(select.capacity, 4);
+        assert_eq!(select.pages, 5);
+        assert_eq!(select.cur_page, 3);
+        assert_eq!(select.cursor, 3);
+        assert_eq!(select.visible_options()[select.cursor].label, "15");
     }
 }

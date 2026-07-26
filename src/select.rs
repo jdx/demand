@@ -53,7 +53,7 @@ pub struct Select<'a, T> {
 
     cursor_x: usize,
     cursor_y: usize,
-    height: usize,
+    last_frame: String,
     term: Term,
     filter: String,
     filtering: bool,
@@ -74,7 +74,7 @@ impl<'a, T> Select<'a, T> {
             theme: &theme::DEFAULT,
             cursor_x: 0,
             cursor_y: 0,
-            height: 0,
+            last_frame: String::new(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -136,11 +136,20 @@ impl<'a, T> Select<'a, T> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         loop {
+            self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
-                self.clear()?;
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                } else {
+                    self.clear()?;
+                }
                 self.draw()?;
                 self.term.hide_cursor()
             })?;
@@ -159,8 +168,12 @@ impl<'a, T> Select<'a, T> {
                 Ok::<T, io::Error>(selected.item)
             };
 
+            let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
+                continue;
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown => self.handle_down()?,
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
@@ -174,7 +187,7 @@ impl<'a, T> Select<'a, T> {
                     _ => {}
                 }
             } else {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
@@ -320,7 +333,25 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn get_pages(&self) -> usize {
-        ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
+        ((self.filtered_options().len() as f64) / self.capacity as f64).ceil() as usize
+    }
+
+    fn refresh_layout(&mut self) {
+        self.resize_layout(self.term.size().0 as usize);
+    }
+
+    fn resize_layout(&mut self, rows: usize) {
+        let capacity = rows.max(8) - 6;
+        if capacity == self.capacity {
+            return;
+        }
+        let option_count = self.filtered_options().len();
+        let cursor =
+            (self.cur_page * self.capacity + self.cursor_y).min(option_count.saturating_sub(1));
+        self.capacity = capacity;
+        self.pages = self.get_pages();
+        self.cur_page = cursor / self.capacity;
+        self.cursor_y = cursor % self.capacity;
     }
 
     fn get_selected_option_idx(&mut self) -> usize {
@@ -496,13 +527,14 @@ impl<'a, T> Select<'a, T> {
         let output = self.render()?;
         self.term.write_all(output.as_bytes())?;
         self.term.flush()?;
-        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        self.last_frame = output;
         Ok(())
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
+        self.term.clear_last_lines(height)?;
+        self.last_frame.clear();
         Ok(())
     }
 }
@@ -622,5 +654,26 @@ mod tests {
             1,
             "prompt drawn more than once:\n{screen}"
         );
+    }
+
+    #[test]
+    fn resize_preserves_focused_option() {
+        let mut select = Select::new("Pick").options(
+            (0..20)
+                .map(|value| DemandOption::new(value.to_string()))
+                .collect(),
+        );
+        select.capacity = 10;
+        select.pages = 2;
+        select.cur_page = 1;
+        select.cursor_y = 5;
+
+        select.resize_layout(10);
+
+        assert_eq!(select.capacity, 4);
+        assert_eq!(select.pages, 5);
+        assert_eq!(select.cur_page, 3);
+        assert_eq!(select.cursor_y, 3);
+        assert_eq!(select.visible_options()[select.cursor_y].label, "15");
     }
 }
