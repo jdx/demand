@@ -67,7 +67,7 @@ pub struct MultiSelect<'a, T> {
     cursor_x: usize,
     cursor_y: usize,
     cursor: usize,
-    last_line_count: usize,
+    height: usize,
     term: Term,
     pages: usize,
     cur_page: usize,
@@ -90,7 +90,7 @@ impl<'a, T> MultiSelect<'a, T> {
             cursor_y: 0,
             err: None,
             cursor: 0,
-            last_line_count: 0,
+            height: 0,
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -180,10 +180,7 @@ impl<'a, T> MultiSelect<'a, T> {
         self.min = self.min.min(self.max);
 
         loop {
-            let output = self.render()?;
-            let line_count = output.lines().count();
-
-            self.reposition_and_write(&output, line_count)?;
+            self.redraw()?;
 
             if self.filtering {
                 match self.term.read_key()? {
@@ -662,49 +659,21 @@ impl<'a, T> MultiSelect<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    fn reposition_and_write(&mut self, output: &str, line_count: usize) -> io::Result<()> {
-        // The previous render leaves the cursor at the end of its last line
-        // (no trailing newline), so row `last_line_count - 1` of that render.
-        // Moving up by the full count would land one row above the top.
-        if self.last_line_count > 0 {
-            self.term.move_cursor_up(self.last_line_count - 1)?;
-        }
-
-        self.term.move_cursor_left(usize::MAX)?;
-
-        let mut lines = output.lines().peekable();
-        while let Some(line) = lines.next() {
-            self.term.move_cursor_left(usize::MAX)?;
-            self.term.clear_line()?;
-
-            write!(self.term, "{}", line)?;
-
-            if lines.peek().is_some() {
-                writeln!(self.term)?;
-            }
-        }
-
-        if line_count < self.last_line_count {
-            let extra = self.last_line_count - line_count;
-            for _ in 0..extra {
-                writeln!(self.term)?;
-                self.term.move_cursor_left(usize::MAX)?;
-                self.term.clear_line()?;
-            }
-            // Leave the cursor on the last line of the new render so the
-            // invariant above (cursor at end of row N-1) still holds.
-            self.term.move_cursor_up(extra)?;
-        }
-
-        self.last_line_count = line_count;
+    /// Clear the previous frame, render the next one, and remember its
+    /// physical height. Terminal wrapping can make one logical line occupy
+    /// several rows, so `output.lines().count()` is not sufficient here.
+    fn redraw(&mut self) -> io::Result<()> {
+        self.cleanup()?;
+        let output = self.render()?;
+        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        self.term.write_all(output.as_bytes())?;
         self.term.flush()?;
         Ok(())
     }
 
     fn cleanup(&mut self) -> io::Result<()> {
-        if self.last_line_count > 0 {
-            self.term.clear_last_lines(self.last_line_count)?;
-        }
+        self.term.clear_last_lines(self.height)?;
+        self.height = 0;
         Ok(())
     }
 }
@@ -713,7 +682,7 @@ impl<'a, T> MultiSelect<'a, T> {
 mod tests {
     use crate::test::without_ansi;
     #[cfg(unix)]
-    use crate::test::{capture_term, snapshot};
+    use crate::test::{capture_term, replay, snapshot};
 
     use super::*;
     use indoc::indoc;
@@ -797,10 +766,8 @@ mod tests {
         );
     }
 
-    /// Regression for the off-by-one in `reposition_and_write` (jdx/demand#129):
-    /// a previous version moved the cursor up by `last_line_count` instead of
-    /// `last_line_count - 1`, causing the menu to drift up by one row on every
-    /// keypress in `mise up -i` and any other multi-iteration redraw.
+    /// Regression for the off-by-one in the old line-by-line repositioning
+    /// code (jdx/demand#129), which made the menu drift up on every keypress.
     ///
     /// Drives the redraw path through a `Term::read_write_pair` whose writer is
     /// a `SharedBuf`, replays the captured bytes through a vt100 emulator, and
@@ -808,7 +775,7 @@ mod tests {
     /// origin doesn't drift).
     #[cfg(unix)]
     #[test]
-    fn reposition_does_not_drift_upward() {
+    fn redraw_does_not_drift_upward() {
         let (term, buf) = capture_term();
         let mut ms = MultiSelect::new("Toppings")
             .option(DemandOption::new("Lettuce"))
@@ -826,12 +793,10 @@ mod tests {
         let mut cursor_rows = Vec::new();
         for _ in 0..6 {
             let before = snapshot(&buf).len();
-            let output = ms.render().unwrap();
-            let line_count = output.lines().count();
-            ms.reposition_and_write(&output, line_count).unwrap();
+            ms.redraw().unwrap();
 
             let new_bytes = snapshot(&buf)[before..].to_vec();
-            parser.process(&new_bytes);
+            replay(&mut parser, &new_bytes);
             cursor_rows.push(parser.screen().cursor_position().0);
 
             // Move the in-menu cursor so the renders aren't byte-identical and
@@ -839,7 +804,7 @@ mod tests {
             ms.handle_down().unwrap();
         }
 
-        // After iter 1 the vt100 cursor settles at row (start + line_count - 1).
+        // After iter 1 the vt100 cursor settles at the end of the frame.
         // With the bug, every subsequent iter pulls it up by another row; with
         // the fix it stays put.
         let first = cursor_rows[0];
@@ -851,16 +816,14 @@ mod tests {
         }
     }
 
-    /// Companion to `reposition_does_not_drift_upward`: when the rendered
-    /// output shrinks, the new last-line-count must keep the same "cursor at
-    /// end of last row" invariant so the next iteration's `move_cursor_up`
-    /// still lands on row 0 of the new render.
+    /// When the rendered output shrinks, redraw must clear the rows that are
+    /// no longer occupied and leave the cursor at the end of the new frame.
     #[cfg(unix)]
     #[test]
-    fn reposition_handles_shrinking_render() {
+    fn redraw_clears_rows_when_wrapped_frame_shrinks() {
         let (term, buf) = capture_term();
         let mut ms = MultiSelect::new("T")
-            .option(DemandOption::new("a"))
+            .option(DemandOption::new("long").label(&"x".repeat(140)))
             .option(DemandOption::new("b"))
             .option(DemandOption::new("c"));
         ms.term = term;
@@ -870,38 +833,61 @@ mod tests {
 
         // First render with all 3 options.
         let before = snapshot(&buf).len();
-        let output = ms.render().unwrap();
-        let line_count_full = output.lines().count();
-        ms.reposition_and_write(&output, line_count_full).unwrap();
-        parser.process(&snapshot(&buf)[before..]);
+        ms.redraw().unwrap();
+        replay(&mut parser, &snapshot(&buf)[before..]);
         let row_after_full = parser.screen().cursor_position().0;
 
-        // Drop two options, forcing the next render to shrink.
+        // Remove the wrapped option and one short option, forcing the next
+        // render to shrink by both logical and physical rows.
+        ms.options.remove(0);
         ms.options.truncate(1);
 
         let before = snapshot(&buf).len();
-        let output = ms.render().unwrap();
-        let line_count = output.lines().count();
-        ms.reposition_and_write(&output, line_count).unwrap();
-        parser.process(&snapshot(&buf)[before..]);
+        ms.redraw().unwrap();
+        replay(&mut parser, &snapshot(&buf)[before..]);
         let row_after_short = parser.screen().cursor_position().0;
 
-        assert!(line_count < line_count_full, "render must actually shrink");
-        // Cursor should land on the last row of the shorter render — i.e. it
-        // should have moved up by the difference, not stayed at the old depth.
-        assert_eq!(
-            row_after_short,
-            row_after_full - (line_count_full - line_count) as u16,
-            "cursor didn't reposition correctly after shrink"
-        );
+        assert!(row_after_short < row_after_full);
+        assert!(!parser.screen().contents().contains("xxxxxxxx"));
 
         // The third render must again be stable — a fresh redraw on top of
         // the shrunken state without further drift.
         let before = snapshot(&buf).len();
-        let output = ms.render().unwrap();
-        let line_count = output.lines().count();
-        ms.reposition_and_write(&output, line_count).unwrap();
-        parser.process(&snapshot(&buf)[before..]);
+        ms.redraw().unwrap();
+        replay(&mut parser, &snapshot(&buf)[before..]);
         assert_eq!(parser.screen().cursor_position().0, row_after_short);
+    }
+
+    /// Regression for jdx/mise#11326: a wrapped option used to make each
+    /// redraw start below stale physical rows, stacking another copy of the
+    /// prompt on every keypress.
+    #[cfg(unix)]
+    #[test]
+    fn wrapped_option_does_not_stack_copies_of_the_frame() {
+        let (term, buf) = capture_term();
+        let mut ms = MultiSelect::new("mise upgrade")
+            .option(DemandOption::new("long").label(&"x".repeat(140)))
+            .option(DemandOption::new("short"));
+        ms.term = term;
+        let width = ms.term.size().1 as usize;
+        assert!(width < 140, "test needs a label wider than the terminal");
+
+        let mut parser = vt100::Parser::new(40, width as u16, 0);
+        parser.process(&b"\n".repeat(20));
+
+        for _ in 0..3 {
+            let before = snapshot(&buf).len();
+            ms.redraw().unwrap();
+
+            replay(&mut parser, &snapshot(&buf)[before..]);
+            ms.handle_down().unwrap();
+        }
+
+        let screen = parser.screen().contents();
+        assert_eq!(
+            screen.matches("mise upgrade").count(),
+            1,
+            "prompt drawn more than once:\n{screen}"
+        );
     }
 }

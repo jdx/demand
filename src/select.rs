@@ -505,7 +505,7 @@ impl<'a, T> Select<'a, T> {
 mod tests {
     use crate::test::without_ansi;
     #[cfg(unix)]
-    use crate::test::{capture_term, snapshot};
+    use crate::test::{capture_term, replay, snapshot};
 
     use super::*;
     use indoc::indoc;
@@ -609,17 +609,7 @@ mod tests {
         }
 
         let mut parser = vt100::Parser::new(24, width as u16, 0);
-        // A real terminal maps the widget's `\n` to CR+LF (ONLCR); the
-        // emulator doesn't, and without it the cursor keeps its column and
-        // the row math is meaningless.
-        let mut bytes = Vec::new();
-        for b in snapshot(&buf) {
-            if b == b'\n' {
-                bytes.push(b'\r');
-            }
-            bytes.push(b);
-        }
-        parser.process(&bytes);
+        replay(&mut parser, &snapshot(&buf));
         let screen = parser.screen().contents();
         assert_eq!(
             screen.matches("Pick a script").count(),
