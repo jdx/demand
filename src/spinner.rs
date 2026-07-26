@@ -159,13 +159,17 @@ impl<'a> Spinner<'a> {
                         break;
                     }
                 }
-                self.clear()?;
-                let output = self.render()?;
-                // `rendered_rows`, not `rendered_height`: the spinner frame
-                // has no trailing newline, so the cursor sits on its last
-                // row and that row counts.
-                self.height = crate::height::rendered_rows(&output, self.term.size().1 as usize);
-                self.term.write_all(output.as_bytes())?;
+                let term = self.term.clone();
+                crate::synchronized_output::run(&term, || {
+                    self.clear()?;
+                    let output = self.render()?;
+                    // `rendered_rows`, not `rendered_height`: the spinner frame
+                    // has no trailing newline, so the cursor sits on its last
+                    // row and that row counts.
+                    self.height =
+                        crate::height::rendered_rows(&output, self.term.size().1 as usize);
+                    self.term.write_all(output.as_bytes())
+                })?;
                 sleep(self.style.fps);
                 if handle.is_finished() {
                     self.clear()?;

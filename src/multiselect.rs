@@ -180,7 +180,8 @@ impl<'a, T> MultiSelect<'a, T> {
         self.min = self.min.min(self.max);
 
         loop {
-            self.redraw()?;
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || self.redraw())?;
 
             if self.filtering {
                 match self.term.read_key()? {
@@ -190,19 +191,8 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::ArrowRight => self.handle_right()?,
                     Key::Enter => {
                         if let Some(selected) = self.try_confirm() {
-                            self.cleanup()?;
-                            self.term.show_cursor()?;
                             ctrlc_handle.close();
-                            let output = self.render_success(&selected)?;
-                            self.term.write_all(output.as_bytes())?;
-                            let selected = self
-                                .options
-                                .into_iter()
-                                .filter(|o| o.selected)
-                                .map(|o| o.item)
-                                .collect::<Vec<_>>();
-                            self.term.clear_to_end_of_screen()?;
-                            return Ok(selected);
+                            return self.finish(selected);
                         }
                     }
                     Key::Escape => self.handle_stop_filtering(false)?,
@@ -235,25 +225,31 @@ impl<'a, T> MultiSelect<'a, T> {
                     }
                     Key::Enter => {
                         if let Some(selected) = self.try_confirm() {
-                            self.cleanup()?;
-                            self.term.show_cursor()?;
                             ctrlc_handle.close();
-                            let output = self.render_success(&selected)?;
-                            self.term.write_all(output.as_bytes())?;
-                            let selected = self
-                                .options
-                                .into_iter()
-                                .filter(|o| o.selected)
-                                .map(|o| o.item)
-                                .collect::<Vec<_>>();
-                            self.term.clear_to_end_of_screen()?;
-                            return Ok(selected);
+                            return self.finish(selected);
                         }
                     }
                     _ => {}
                 }
             }
         }
+    }
+
+    fn finish(mut self, selected_labels: Vec<String>) -> io::Result<Vec<T>> {
+        let output = self.render_success(&selected_labels)?;
+        let term = self.term.clone();
+        crate::synchronized_output::run(&term, || {
+            self.cleanup()?;
+            self.term.show_cursor()?;
+            self.term.write_all(output.as_bytes())?;
+            self.term.clear_to_end_of_screen()
+        })?;
+        Ok(self
+            .options
+            .into_iter()
+            .filter(|option| option.selected)
+            .map(|option| option.item)
+            .collect())
     }
 
     fn filtered_options(&self) -> Vec<&DemandOption<T>> {

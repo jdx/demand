@@ -374,13 +374,16 @@ impl<'a> Input<'a> {
         self.update_suggestions()?;
 
         loop {
-            self.clear()?;
-            let output = self.render()?;
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || {
+                self.clear()?;
+                let output = self.render()?;
 
-            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
-            self.set_cursor()?;
+                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                self.term.write_all(output.as_bytes())?;
+                self.term.flush()?;
+                self.set_cursor()
+            })?;
 
             let key = self.term.read_key()?;
             match key {
@@ -565,9 +568,12 @@ impl<'a> Input<'a> {
     }
 
     fn handle_submit(mut self) -> io::Result<String> {
-        self.clear()?;
-        let output = self.render_success()?;
-        self.term.write_all(output.as_bytes())?;
+        let term = self.term.clone();
+        crate::synchronized_output::run(&term, || {
+            self.clear()?;
+            let output = self.render_success()?;
+            self.term.write_all(output.as_bytes())
+        })?;
         Ok(self.input)
     }
 
