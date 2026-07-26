@@ -22,5 +22,8 @@ indoc = "2"
 insta = "1"
 vt100 = "0.16"
 
+[target.'cfg(unix)'.dev-dependencies]
+portable-pty = "0.9"
+
 [profile.dev]
 debug = 1

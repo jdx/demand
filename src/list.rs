@@ -128,11 +128,15 @@ impl<'a> List<'a> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         loop {
-            self.clear()?;
-            let output = self.render()?;
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
-            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || {
+                self.clear()?;
+                let output = self.render()?;
+                self.term.write_all(output.as_bytes())?;
+                self.term.flush()?;
+                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                Ok(())
+            })?;
             if self.filtering {
                 match self.term.read_key()? {
                     Key::Enter => self.handle_stop_filtering(true)?,
@@ -155,11 +159,14 @@ impl<'a> List<'a> {
                         return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
                     }
                     Key::Enter => {
-                        self.clear()?;
-                        self.term.show_cursor()?;
                         ctrlc_handle.close();
-                        let output = self.render_success()?;
-                        self.term.write_all(output.as_bytes())?;
+                        let term = self.term.clone();
+                        crate::synchronized_output::run(&term, || {
+                            self.clear()?;
+                            self.term.show_cursor()?;
+                            let output = self.render_success()?;
+                            self.term.write_all(output.as_bytes())
+                        })?;
                         return Ok(());
                     }
                     _ => {}

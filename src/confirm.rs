@@ -198,11 +198,14 @@ impl<'a> Confirm<'a> {
         self.term.clear_line()?;
         self.term.hide_cursor()?;
         loop {
-            self.clear()?;
-            let output = self.render()?;
-            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || {
+                self.clear()?;
+                let output = self.render()?;
+                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                self.term.write_all(output.as_bytes())?;
+                self.term.flush()
+            })?;
             match self.term.read_key()? {
                 Key::ArrowLeft | Key::Char('h') => self.handle_left(),
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
@@ -232,11 +235,14 @@ impl<'a> Confirm<'a> {
     }
 
     fn handle_submit(mut self) -> io::Result<bool> {
-        self.term.clear_to_end_of_screen()?;
-        self.clear()?;
-        self.term.show_cursor()?;
-        let output = self.render_success()?;
-        self.term.write_all(output.as_bytes())?;
+        let term = self.term.clone();
+        crate::synchronized_output::run(&term, || {
+            self.term.clear_to_end_of_screen()?;
+            self.clear()?;
+            self.term.show_cursor()?;
+            let output = self.render_success()?;
+            self.term.write_all(output.as_bytes())
+        })?;
         Ok(self.selected)
     }
 

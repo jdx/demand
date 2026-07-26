@@ -143,11 +143,14 @@ impl<'a> Dialog<'a> {
 
         self.term.hide_cursor()?;
         loop {
-            self.clear()?;
-            let output = self.render()?;
-            self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-            self.term.write_all(output.as_bytes())?;
-            self.term.flush()?;
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || {
+                self.clear()?;
+                let output = self.render()?;
+                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                self.term.write_all(output.as_bytes())?;
+                self.term.flush()
+            })?;
             match self.term.read_key()? {
                 Key::ArrowLeft | Key::Char('h') => self.handle_left(),
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
@@ -172,10 +175,13 @@ impl<'a> Dialog<'a> {
     }
 
     fn handle_submit(mut self) -> io::Result<String> {
-        self.clear()?;
-        self.term.show_cursor()?;
-        let output = self.render_success()?;
-        self.term.write_all(output.as_bytes())?;
+        let term = self.term.clone();
+        crate::synchronized_output::run(&term, || {
+            self.clear()?;
+            self.term.show_cursor()?;
+            let output = self.render_success()?;
+            self.term.write_all(output.as_bytes())
+        })?;
         let result = if !self.buttons.is_empty() {
             self.buttons[self.selected_button_idx].label.clone()
         } else {

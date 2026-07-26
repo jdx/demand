@@ -138,18 +138,24 @@ impl<'a, T> Select<'a, T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         loop {
-            self.clear()?;
-            self.draw()?;
-            self.term.hide_cursor()?;
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || {
+                self.clear()?;
+                self.draw()?;
+                self.term.hide_cursor()
+            })?;
             let enter = |mut select: Select<T>| {
-                select.clear()?;
-                select.term.show_cursor()?;
                 let id = select.visible_options().get(select.cursor_y).unwrap().id;
                 let selected = select.options.iter().find(|o| o.id == id).unwrap();
                 let output = select.render_success(&selected.label)?;
+                let term = select.term.clone();
+                crate::synchronized_output::run(&term, || {
+                    select.clear()?;
+                    select.term.show_cursor()?;
+                    select.term.write_all(output.as_bytes())?;
+                    select.term.clear_to_end_of_screen()
+                })?;
                 let selected = select.options.into_iter().find(|o| o.id == id).unwrap();
-                select.term.write_all(output.as_bytes())?;
-                select.term.clear_to_end_of_screen()?;
                 Ok::<T, io::Error>(selected.item)
             };
 

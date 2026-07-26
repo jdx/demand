@@ -26,6 +26,7 @@ mod multiselect;
 mod option;
 mod select;
 mod spinner;
+mod synchronized_output;
 mod theme;
 mod tty;
 mod wizard;
