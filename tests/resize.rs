@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
 const BEGIN: &[u8] = b"\x1b[?2026h";
+const CLEAR_SCREEN: &[u8] = b"\r\x1b[2J\r\x1b[H";
 
 #[test]
 fn resize_child_scenario() {
@@ -81,10 +82,18 @@ fn resize_redraws_without_keyboard_input() {
     child.wait().expect("wait child");
     drop(pair.master);
     reader_thread.join().expect("join reader");
+    while let Ok(chunk) = rx.try_recv() {
+        output.extend(chunk);
+    }
 
     assert!(
         redrew,
         "prompt did not redraw after SIGWINCH without keyboard input: {}",
+        String::from_utf8_lossy(&output).escape_debug()
+    );
+    assert!(
+        frame(&output, 1).is_some_and(|redraw| occurrences(redraw, CLEAR_SCREEN) == 1),
+        "resize redraw did not reset the viewport: {}",
         String::from_utf8_lossy(&output).escape_debug()
     );
 }
@@ -108,4 +117,14 @@ fn occurrences(haystack: &[u8], needle: &[u8]) -> usize {
         .windows(needle.len())
         .filter(|window| *window == needle)
         .count()
+}
+
+fn frame(output: &[u8], index: usize) -> Option<&[u8]> {
+    let start = output
+        .windows(BEGIN.len())
+        .enumerate()
+        .filter(|(_, window)| *window == BEGIN)
+        .nth(index)
+        .map(|(offset, _)| offset + BEGIN.len())?;
+    Some(&output[start..])
 }

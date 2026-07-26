@@ -127,12 +127,19 @@ impl<'a> List<'a> {
     pub fn run(mut self) -> Result<(), io::Error> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
         let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         loop {
             self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
-                self.clear()?;
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                } else {
+                    self.clear()?;
+                }
                 let output = self.render()?;
                 self.term.write_all(output.as_bytes())?;
                 self.term.flush()?;
@@ -140,6 +147,7 @@ impl<'a> List<'a> {
                 Ok(())
             })?;
             let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
                 continue;
             };
             if self.filtering {

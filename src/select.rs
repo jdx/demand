@@ -137,12 +137,19 @@ impl<'a, T> Select<'a, T> {
     pub fn run(mut self) -> io::Result<T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
         let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         loop {
             self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
-                self.clear()?;
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                } else {
+                    self.clear()?;
+                }
                 self.draw()?;
                 self.term.hide_cursor()
             })?;
@@ -162,6 +169,7 @@ impl<'a, T> Select<'a, T> {
             };
 
             let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
                 continue;
             };
             if self.filtering {

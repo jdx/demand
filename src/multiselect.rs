@@ -176,6 +176,7 @@ impl<'a, T> MultiSelect<'a, T> {
     pub fn run(mut self) -> io::Result<Vec<T>> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
         let mut events = crate::event::EventReader::new()?;
+        let mut reset_viewport = false;
 
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
@@ -183,9 +184,17 @@ impl<'a, T> MultiSelect<'a, T> {
         loop {
             self.refresh_layout();
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || self.redraw())?;
+            crate::synchronized_output::run(&term, || {
+                if reset_viewport {
+                    self.term.clear_screen()?;
+                    self.last_frame.clear();
+                    reset_viewport = false;
+                }
+                self.redraw()
+            })?;
 
             let Some(key) = events.read_key(&self.term)? else {
+                reset_viewport = true;
                 continue;
             };
             if self.filtering {
