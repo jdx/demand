@@ -161,10 +161,8 @@ impl<'a, T> Select<'a, T> {
                 Ok::<T, io::Error>(selected.item)
             };
 
-            let key = match events.read(&self.term)? {
-                crate::event::Event::Key(key) => key,
-                #[cfg(unix)]
-                crate::event::Event::Resize => continue,
+            let Some(key) = events.read_key(&self.term)? else {
+                continue;
             };
             if self.filtering {
                 match key {

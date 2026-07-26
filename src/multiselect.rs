@@ -185,10 +185,8 @@ impl<'a, T> MultiSelect<'a, T> {
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || self.redraw())?;
 
-            let key = match events.read(&self.term)? {
-                crate::event::Event::Key(key) => key,
-                #[cfg(unix)]
-                crate::event::Event::Resize => continue,
+            let Some(key) = events.read_key(&self.term)? else {
+                continue;
             };
             if self.filtering {
                 match key {

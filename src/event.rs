@@ -2,12 +2,6 @@ use std::io;
 
 use console::{Key, Term};
 
-pub(crate) enum Event {
-    Key(Key),
-    #[cfg(unix)]
-    Resize,
-}
-
 pub(crate) struct EventReader {
     #[cfg(unix)]
     resize: unix::ResizeListener,
@@ -22,13 +16,16 @@ impl EventReader {
     }
 
     #[cfg(unix)]
-    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
-        self.resize.read(term)
+    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
+        self.resize.read(term).map(|event| match event {
+            unix::Event::Key(key) => Some(key),
+            unix::Event::Resize => None,
+        })
     }
 
     #[cfg(not(unix))]
-    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
-        term.read_key().map(Event::Key)
+    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
+        term.read_key().map(Some)
     }
 }
 
@@ -43,7 +40,10 @@ mod unix {
     use console::Term;
     use signal_hook::{SigId, consts::SIGWINCH, low_level};
 
-    use super::Event;
+    pub(super) enum Event {
+        Key(console::Key),
+        Resize,
+    }
 
     pub(super) struct ResizeListener {
         input: Option<File>,

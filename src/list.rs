@@ -139,10 +139,8 @@ impl<'a> List<'a> {
                 self.last_frame = output;
                 Ok(())
             })?;
-            let key = match events.read(&self.term)? {
-                crate::event::Event::Key(key) => key,
-                #[cfg(unix)]
-                crate::event::Event::Resize => continue,
+            let Some(key) = events.read_key(&self.term)? else {
+                continue;
             };
             if self.filtering {
                 match key {
