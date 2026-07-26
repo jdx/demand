@@ -264,12 +264,13 @@ impl<'a> List<'a> {
         if capacity == self.capacity {
             return;
         }
+        let entry_count = self.filtered_entries().len();
+        let start =
+            (self.cur_page * self.capacity + self.scroll).min(entry_count.saturating_sub(capacity));
         self.capacity = capacity;
+        self.cur_page = start / self.capacity;
+        self.scroll = start % self.capacity;
         self.pages = self.get_pages();
-        self.cur_page = self.cur_page.min(self.pages.saturating_sub(1));
-        self.scroll = self
-            .scroll
-            .min(self.filtered_entries().len().saturating_sub(1));
     }
 
     fn visible_entries(&self) -> Vec<&&'a str> {
@@ -406,5 +407,35 @@ mod tests {
             },
             without_ansi(list.render().unwrap().as_str())
         )
+    }
+
+    #[test]
+    fn resize_preserves_first_visible_entry() {
+        let items = (0..20).map(|value| value.to_string()).collect::<Vec<_>>();
+        let item_refs = items.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut list = List::new("Items").items(&item_refs);
+        list.capacity = 10;
+        list.cur_page = 1;
+        list.scroll = 2;
+
+        list.resize_layout(9);
+
+        assert_eq!(list.capacity, 4);
+        assert_eq!(*list.visible_entries()[0], "12");
+    }
+
+    #[test]
+    fn resize_clamps_scroll_to_last_full_view() {
+        let items = (0..20).map(|value| value.to_string()).collect::<Vec<_>>();
+        let item_refs = items.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut list = List::new("Items").items(&item_refs);
+        list.capacity = 4;
+        list.cur_page = 4;
+        list.scroll = 2;
+
+        list.resize_layout(20);
+
+        assert_eq!(list.capacity, 15);
+        assert_eq!(*list.visible_entries()[0], "5");
     }
 }

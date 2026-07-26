@@ -452,12 +452,13 @@ impl<'a, T> MultiSelect<'a, T> {
         if capacity == self.capacity {
             return;
         }
+        let option_count = self.filtered_options().len();
+        let cursor =
+            (self.cur_page * self.capacity + self.cursor).min(option_count.saturating_sub(1));
         self.capacity = capacity;
         self.pages = self.get_pages();
-        self.cur_page = self.cur_page.min(self.pages.saturating_sub(1));
-        self.cursor = self
-            .cursor
-            .min(self.visible_options().len().saturating_sub(1));
+        self.cur_page = cursor / self.capacity;
+        self.cursor = cursor % self.capacity;
     }
 
     fn get_pages(&self) -> usize {
@@ -907,20 +908,23 @@ mod tests {
     }
 
     #[test]
-    fn resize_updates_capacity_and_clamps_navigation() {
+    fn resize_preserves_focused_option() {
         let mut select = MultiSelect::new("Pick").options(
             (0..20)
                 .map(|value| DemandOption::new(value.to_string()))
                 .collect(),
         );
-        select.cur_page = 10;
-        select.cursor = 10;
+        select.capacity = 10;
+        select.pages = 2;
+        select.cur_page = 1;
+        select.cursor = 5;
 
         select.resize_layout(10);
 
         assert_eq!(select.capacity, 4);
         assert_eq!(select.pages, 5);
-        assert_eq!(select.cur_page, 4);
+        assert_eq!(select.cur_page, 3);
         assert_eq!(select.cursor, 3);
+        assert_eq!(select.visible_options()[select.cursor].label, "15");
     }
 }
