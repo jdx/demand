@@ -53,7 +53,7 @@ pub struct List<'a> {
     filterable: bool,
     filter: String,
     cur_page: usize,
-    height: usize,
+    last_frame: String,
     pages: usize,
     scroll: usize,
 }
@@ -71,7 +71,7 @@ impl<'a> List<'a> {
             filtering: false,
             filterable: false,
             filter: String::new(),
-            height: 0,
+            last_frame: String::new(),
             cur_page: 0,
             pages: 0,
             success_items: 4,
@@ -128,13 +128,14 @@ impl<'a> List<'a> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         loop {
+            self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
                 self.clear()?;
                 let output = self.render()?;
                 self.term.write_all(output.as_bytes())?;
                 self.term.flush()?;
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+                self.last_frame = output;
                 Ok(())
             })?;
             if self.filtering {
@@ -254,6 +255,23 @@ impl<'a> List<'a> {
         }
     }
 
+    fn refresh_layout(&mut self) {
+        self.resize_layout(self.term.size().0 as usize);
+    }
+
+    fn resize_layout(&mut self, rows: usize) {
+        let capacity = rows.max(8) - 5;
+        if capacity == self.capacity {
+            return;
+        }
+        self.capacity = capacity;
+        self.pages = self.get_pages();
+        self.cur_page = self.cur_page.min(self.pages.saturating_sub(1));
+        self.scroll = self
+            .scroll
+            .min(self.filtered_entries().len().saturating_sub(1));
+    }
+
     fn visible_entries(&self) -> Vec<&&'a str> {
         let filtered = self.filtered_entries();
         let start = (self.cur_page * self.capacity) + self.scroll;
@@ -347,12 +365,14 @@ impl<'a> List<'a> {
     }
 
     fn clear(&mut self) -> Result<(), io::Error> {
-        if self.height > 0 {
-            self.term.clear_last_lines(self.height)?;
-        } else {
+        if self.last_frame.is_empty() {
             self.term.clear_line()?;
+        } else {
+            let height =
+                crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
+            self.term.clear_last_lines(height)?;
         }
-        self.height = 0;
+        self.last_frame.clear();
         Ok(())
     }
 }

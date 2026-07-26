@@ -53,7 +53,7 @@ pub struct Select<'a, T> {
 
     cursor_x: usize,
     cursor_y: usize,
-    height: usize,
+    last_frame: String,
     term: Term,
     filter: String,
     filtering: bool,
@@ -74,7 +74,7 @@ impl<'a, T> Select<'a, T> {
             theme: &theme::DEFAULT,
             cursor_x: 0,
             cursor_y: 0,
-            height: 0,
+            last_frame: String::new(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -138,6 +138,7 @@ impl<'a, T> Select<'a, T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
 
         loop {
+            self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
                 self.clear()?;
@@ -323,6 +324,23 @@ impl<'a, T> Select<'a, T> {
         ((self.options.len() as f64) / self.capacity as f64).ceil() as usize
     }
 
+    fn refresh_layout(&mut self) {
+        self.resize_layout(self.term.size().0 as usize);
+    }
+
+    fn resize_layout(&mut self, rows: usize) {
+        let capacity = rows.max(8) - 6;
+        if capacity == self.capacity {
+            return;
+        }
+        self.capacity = capacity;
+        self.pages = self.get_pages();
+        self.cur_page = self.cur_page.min(self.pages.saturating_sub(1));
+        self.cursor_y = self
+            .cursor_y
+            .min(self.visible_options().len().saturating_sub(1));
+    }
+
     fn get_selected_option_idx(&mut self) -> usize {
         self.visible_options()
             .iter()
@@ -496,13 +514,14 @@ impl<'a, T> Select<'a, T> {
         let output = self.render()?;
         self.term.write_all(output.as_bytes())?;
         self.term.flush()?;
-        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        self.last_frame = output;
         Ok(())
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
+        self.term.clear_last_lines(height)?;
+        self.last_frame.clear();
         Ok(())
     }
 }
@@ -622,5 +641,23 @@ mod tests {
             1,
             "prompt drawn more than once:\n{screen}"
         );
+    }
+
+    #[test]
+    fn resize_updates_capacity_and_clamps_navigation() {
+        let mut select = Select::new("Pick").options(
+            (0..20)
+                .map(|value| DemandOption::new(value.to_string()))
+                .collect(),
+        );
+        select.cur_page = 10;
+        select.cursor_y = 10;
+
+        select.resize_layout(10);
+
+        assert_eq!(select.capacity, 4);
+        assert_eq!(select.pages, 5);
+        assert_eq!(select.cur_page, 4);
+        assert_eq!(select.cursor_y, 3);
     }
 }
