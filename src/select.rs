@@ -136,6 +136,7 @@ impl<'a, T> Select<'a, T> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
 
         loop {
             self.refresh_layout();
@@ -160,8 +161,13 @@ impl<'a, T> Select<'a, T> {
                 Ok::<T, io::Error>(selected.item)
             };
 
+            let key = match events.read(&self.term)? {
+                crate::event::Event::Key(key) => key,
+                #[cfg(unix)]
+                crate::event::Event::Resize => continue,
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown => self.handle_down()?,
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
@@ -175,7 +181,7 @@ impl<'a, T> Select<'a, T> {
                     _ => {}
                 }
             } else {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,

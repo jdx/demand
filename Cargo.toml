@@ -16,6 +16,9 @@ itertools = "0.15"
 signal-hook = "0.4"
 termcolor = "1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 ctor = "1"
 indoc = "2"

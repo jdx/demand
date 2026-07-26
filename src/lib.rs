@@ -19,6 +19,7 @@ mod confirm;
 #[cfg_attr(any(windows), path = "ctrlc_stub.rs")]
 mod ctrlc;
 mod dialog;
+mod event;
 mod height;
 mod input;
 mod list;

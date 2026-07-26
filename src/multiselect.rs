@@ -175,6 +175,7 @@ impl<'a, T> MultiSelect<'a, T> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<Vec<T>> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
 
         self.max = self.max.min(self.options.len());
         self.min = self.min.min(self.max);
@@ -184,8 +185,13 @@ impl<'a, T> MultiSelect<'a, T> {
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || self.redraw())?;
 
+            let key = match events.read(&self.term)? {
+                crate::event::Event::Key(key) => key,
+                #[cfg(unix)]
+                crate::event::Event::Resize => continue,
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown => self.handle_down()?,
                     Key::ArrowUp => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
@@ -204,7 +210,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 }
             } else {
                 self.term.hide_cursor()?;
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowUp | Key::Char('k') => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,

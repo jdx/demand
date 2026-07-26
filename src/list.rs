@@ -126,6 +126,7 @@ impl<'a> List<'a> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> Result<(), io::Error> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        let mut events = crate::event::EventReader::new()?;
 
         loop {
             self.refresh_layout();
@@ -138,8 +139,13 @@ impl<'a> List<'a> {
                 self.last_frame = output;
                 Ok(())
             })?;
+            let key = match events.read(&self.term)? {
+                crate::event::Event::Key(key) => key,
+                #[cfg(unix)]
+                crate::event::Event::Resize => continue,
+            };
             if self.filtering {
-                match self.term.read_key()? {
+                match key {
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
@@ -148,7 +154,7 @@ impl<'a> List<'a> {
                 }
             } else {
                 self.term.hide_cursor()?;
-                match self.term.read_key()? {
+                match key {
                     Key::ArrowUp | Key::Char('k') => self.handle_up(),
                     Key::ArrowDown | Key::Char('j') => self.handle_down()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
