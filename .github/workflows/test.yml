@@ -21,18 +21,25 @@ jobs:
       - run: cargo test --lib --tests
       - run: hk check --all
 
+  semver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: obi1kenobi/cargo-semver-checks-action@6b69fcf40e9b5fb17adeb57e4b6ecd020649a239 # v2.9
+
   test-ci:
     runs-on: ubuntu-latest
     timeout-minutes: 1
-    needs: [test]
+    needs: [test, semver]
     # Run on success or upstream failure but skip when the workflow is cancelled
     # — `always()` would override `cancel-in-progress` and waste a runner.
     if: ${{ !cancelled() }}
     steps:
       - name: Check CI job results
         run: |
-          if [ "${{ needs.test.result }}" != "success" ]; then
-            echo "test failed or was skipped"
+          if [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.semver.result }}" != "success" ]; then
+            echo "test or semver failed or was skipped"
             exit 1
           fi
           echo "All CI jobs completed successfully"
