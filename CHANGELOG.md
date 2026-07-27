@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.5](https://github.com/jdx/demand/compare/v2.0.4...v2.0.5) - 2026-07-26
+
+### Fixed
+
+- adapt selector layout after terminal resize ([#195](https://github.com/jdx/demand/pull/195))
+- synchronize in-place prompt redraws ([#193](https://github.com/jdx/demand/pull/193))
+- *(multiselect)* clear wrapped rows when redrawing ([#192](https://github.com/jdx/demand/pull/192))
+
+### Other
+
+- *(ci)* add cargo semver checks ([#196](https://github.com/jdx/demand/pull/196))
+
 ## [2.0.4](https://github.com/jdx/demand/compare/v2.0.3...v2.0.4) - 2026-07-25
 
 ### Fixed
