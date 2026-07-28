@@ -544,7 +544,7 @@ impl<'a, T> Select<'a, T> {
 mod tests {
     use crate::test::without_ansi;
     #[cfg(unix)]
-    use crate::test::{capture_term, replay, snapshot};
+    use crate::test::{Parser, capture_term, replay, snapshot};
 
     use super::*;
     use indoc::indoc;
@@ -624,7 +624,7 @@ mod tests {
     /// leftovers, so the prompt visibly duplicated itself.
     ///
     /// Drives three redraw cycles through a captured `Term`, replays the
-    /// bytes through a vt100 emulator, and asserts the screen holds one
+    /// bytes through a terminal emulator, and asserts the screen holds one
     /// copy of the prompt.
     #[cfg(unix)]
     #[test]
@@ -647,7 +647,7 @@ mod tests {
             select.cursor_y = i % select.options.len();
         }
 
-        let mut parser = vt100::Parser::new(24, width as u16, 0);
+        let mut parser = Parser::new(24, width as u16, 0);
         replay(&mut parser, &snapshot(&buf));
         let screen = parser.screen().contents();
         assert_eq!(
