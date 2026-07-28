@@ -153,10 +153,12 @@ impl<'a> List<'a> {
             };
             if self.filtering {
                 match key {
+                    Key::ArrowDown | Key::Char(CTRL_N) => self.handle_down()?,
+                    Key::ArrowUp | Key::Char(CTRL_P) => self.handle_up(),
                     Key::Enter => self.handle_stop_filtering(true)?,
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
-                    Key::Char(c) => self.handle_filter_key(c)?,
+                    Key::Char(c) if !c.is_control() => self.handle_filter_key(c)?,
                     _ => {}
                 }
             } else {
