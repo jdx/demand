@@ -711,7 +711,7 @@ impl<'a, T> MultiSelect<'a, T> {
 mod tests {
     use crate::test::without_ansi;
     #[cfg(unix)]
-    use crate::test::{capture_term, replay, snapshot, Parser};
+    use crate::test::{Parser, capture_term, replay, snapshot};
 
     use super::*;
     use indoc::indoc;

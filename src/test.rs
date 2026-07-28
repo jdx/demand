@@ -18,7 +18,7 @@ pub fn without_ansi(s: &str) -> Cow<'_, str> {
 /// these cover were reported on Linux/macOS and the fixes are
 /// platform-agnostic, so unix-only coverage is sufficient.
 #[cfg(unix)]
-pub use capture::{capture_term, replay, snapshot, Parser};
+pub use capture::{Parser, capture_term, replay, snapshot};
 
 #[cfg(unix)]
 mod capture {
