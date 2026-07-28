@@ -301,6 +301,7 @@ impl<'a, T> Select<'a, T> {
         self.cur_page = 0;
 
         if !save {
+            self.cursor_x = 0;
             self.filter.clear();
             self.pages = self.get_pages();
         }
