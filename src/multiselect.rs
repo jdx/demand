@@ -711,7 +711,7 @@ impl<'a, T> MultiSelect<'a, T> {
 mod tests {
     use crate::test::without_ansi;
     #[cfg(unix)]
-    use crate::test::{capture_term, replay, snapshot};
+    use crate::test::{capture_term, replay, snapshot, Parser};
 
     use super::*;
     use indoc::indoc;
@@ -799,7 +799,7 @@ mod tests {
     /// code (jdx/demand#129), which made the menu drift up on every keypress.
     ///
     /// Drives the redraw path through a `Term::read_write_pair` whose writer is
-    /// a `SharedBuf`, replays the captured bytes through a vt100 emulator, and
+    /// a `SharedBuf`, replays the captured bytes through a terminal emulator, and
     /// asserts that the cursor row is stable across iterations (i.e. the render
     /// origin doesn't drift).
     #[cfg(unix)]
@@ -813,10 +813,10 @@ mod tests {
             .option(DemandOption::new("Nutella"));
         ms.term = term;
 
-        // Start the vt100 cursor well below the top of the screen, so that an
+        // Start the emulator cursor well below the top of the screen, so that an
         // upward off-by-one would actually shift the rendered area visibly
         // rather than getting silently clamped at row 0.
-        let mut parser = vt100::Parser::new(40, 120, 0);
+        let mut parser = Parser::new(40, 120, 0);
         parser.process(&b"\n".repeat(20));
 
         let mut cursor_rows = Vec::new();
@@ -833,7 +833,7 @@ mod tests {
             ms.handle_down().unwrap();
         }
 
-        // After iter 1 the vt100 cursor settles at the end of the frame.
+        // After iter 1 the emulator cursor settles at the end of the frame.
         // With the bug, every subsequent iter pulls it up by another row; with
         // the fix it stays put.
         let first = cursor_rows[0];
@@ -857,7 +857,7 @@ mod tests {
             .option(DemandOption::new("c"));
         ms.term = term;
 
-        let mut parser = vt100::Parser::new(40, 120, 0);
+        let mut parser = Parser::new(40, 120, 0);
         parser.process(&b"\n".repeat(20));
 
         // First render with all 3 options.
@@ -901,7 +901,7 @@ mod tests {
         let width = ms.term.size().1 as usize;
         assert!(width < 140, "test needs a label wider than the terminal");
 
-        let mut parser = vt100::Parser::new(40, width as u16, 0);
+        let mut parser = Parser::new(40, width as u16, 0);
         parser.process(&b"\n".repeat(20));
 
         for _ in 0..3 {
