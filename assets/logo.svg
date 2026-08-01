@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">demand logo</title>
+  <desc id="desc">A terminal prompt chevron followed by a block cursor.</desc>
+  <defs>
+    <linearGradient id="chevron" x1="130" y1="130" x2="294" y2="382" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7571f9"/>
+      <stop offset="1" stop-color="#f780e2"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#14121c"/>
+  <path d="M152 152 L272 256 L152 360" stroke="url(#chevron)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="306" y="196" width="76" height="120" rx="14" fill="#02bf87"/>
+</svg>
