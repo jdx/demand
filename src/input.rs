@@ -7,6 +7,7 @@ use console::{Key, Term, measure_text_width};
 use termcolor::{Buffer, WriteColor};
 
 use crate::ctrlc;
+use crate::keys::{CTRL_U, CTRL_W};
 use crate::{Theme, theme};
 
 /// Trait for implementing autocompletion features for text inputs.
@@ -199,9 +200,6 @@ pub struct Input<'a> {
     input_line_offset: usize,
     suggestions_scroll_offset: usize,
 }
-
-const CTRL_U: char = '\u{15}';
-const CTRL_W: char = '\u{17}';
 
 impl<'a> Input<'a> {
     /// Creates a new input with the given title.
