@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0](https://github.com/jdx/demand/compare/v2.0.5...v2.1.0) - 2026-08-04
+
+### Added
+
+- add project logo ([#201](https://github.com/jdx/demand/pull/201))
+
+### Fixed
+
+- reset cursor_x when clearing filter on Escape ([#199](https://github.com/jdx/demand/pull/199))
+
+### Other
+
+- *(deps)* update dependency hk to v1.54.0 ([#202](https://github.com/jdx/demand/pull/202))
+- Migrate test terminal emulator from vt100 to rio-vt ([#198](https://github.com/jdx/demand/pull/198))
+
 ## [2.0.5](https://github.com/jdx/demand/compare/v2.0.4...v2.0.5) - 2026-07-26
 
 ### Fixed
