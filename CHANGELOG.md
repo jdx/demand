@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.1.0](https://github.com/jdx/demand/compare/v2.0.5...v2.1.0) - 2026-08-18
+
+### Added
+
+- add project logo ([#201](https://github.com/jdx/demand/pull/201))
+
+### Fixed
+
+- reset cursor_x when clearing filter on Escape ([#199](https://github.com/jdx/demand/pull/199))
+
+### Other
+
+- *(deps)* update dtolnay/rust-toolchain digest to 4360b52 ([#206](https://github.com/jdx/demand/pull/206))
+- *(deps)* update swatinem/rust-cache digest to 6323deb ([#207](https://github.com/jdx/demand/pull/207))
+- *(deps)* update dependency hk to v1.55.0 ([#205](https://github.com/jdx/demand/pull/205))
+- *(deps)* update dependency hk to v1.54.1 ([#204](https://github.com/jdx/demand/pull/204))
+- *(deps)* update jdx/mise-action digest to 7e36c90 ([#203](https://github.com/jdx/demand/pull/203))
+- *(deps)* update dependency hk to v1.54.0 ([#202](https://github.com/jdx/demand/pull/202))
+- Migrate test terminal emulator from vt100 to rio-vt ([#198](https://github.com/jdx/demand/pull/198))
+
 ## [2.0.5](https://github.com/jdx/demand/compare/v2.0.4...v2.0.5) - 2026-07-26
 
 ### Fixed
