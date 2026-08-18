@@ -22,6 +22,7 @@ mod dialog;
 mod event;
 mod height;
 mod input;
+mod keys;
 mod list;
 mod multiselect;
 mod option;

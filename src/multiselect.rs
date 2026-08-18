@@ -8,6 +8,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
 
+use crate::keys::{CTRL_N, CTRL_P};
 use crate::theme::Theme;
 use crate::{DemandOption, ctrlc, theme};
 
@@ -199,8 +200,8 @@ impl<'a, T> MultiSelect<'a, T> {
             };
             if self.filtering {
                 match key {
-                    Key::ArrowDown => self.handle_down()?,
-                    Key::ArrowUp => self.handle_up()?,
+                    Key::ArrowDown | Key::Char(CTRL_N) => self.handle_down()?,
+                    Key::ArrowUp | Key::Char(CTRL_P) => self.handle_up()?,
                     Key::ArrowLeft => self.handle_left()?,
                     Key::ArrowRight => self.handle_right()?,
                     Key::Enter => {
@@ -212,14 +213,14 @@ impl<'a, T> MultiSelect<'a, T> {
                     Key::Escape => self.handle_stop_filtering(false)?,
                     Key::Backspace => self.handle_filter_backspace()?,
                     key if key == self.toggle_key => self.handle_toggle(),
-                    Key::Char(c) => self.handle_filter_key(c)?,
+                    Key::Char(c) if !c.is_control() => self.handle_filter_key(c)?,
                     _ => {}
                 }
             } else {
                 self.term.hide_cursor()?;
                 match key {
-                    Key::ArrowDown | Key::Char('j') => self.handle_down()?,
-                    Key::ArrowUp | Key::Char('k') => self.handle_up()?,
+                    Key::ArrowDown | Key::Char('j') | Key::Char(CTRL_N) => self.handle_down()?,
+                    Key::ArrowUp | Key::Char('k') | Key::Char(CTRL_P) => self.handle_up()?,
                     Key::ArrowLeft | Key::Char('h') => self.handle_left()?,
                     Key::ArrowRight | Key::Char('l') => self.handle_right()?,
                     key if key == self.toggle_key || key == Key::Char('x') => self.handle_toggle(),
