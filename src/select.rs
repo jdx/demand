@@ -4,7 +4,6 @@ use std::io::Write;
 use crate::theme::Theme;
 use crate::{DemandOption, ctrlc, theme};
 use console::{Alignment, Key, Term};
-use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
@@ -222,8 +221,7 @@ impl<'a, T> Select<'a, T> {
                 if self.filter.is_empty() {
                     Some((0, opt))
                 } else {
-                    self.fuzzy_matcher
-                        .fuzzy_match(&opt.label.to_lowercase(), &self.filter.to_lowercase())
+                    crate::fuzzy::score(&self.fuzzy_matcher, &opt.label, &self.filter)
                         .map(|score| (score, opt))
                 }
             })
@@ -491,10 +489,7 @@ impl<'a, T> Select<'a, T> {
         out: &mut dyn WriteColor,
         label: &str,
     ) -> Result<(), std::io::Error> {
-        let matches = self
-            .fuzzy_matcher
-            .fuzzy_indices(&label.to_lowercase(), &self.filter.to_lowercase());
-        if let Some((_, indices)) = matches {
+        if let Some(indices) = crate::fuzzy::indices(&self.fuzzy_matcher, label, &self.filter) {
             for (j, c) in label.chars().enumerate() {
                 if indices.contains(&j) {
                     out.set_color(&self.theme.selected_option)?;
@@ -615,6 +610,18 @@ mod tests {
             },
             without_ansi(select.render().unwrap().as_str())
         );
+    }
+
+    #[test]
+    fn filter_matches_space_separated_terms() {
+        let mut select = Select::new("Tasks")
+            .option(DemandOption::new("node:@acme/api#test"))
+            .option(DemandOption::new("node:@acme/api#lint"));
+        select.filter = "api test".to_string();
+
+        let matches = select.filtered_options();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].label, "node:@acme/api#test");
     }
 
     /// Regression for the wrapped-line redraw bug (jdx/aube#1107): an

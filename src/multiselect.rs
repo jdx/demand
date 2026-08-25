@@ -3,7 +3,6 @@ use std::io;
 use std::io::Write;
 
 use console::{Alignment, Key, Term};
-use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use itertools::Itertools;
 use termcolor::{Buffer, WriteColor};
@@ -273,8 +272,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 if self.filter.is_empty() {
                     Some((0, opt))
                 } else {
-                    self.fuzzy_matcher
-                        .fuzzy_match(&opt.label.to_lowercase(), &self.filter.to_lowercase())
+                    crate::fuzzy::score(&self.fuzzy_matcher, &opt.label, &self.filter)
                         .map(|score| (score, opt))
                 }
             })
@@ -656,10 +654,7 @@ impl<'a, T> MultiSelect<'a, T> {
         out: &mut dyn WriteColor,
         label: &str,
     ) -> Result<(), std::io::Error> {
-        let matches = self
-            .fuzzy_matcher
-            .fuzzy_indices(&label.to_lowercase(), &self.filter.to_lowercase());
-        if let Some((_, indices)) = matches {
+        if let Some(indices) = crate::fuzzy::indices(&self.fuzzy_matcher, label, &self.filter) {
             for (j, c) in label.chars().enumerate() {
                 if indices.contains(&j) {
                     out.set_color(&self.theme.selected_option)?;
