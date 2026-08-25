@@ -20,6 +20,7 @@ mod confirm;
 mod ctrlc;
 mod dialog;
 mod event;
+mod fuzzy;
 mod height;
 mod input;
 mod list;
