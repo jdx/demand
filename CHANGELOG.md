@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.1](https://github.com/jdx/demand/compare/v2.1.0...v2.1.1) - 2026-09-01
+
+### Other
+
+- *(deps)* update jdx/mise-action digest to c2a8761 ([#213](https://github.com/jdx/demand/pull/213))
+- *(deps)* update dependency hk to v1.57.0 ([#214](https://github.com/jdx/demand/pull/214))
+- add sponsor logos to readme ([#212](https://github.com/jdx/demand/pull/212))
+- *(sponsors)* replace 37signals with omacom foundation ([#210](https://github.com/jdx/demand/pull/210))
+
 ## [2.1.0](https://github.com/jdx/demand/compare/v2.0.5...v2.1.0) - 2026-08-25
 
 ### Added
