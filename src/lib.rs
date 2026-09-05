@@ -23,6 +23,7 @@ mod event;
 mod fuzzy;
 mod height;
 mod input;
+mod keys;
 mod list;
 mod multiselect;
 mod option;
