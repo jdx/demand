@@ -10,7 +10,7 @@ description = "Generate changelog"
 run = "git cliff -o CHANGELOG.md"
 
 [tasks.coverage]
-tools = { "cargo-tarpaulin" = "0.27" }
+tools = { "cargo:cargo-tarpaulin" = "0.27" }
 depends = [ "lint" ]
 description = "Run tests with coverage"
 run = "cargo tarpaulin --lib --tests"
