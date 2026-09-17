@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.1](https://github.com/jdx/demand/compare/v2.1.0...v2.1.1) - 2026-09-17
+
+### Other
+
+- add entire trail runners ([#219](https://github.com/jdx/demand/pull/219))
+- *(deps)* update dependency hk to v2 ([#217](https://github.com/jdx/demand/pull/217))
+- remove entire and codex agent hooks
+- lock tool versions with mise.lock ([#218](https://github.com/jdx/demand/pull/218))
+- *(deps)* update dtolnay/rust-toolchain digest to 6bed076 ([#216](https://github.com/jdx/demand/pull/216))
+- *(deps)* update dependency hk to v1.58.1 ([#215](https://github.com/jdx/demand/pull/215))
+- *(deps)* update jdx/mise-action digest to c2a8761 ([#213](https://github.com/jdx/demand/pull/213))
+- *(deps)* update dependency hk to v1.57.0 ([#214](https://github.com/jdx/demand/pull/214))
+- add sponsor logos to readme ([#212](https://github.com/jdx/demand/pull/212))
+- *(sponsors)* replace 37signals with omacom foundation ([#210](https://github.com/jdx/demand/pull/210))
+
 ## [2.1.0](https://github.com/jdx/demand/compare/v2.0.5...v2.1.0) - 2026-08-25
 
 ### Added
