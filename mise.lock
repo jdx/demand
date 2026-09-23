@@ -49,20 +49,73 @@ url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.23.0/ca
 url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/546062212"
 provenance = "github-attestations"
 
-[[tools."cargo:cargo-release"]]
+[[tools.cargo-release]]
 version = "1.0.0"
-backend = "cargo:cargo-release"
+backend = "github:crate-ci/cargo-release"
 specifiers = ["1.0"]
+
+[tools.cargo-release."platforms.macos-arm64"]
+checksum = "sha256:08c58ac070d46f3a4147ed0f94666b1f9ab85caff4a370ca4feac534a6e959d1"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354288953"
+provenance = "github-attestations"
+
+[tools.cargo-release."platforms.macos-x64"]
+checksum = "sha256:c61aa043be12745c9e3ecc389c6d0e78b29f440860533a6e9acbfce7aeb167f3"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354289094"
+provenance = "github-attestations"
+
+[tools.cargo-release."platforms.windows-x64"]
+checksum = "sha256:ab8b999cb78c5324f6a3bc4cd4279cbcc7b189d92adc936c5c52ee4e5baea472"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354288604"
+provenance = "github-attestations"
 
 [[tools."cargo:cargo-tarpaulin"]]
 version = "0.27.3"
 backend = "cargo:cargo-tarpaulin"
 specifiers = ["0.27"]
 
-[[tools."cargo:git-cliff"]]
+[[tools.git-cliff]]
 version = "2.14.2"
-backend = "cargo:git-cliff"
+backend = "aqua:orhun/git-cliff"
 specifiers = ["2"]
+
+[tools.git-cliff."platforms.linux-arm64"]
+checksum = "sha256:69e208f6e4baef3a0f9b759d5f44223aa9336b86c691072a3d0c98d35a816e69"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573483780"
+
+[tools.git-cliff."platforms.linux-arm64-musl"]
+checksum = "sha256:4be21b21ec9699af4d330b224aeba8a41d41d8f5b351ca2da8a9ea2bdc36380f"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573485334"
+
+[tools.git-cliff."platforms.linux-x64"]
+checksum = "sha256:24f397c733add5390fdceee3a2088588ab0d5f944ce00d34cb7029b888cf2db4"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573483509"
+
+[tools.git-cliff."platforms.linux-x64-musl"]
+checksum = "sha256:fa21e2fc70046fcfd0e43e5e4613873ab799aff3d9dc8559c00d31b270e417d0"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573485273"
+
+[tools.git-cliff."platforms.macos-arm64"]
+checksum = "sha256:a0be97e237d440d34c5e508ec21d070b2c85cbb8be48a46a56f9a4e8bd247f05"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573487203"
+
+[tools.git-cliff."platforms.macos-x64"]
+checksum = "sha256:4e647d2deb152aca1e987f225cf42b080b991dd98f3bce4027ef95446d982ac3"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573484837"
+
+[tools.git-cliff."platforms.windows-x64"]
+checksum = "sha256:6ece2112b3f4af462190ecbea4aeb1315fff6af415629b597f84319073c31131"
+url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573487227"
 
 [[tools.hk]]
 version = "2.1.0"
