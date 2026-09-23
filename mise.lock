@@ -50,26 +50,50 @@ url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/asset
 provenance = "github-attestations"
 
 [[tools.cargo-release]]
-version = "1.0.0"
+version = "1.1.6"
 backend = "github:crate-ci/cargo-release"
-specifiers = ["1.0"]
+specifiers = ["1"]
+
+[tools.cargo-release."platforms.linux-arm64"]
+checksum = "sha256:a74a3dc62204ed1c10e3da644fa6b5dc0abead13d1936e1a21f0decfaf26b983"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568871846"
+provenance = "github-attestations"
+
+[tools.cargo-release."platforms.linux-arm64-musl"]
+checksum = "sha256:a74a3dc62204ed1c10e3da644fa6b5dc0abead13d1936e1a21f0decfaf26b983"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568871846"
+provenance = "github-attestations"
+
+[tools.cargo-release."platforms.linux-x64"]
+checksum = "sha256:d82672b9f26b9a11f1b080eedeb74ffa3dd02d96ae9fb3cbc180e4a10d5417db"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568873165"
+provenance = "github-attestations"
+
+[tools.cargo-release."platforms.linux-x64-musl"]
+checksum = "sha256:d82672b9f26b9a11f1b080eedeb74ffa3dd02d96ae9fb3cbc180e4a10d5417db"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568873165"
+provenance = "github-attestations"
 
 [tools.cargo-release."platforms.macos-arm64"]
-checksum = "sha256:08c58ac070d46f3a4147ed0f94666b1f9ab85caff4a370ca4feac534a6e959d1"
-url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354288953"
+checksum = "sha256:2f41e0d9f9538108f943f498af9f923cd6efd7e3ecdd69c7f78516bb29f32c53"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568874942"
 provenance = "github-attestations"
 
 [tools.cargo-release."platforms.macos-x64"]
-checksum = "sha256:c61aa043be12745c9e3ecc389c6d0e78b29f440860533a6e9acbfce7aeb167f3"
-url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354289094"
+checksum = "sha256:f1a5544f7b9464bc308caac45ed0a10d4839b6a38d7f83af27cfb72e68efe501"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568875686"
 provenance = "github-attestations"
 
 [tools.cargo-release."platforms.windows-x64"]
-checksum = "sha256:ab8b999cb78c5324f6a3bc4cd4279cbcc7b189d92adc936c5c52ee4e5baea472"
-url = "https://github.com/crate-ci/cargo-release/releases/download/v1.0.0/cargo-release-v1.0.0-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/354288604"
+checksum = "sha256:511ac6eb265f137cf78c74f6488bcdad750e669b5dd63324cc5582ea5a59ab5e"
+url = "https://github.com/crate-ci/cargo-release/releases/download/v1.1.6/cargo-release-v1.1.6-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/crate-ci/cargo-release/releases/assets/568875956"
 provenance = "github-attestations"
 
 [[tools."cargo:cargo-tarpaulin"]]

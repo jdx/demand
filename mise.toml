@@ -1,6 +1,6 @@
 [tools]
 git-cliff = "2"
-cargo-release = "1.0"
+cargo-release = "1"
 hk = { version = "latest", minimum_release_age = "0s" }
 cargo-binstall = "latest"
 pkl = "latest"
