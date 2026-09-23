@@ -1,7 +1,7 @@
 [tools]
-"cargo:git-cliff" = "2"
-"cargo:cargo-release" = "1.0"
-hk = "2.0.1"
+git-cliff = "2"
+cargo-release = "1"
+hk = { version = "latest", minimum_release_age = "0s" }
 cargo-binstall = "latest"
 pkl = "latest"
 
