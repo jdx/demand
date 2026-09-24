@@ -55,7 +55,7 @@ impl Frame {
 
     /// Pretend the frame was drawn at `width`, to exercise resize handling
     /// with a terminal whose size can't change.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(crate) fn set_width(&mut self, width: usize) {
         self.width = width;
     }
