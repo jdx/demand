@@ -871,7 +871,7 @@ impl<'a> Input<'a> {
     /// cursor included, where it is.
     fn draw(&mut self) -> io::Result<()> {
         let output = self.render()?;
-        if self.frame.is_current(&output) {
+        if self.frame.is_current(&self.term, &output) {
             return Ok(());
         }
         self.reset_cursor_to_end()?;

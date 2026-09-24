@@ -129,11 +129,14 @@ impl<'a> List<'a> {
         let mut events = crate::event::EventReader::new()?;
         let mut reset_viewport = false;
 
-        self.term.clear_line()?;
         loop {
             self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
+                if self.frame.is_empty() {
+                    // Start the first frame on a clean line.
+                    self.term.clear_line()?;
+                }
                 if reset_viewport {
                     self.term.clear_screen()?;
                     self.frame.forget();

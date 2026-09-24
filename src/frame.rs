@@ -7,13 +7,15 @@ use console::Term;
 ///
 /// Every frame is drawn with the cursor left where the frame ends. To
 /// replace it, the cursor moves up to the first line that differs, clears
-/// from there to the end of the screen, and writes the rest of the new
-/// frame. Lines above the first change are left alone, and a frame
+/// the rows the old frame occupied from there down, and writes the rest of
+/// the new frame. Lines above the first change are left alone, and a frame
 /// identical to the last one writes nothing at all — pressing ↓ on the
 /// last option of a `Select` no longer repaints the whole prompt.
 #[derive(Default)]
 pub(crate) struct Frame {
     last: String,
+    /// Terminal width the frame was drawn at.
+    width: usize,
 }
 
 impl Frame {
@@ -25,12 +27,15 @@ impl Frame {
             term.flush()?;
         }
         self.last = next;
+        self.width = width;
         Ok(())
     }
 
-    /// Whether drawing `next` would change anything on screen.
-    pub(crate) fn is_current(&self, next: &str) -> bool {
-        !self.last.is_empty() && self.last == next
+    /// Whether drawing `next` would leave the screen exactly as it is. A
+    /// resize reflows the frame even when its text is unchanged, so that
+    /// only counts at the width it was drawn at.
+    pub(crate) fn is_current(&self, term: &Term, next: &str) -> bool {
+        !self.last.is_empty() && self.last == next && self.width == term.size().1 as usize
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -83,11 +88,19 @@ fn patch(prev: &str, next: &str, width: usize) -> Option<String> {
         .sum();
     let kept: usize = next_lines[..unchanged].iter().map(|l| l.len() + 1).sum();
 
+    // Clear only the rows the old frame occupied, like `clear_last_lines`:
+    // clearing to the end of the screen would also take out anything
+    // below the prompt that it doesn't own.
     let mut out = String::new();
     if rows_up > 0 {
         out.push_str(&format!("\x1b[{rows_up}A"));
+        out.push_str(&"\x1b[2K\x1b[1B".repeat(rows_up));
     }
-    out.push_str("\r\x1b[J");
+    out.push_str("\x1b[2K");
+    if rows_up > 0 {
+        out.push_str(&format!("\x1b[{rows_up}A"));
+    }
+    out.push('\r');
     // Colors carry across newlines, so a rewrite starting mid-frame has to
     // restore whatever the skipped lines left set.
     out.push_str(&active_style(&next[..kept]));
@@ -127,6 +140,18 @@ fn active_style(s: &str) -> String {
 mod tests {
     use super::{active_style, patch};
 
+    /// What `patch` writes to move up `rows` rows, clearing each on the
+    /// way down, and return to the first.
+    fn clear(rows: usize) -> String {
+        if rows == 0 {
+            return "\x1b[2K\r".to_string();
+        }
+        format!(
+            "\x1b[{rows}A{}\x1b[2K\x1b[{rows}A\r",
+            "\x1b[2K\x1b[1B".repeat(rows)
+        )
+    }
+
     #[test]
     fn an_identical_frame_writes_nothing() {
         assert_eq!(patch("a\nb\n\x1b[0m", "a\nb\n\x1b[0m", 80), None);
@@ -144,7 +169,7 @@ mod tests {
         let next = "title\n  one\n❯ two\nhelp\n";
         assert_eq!(
             patch(prev, next, 80).as_deref(),
-            Some("\x1b[3A\r\x1b[J  one\n❯ two\nhelp\n")
+            Some(format!("{}  one\n❯ two\nhelp\n", clear(3)).as_str())
         );
     }
 
@@ -156,7 +181,7 @@ mod tests {
         let next = format!("title\n{}\n", "y".repeat(20));
         assert_eq!(
             patch(&prev, &next, 8).as_deref(),
-            Some(format!("\x1b[3A\r\x1b[J{}\n", "y".repeat(20)).as_str())
+            Some(format!("{}{}\n", clear(3), "y".repeat(20)).as_str())
         );
     }
 
@@ -165,14 +190,14 @@ mod tests {
     fn a_change_on_the_cursor_row_stays_put() {
         assert_eq!(
             patch("a\n/ Loading", "a\n- Loading", 80).as_deref(),
-            Some("\r\x1b[J- Loading")
+            Some(format!("{}- Loading", clear(0)).as_str())
         );
     }
 
     #[test]
     fn a_shorter_frame_clears_what_it_no_longer_covers() {
         let out = patch("a\nb\nc\n", "a\n", 80).unwrap();
-        assert_eq!(out, "\x1b[2A\r\x1b[J");
+        assert_eq!(out, clear(2));
     }
 
     #[test]
@@ -183,7 +208,7 @@ mod tests {
         // the bold from line 0 is still in effect.
         assert_eq!(
             patch(prev, next, 80).as_deref(),
-            Some("\x1b[1A\r\x1b[J\x1b[1m\x1b[32mtwo\n")
+            Some(format!("{}\x1b[1m\x1b[32mtwo\n", clear(1)).as_str())
         );
     }
 
@@ -194,5 +219,26 @@ mod tests {
             "\x1b[38;5;2m"
         );
         assert_eq!(active_style("plain"), "");
+    }
+
+    /// A patch clears only the rows the old frame occupied: text below
+    /// the prompt, which it doesn't own, survives the redraw.
+    #[cfg(unix)]
+    #[test]
+    fn leaves_content_below_the_frame_alone() {
+        use crate::test::{Parser, replay};
+
+        let prev = "title\n❯ one\n  two\n";
+        let next = "title\n  one\n❯ two\n";
+        let mut parser = Parser::new(10, 20, 0);
+        replay(&mut parser, prev.as_bytes());
+        // Something else wrote two rows further down, then put the cursor
+        // back where the frame left it.
+        replay(&mut parser, b"\x1b7\x1b[2Bkeep me\x1b8");
+        replay(&mut parser, patch(prev, next, 20).unwrap().as_bytes());
+
+        let screen = parser.screen().contents();
+        assert!(screen.contains("❯ two"), "{screen}");
+        assert!(screen.contains("keep me"), "{screen}");
     }
 }
