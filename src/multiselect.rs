@@ -66,7 +66,7 @@ pub struct MultiSelect<'a, T> {
     cursor_x: usize,
     cursor_y: usize,
     cursor: usize,
-    last_frame: String,
+    frame: crate::frame::Frame,
     term: Term,
     pages: usize,
     cur_page: usize,
@@ -89,7 +89,7 @@ impl<'a, T> MultiSelect<'a, T> {
             cursor_y: 0,
             err: None,
             cursor: 0,
-            last_frame: String::new(),
+            frame: Default::default(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -186,7 +186,7 @@ impl<'a, T> MultiSelect<'a, T> {
             crate::synchronized_output::run(&term, || {
                 if reset_viewport {
                     self.term.clear_screen()?;
-                    self.last_frame.clear();
+                    self.frame.forget();
                     reset_viewport = false;
                 }
                 self.redraw()
@@ -682,23 +682,14 @@ impl<'a, T> MultiSelect<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    /// Clear the previous frame, render the next one, and remember its
-    /// physical height. Terminal wrapping can make one logical line occupy
-    /// several rows, so `output.lines().count()` is not sufficient here.
+    /// Render a frame and draw it over the previous one.
     fn redraw(&mut self) -> io::Result<()> {
-        self.cleanup()?;
         let output = self.render()?;
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()?;
-        self.last_frame = output;
-        Ok(())
+        self.frame.update(&self.term, output)
     }
 
     fn cleanup(&mut self) -> io::Result<()> {
-        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
-        self.term.clear_last_lines(height)?;
-        self.last_frame.clear();
-        Ok(())
+        self.frame.clear(&self.term)
     }
 }
 
