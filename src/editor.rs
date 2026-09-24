@@ -86,8 +86,14 @@ impl<'a> Editor<'a> {
         self
     }
 
-    /// Set the editor to run instead of `$VISUAL` / `$EDITOR`. It may
-    /// include arguments, separated by whitespace, like `code --wait`.
+    /// Set the editor to run instead of `$VISUAL` / `$EDITOR`. Like those,
+    /// it may include arguments, like `code --wait`.
+    ///
+    /// On Unix it's run the way git runs an editor: through `sh` whenever
+    /// it contains anything the shell would interpret, so it's quoted as
+    /// it would be in a shell (`vim --cmd="set number"`). On Windows it's
+    /// split on whitespace, with double quotes keeping spaces together
+    /// (`"C:\Program Files\Editor\edit.exe" --wait`).
     pub fn editor_command(mut self, command: impl Into<OsString>) -> Self {
         self.command = Some(command.into());
         self
@@ -196,6 +202,16 @@ impl<'a> Editor<'a> {
                 format!("could not run editor {}: {err}", command.to_string_lossy()),
             )
         })?;
+        // The shell's exit status for a command it can't find.
+        if status.code() == Some(127) {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "could not run editor {}: not found",
+                    command.to_string_lossy()
+                ),
+            ));
+        }
         if !status.success() {
             return Err(io::Error::other(format!(
                 "editor {} exited with {status}",
@@ -298,10 +314,43 @@ fn default_editor() -> OsString {
         })
 }
 
-/// The command to open `path` in `editor`. Like git, the editor setting may
-/// carry arguments (`code --wait`), so it's split into words; single or
-/// double quotes keep a word with spaces together, as in
-/// `"C:\Program Files\Editor\edit.exe" --wait`.
+/// The command to open `path` in `editor`.
+///
+/// `$EDITOR` is a shell string by convention — git, crontab and less all
+/// hand it to `sh` — so on Unix it goes through the shell too, exactly as
+/// git does it: `sh -c '<editor> "$@"' <editor> <path>` when the setting
+/// has anything the shell would interpret, and a direct exec when it's a
+/// plain program name.
+#[cfg(unix)]
+fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
+    const SHELL_CHARS: &[char] = &[
+        '|', '&', ';', '<', '>', '(', ')', '$', '`', '\\', '"', '\'', ' ', '\t', '\n', '*', '?',
+        '[', '#', '~', '=', '%',
+    ];
+    let editor_str = editor.to_string_lossy();
+    if editor_str.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "no editor configured",
+        ));
+    }
+    let mut command = if editor_str.contains(SHELL_CHARS) {
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg(format!("{editor_str} \"$@\""))
+            .arg(editor);
+        command
+    } else {
+        Command::new(editor)
+    };
+    command.arg(path);
+    Ok(command)
+}
+
+/// The command to open `path` in `editor`: split on whitespace, with
+/// double quotes keeping spaces together, as Windows command lines are.
+#[cfg(not(unix))]
 fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
     let words = split_words(&editor.to_string_lossy());
     let (program, args) = words
@@ -312,38 +361,36 @@ fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
     Ok(command)
 }
 
-/// Split on whitespace into words. A word that starts with a single or
-/// double quote and ends with the same quote — the closing one followed by
-/// whitespace or the end — is taken as the text between them, spaces and
-/// all, as in `"C:\\Program Files\\Editor\\edit.exe" --wait` or
-/// `vim -c 'set tw=72'`. Any other quote is an ordinary character, so an
-/// apostrophe inside a path (`/home/o'brien/bin/edit`) needs no quoting
-/// and can't pair with a quote later in the command. Backslashes are kept
-/// as they are, since they separate Windows paths.
+/// Split on whitespace, except between double quotes, which are removed
+/// wherever they appear: `"C:\\Program Files\\edit.exe"` is one word and
+/// so is `--cmd="set number"`. Single quotes and backslashes are ordinary
+/// characters, as in a Windows command line.
+#[cfg(any(not(unix), test))]
 fn split_words(s: &str) -> Vec<String> {
-    let chars: Vec<char> = s.chars().collect();
     let mut words = Vec::new();
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i].is_whitespace() {
-            i += 1;
-            continue;
-        }
-        let quote = chars[i];
-        if quote == '"' || quote == '\'' {
-            let close = (i + 1..chars.len())
-                .find(|&j| chars[j] == quote && chars.get(j + 1).is_none_or(|c| c.is_whitespace()));
-            if let Some(close) = close {
-                words.push(chars[i + 1..close].iter().collect());
-                i = close + 1;
-                continue;
+    let mut word = String::new();
+    let mut in_word = false;
+    let mut quoted = false;
+    for c in s.chars() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                in_word = true;
+            }
+            c if c.is_whitespace() && !quoted => {
+                if in_word {
+                    words.push(std::mem::take(&mut word));
+                    in_word = false;
+                }
+            }
+            c => {
+                word.push(c);
+                in_word = true;
             }
         }
-        let end = (i..chars.len())
-            .find(|&j| chars[j].is_whitespace())
-            .unwrap_or(chars.len());
-        words.push(chars[i..end].iter().collect());
-        i = end;
+    }
+    if in_word {
+        words.push(word);
     }
     words
 }
@@ -446,50 +493,65 @@ mod tests {
     }
 
     #[test]
-    fn editor_command_splits_arguments() {
-        let command = editor_command(&"code --wait".into(), Path::new("/tmp/x.md")).unwrap();
+    fn split_words_keeps_double_quoted_spaces_together() {
+        assert_eq!(
+            split_words(r#""C:\Program Files\Editor\edit.exe" --wait"#),
+            [r"C:\Program Files\Editor\edit.exe", "--wait"]
+        );
+        assert_eq!(
+            split_words(r#"vim --cmd="set number""#),
+            ["vim", "--cmd=set number"]
+        );
+        // Apostrophes aren't quotes on Windows.
+        assert_eq!(
+            split_words(r"C:\Users\o'brien\edit.exe --wait"),
+            [r"C:\Users\o'brien\edit.exe", "--wait"]
+        );
+        assert!(split_words("   ").is_empty());
+    }
+
+    /// A plain program name is run directly; anything the shell would
+    /// interpret goes through `sh`, with the file passed as `"$@"`.
+    #[cfg(unix)]
+    #[test]
+    fn editor_command_uses_the_shell_like_git() {
+        let command = editor_command(&"code".into(), Path::new("/tmp/x.md")).unwrap();
         assert_eq!(command.get_program(), "code");
         let args: Vec<_> = command.get_args().collect();
-        assert_eq!(args, ["--wait", "/tmp/x.md"]);
+        assert_eq!(args, ["/tmp/x.md"]);
+
+        let command = editor_command(&"code --wait".into(), Path::new("/tmp/x.md")).unwrap();
+        assert_eq!(command.get_program(), "sh");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(
+            args,
+            ["-c", r#"code --wait "$@""#, "code --wait", "/tmp/x.md"]
+        );
+
         assert!(editor_command(&"  ".into(), Path::new("x")).is_err());
     }
 
+    /// Quoting in the setting is the shell's, so a quoted option value
+    /// reaches the editor as one argument.
+    #[cfg(unix)]
     #[test]
-    fn editor_command_keeps_quoted_paths_together() {
-        let command = editor_command(
-            &r#""C:\Program Files\Editor\edit.exe" --wait"#.into(),
-            Path::new("x.md"),
-        )
-        .unwrap();
-        assert_eq!(command.get_program(), r"C:\Program Files\Editor\edit.exe");
-        let args: Vec<_> = command.get_args().collect();
-        assert_eq!(args, ["--wait", "x.md"]);
-        assert_eq!(
-            split_words("vim -c 'set tw=72'"),
-            ["vim", "-c", "set tw=72"]
-        );
-        // A lone apostrophe is part of the word, not an opening quote.
-        assert_eq!(
-            split_words("/home/o'brien/bin/editor --wait"),
-            ["/home/o'brien/bin/editor", "--wait"]
-        );
-        assert_eq!(
-            split_words(r#""/home/o'brien/edit" -w"#),
-            ["/home/o'brien/edit", "-w"]
-        );
-        // An apostrophe mid-word can't pair with a quote later on and
-        // swallow the words between them.
-        assert_eq!(
-            split_words("/home/o'brien/bin/edit -c 'set tw=72'"),
-            ["/home/o'brien/bin/edit", "-c", "set tw=72"]
-        );
-        assert_eq!(
-            split_words("/home/o'brien/it's/edit --wait"),
-            ["/home/o'brien/it's/edit", "--wait"]
-        );
-        // A quote only closes where a word ends.
-        assert_eq!(split_words(r#""a b"c d"#), [r#""a"#, r#"b"c"#, "d"]);
-        assert_eq!(split_words("  '' x "), ["", "x"]);
+    fn edit_passes_shell_quoted_arguments_through() {
+        let script = TempFile::create("sh", "printf '%s\\n' \"$1\" >> \"$2\"\n").unwrap();
+        let editor = Editor::new("Notes")
+            .default_value("hello\n")
+            .editor_command(format!(
+                r#"sh {} --cmd="set number""#,
+                script.path().display()
+            ));
+        assert_eq!(editor.edit().unwrap(), "hello\n--cmd=set number\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn edit_reports_an_editor_that_isnt_found() {
+        let editor = Editor::new("Notes").editor_command("no-such-editor-xyz --wait");
+        let err = editor.edit().unwrap_err();
+        assert!(err.to_string().contains("not found"), "{err}");
     }
 
     #[cfg(unix)]
