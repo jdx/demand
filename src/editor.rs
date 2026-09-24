@@ -171,14 +171,27 @@ impl<'a> Editor<'a> {
     fn edit(&self) -> io::Result<String> {
         let file = TempFile::create(&self.extension, &self.text)?;
         let command = self.command.clone().unwrap_or_else(default_editor);
-        let status = editor_command(&command, file.path())?
-            .status()
-            .map_err(|err| {
-                io::Error::new(
-                    err.kind(),
-                    format!("could not run editor {}: {err}", command.to_string_lossy()),
-                )
-            })?;
+        let mut child = editor_command(&command, file.path())?;
+        // The prompt is on stderr so callers can capture stdout, as in
+        // `notes=$(my-cli)`. The editor must not inherit that capture, or
+        // its UI ends up in the caller's output: give it the terminal.
+        #[cfg(unix)]
+        if let Ok(tty) = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+        {
+            child
+                .stdin(tty.try_clone()?)
+                .stdout(tty.try_clone()?)
+                .stderr(tty);
+        }
+        let status = child.status().map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!("could not run editor {}: {err}", command.to_string_lossy()),
+            )
+        })?;
         if !status.success() {
             return Err(io::Error::other(format!(
                 "editor {} exited with {status}",
@@ -276,17 +289,51 @@ fn default_editor() -> OsString {
 }
 
 /// The command to open `path` in `editor`. Like git, the editor setting may
-/// carry arguments (`code --wait`), so it's split on whitespace; quoting
-/// isn't supported.
+/// carry arguments (`code --wait`), so it's split into words; single or
+/// double quotes keep a word with spaces together, as in
+/// `"C:\Program Files\Editor\edit.exe" --wait`.
 fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
-    let editor = editor.to_string_lossy();
-    let mut parts = editor.split_whitespace();
-    let program = parts
-        .next()
+    let words = split_words(&editor.to_string_lossy());
+    let (program, args) = words
+        .split_first()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no editor configured"))?;
     let mut command = Command::new(program);
-    command.args(parts).arg(path);
+    command.args(args).arg(path);
     Ok(command)
+}
+
+/// Split on whitespace, except inside single or double quotes, which are
+/// removed. Backslashes are kept as they are, since they separate Windows
+/// paths.
+fn split_words(s: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut in_word = false;
+    let mut quote = None;
+    for c in s.chars() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            Some(_) => word.push(c),
+            None if c == '"' || c == '\'' => {
+                quote = Some(c);
+                in_word = true;
+            }
+            None if c.is_whitespace() => {
+                if in_word {
+                    words.push(std::mem::take(&mut word));
+                    in_word = false;
+                }
+            }
+            None => {
+                word.push(c);
+                in_word = true;
+            }
+        }
+    }
+    if in_word {
+        words.push(word);
+    }
+    words
 }
 
 /// A file in the temp dir that is removed when dropped.
@@ -307,13 +354,19 @@ impl TempFile {
             COUNT.fetch_add(1, Ordering::Relaxed),
         ));
         // `create_new` refuses to follow or reuse anything already at the
-        // path, so another user can't plant a file there first.
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path)?;
+        // path, so another user can't plant a file there first, and on Unix
+        // the file is readable only by its owner: the temp dir is usually
+        // shared and the text stays there while the editor is open.
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let mut file = options.open(&path)?;
+        // Take ownership before writing, so a failed write still removes
+        // the file.
+        let temp = Self { path };
         file.write_all(contents.as_bytes())?;
-        Ok(Self { path })
+        Ok(temp)
     }
 
     fn path(&self) -> &Path {
@@ -387,6 +440,32 @@ mod tests {
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, ["--wait", "/tmp/x.md"]);
         assert!(editor_command(&"  ".into(), Path::new("x")).is_err());
+    }
+
+    #[test]
+    fn editor_command_keeps_quoted_paths_together() {
+        let command = editor_command(
+            &r#""C:\Program Files\Editor\edit.exe" --wait"#.into(),
+            Path::new("x.md"),
+        )
+        .unwrap();
+        assert_eq!(command.get_program(), r"C:\Program Files\Editor\edit.exe");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args, ["--wait", "x.md"]);
+        assert_eq!(
+            split_words("vim -c 'set tw=72'"),
+            ["vim", "-c", "set tw=72"]
+        );
+        assert_eq!(split_words(r#"a"b c"d"#), ["ab cd"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn temp_file_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+        let file = TempFile::create("txt", "secret").unwrap();
+        let mode = fs::metadata(file.path()).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 
     /// Round-trips through a real process standing in for the editor: it
