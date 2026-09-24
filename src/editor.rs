@@ -312,38 +312,38 @@ fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
     Ok(command)
 }
 
-/// Split on whitespace, except inside single or double quotes, which are
-/// removed. A quote with no closing match is an ordinary character, so an
-/// apostrophe in a path (`/home/o'brien/bin/edit`) needs no quoting.
-/// Backslashes are kept as they are, since they separate Windows paths.
+/// Split on whitespace into words. A word that starts with a single or
+/// double quote and ends with the same quote — the closing one followed by
+/// whitespace or the end — is taken as the text between them, spaces and
+/// all, as in `"C:\\Program Files\\Editor\\edit.exe" --wait` or
+/// `vim -c 'set tw=72'`. Any other quote is an ordinary character, so an
+/// apostrophe inside a path (`/home/o'brien/bin/edit`) needs no quoting
+/// and can't pair with a quote later in the command. Backslashes are kept
+/// as they are, since they separate Windows paths.
 fn split_words(s: &str) -> Vec<String> {
     let chars: Vec<char> = s.chars().collect();
     let mut words = Vec::new();
-    let mut word = String::new();
-    let mut in_word = false;
-    let mut quote = None;
-    for (i, &c) in chars.iter().enumerate() {
-        match quote {
-            Some(q) if c == q => quote = None,
-            Some(_) => word.push(c),
-            None if (c == '"' || c == '\'') && chars[i + 1..].contains(&c) => {
-                quote = Some(c);
-                in_word = true;
-            }
-            None if c.is_whitespace() => {
-                if in_word {
-                    words.push(std::mem::take(&mut word));
-                    in_word = false;
-                }
-            }
-            None => {
-                word.push(c);
-                in_word = true;
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+            continue;
+        }
+        let quote = chars[i];
+        if quote == '"' || quote == '\'' {
+            let close = (i + 1..chars.len())
+                .find(|&j| chars[j] == quote && chars.get(j + 1).is_none_or(|c| c.is_whitespace()));
+            if let Some(close) = close {
+                words.push(chars[i + 1..close].iter().collect());
+                i = close + 1;
+                continue;
             }
         }
-    }
-    if in_word {
-        words.push(word);
+        let end = (i..chars.len())
+            .find(|&j| chars[j].is_whitespace())
+            .unwrap_or(chars.len());
+        words.push(chars[i..end].iter().collect());
+        i = end;
     }
     words
 }
@@ -468,7 +468,6 @@ mod tests {
             split_words("vim -c 'set tw=72'"),
             ["vim", "-c", "set tw=72"]
         );
-        assert_eq!(split_words(r#"a"b c"d"#), ["ab cd"]);
         // A lone apostrophe is part of the word, not an opening quote.
         assert_eq!(
             split_words("/home/o'brien/bin/editor --wait"),
@@ -478,6 +477,19 @@ mod tests {
             split_words(r#""/home/o'brien/edit" -w"#),
             ["/home/o'brien/edit", "-w"]
         );
+        // An apostrophe mid-word can't pair with a quote later on and
+        // swallow the words between them.
+        assert_eq!(
+            split_words("/home/o'brien/bin/edit -c 'set tw=72'"),
+            ["/home/o'brien/bin/edit", "-c", "set tw=72"]
+        );
+        assert_eq!(
+            split_words("/home/o'brien/it's/edit --wait"),
+            ["/home/o'brien/it's/edit", "--wait"]
+        );
+        // A quote only closes where a word ends.
+        assert_eq!(split_words(r#""a b"c d"#), [r#""a"#, r#"b"c"#, "d"]);
+        assert_eq!(split_words("  '' x "), ["", "x"]);
     }
 
     #[cfg(unix)]
