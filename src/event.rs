@@ -7,6 +7,8 @@ pub(crate) struct EventReader {
     resize: unix::ResizeListener,
 }
 
+// Only keys can be read on Windows; resizes and updates need `select()`.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub(crate) enum Event {
     Key(Key),
     /// The terminal was resized.
