@@ -551,7 +551,14 @@ impl<'a> Input<'a> {
         let mut buf = [0; 4];
         for c in self.input.chars() {
             match clusters.last_mut() {
-                Some(last) if console::measure_text_width(c.encode_utf8(&mut buf)) == 0 => {
+                // A zero-width char (combining mark, variation selector,
+                // joiner) belongs to the character before it, and a
+                // character after a zero-width joiner is part of the same
+                // emoji sequence (`👩‍💻`).
+                Some(last)
+                    if console::measure_text_width(c.encode_utf8(&mut buf)) == 0
+                        || last.ends_with('\u{200d}') =>
+                {
                     last.push(c)
                 }
                 _ => clusters.push(c.to_string()),
@@ -1577,5 +1584,15 @@ mod tests {
         let mut input = editing("xa\u{301}", 3);
         input.transpose_chars().unwrap();
         assert_eq!(input.input, "a\u{301}x");
+    }
+
+    /// An emoji joined with U+200D moves as one character.
+    #[test]
+    fn ctrl_t_keeps_joined_emoji_together() {
+        let coder = "\u{1f469}\u{200d}\u{1f4bb}";
+        let mut input = editing(&format!("{coder}x"), 3);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("x{coder}"));
+        assert_eq!(input.cursor, 4);
     }
 }
