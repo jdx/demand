@@ -46,7 +46,7 @@ pub struct Editor<'a> {
     extension: String,
     command: Option<OsString>,
     term: Term,
-    height: usize,
+    frame: crate::frame::Frame,
     err: Option<String>,
 }
 
@@ -62,7 +62,7 @@ impl<'a> Editor<'a> {
             extension: "txt".to_string(),
             command: None,
             term: Term::stderr(),
-            height: 0,
+            frame: Default::default(),
             err: None,
         }
     }
@@ -121,13 +121,7 @@ impl<'a> Editor<'a> {
         self.term.hide_cursor()?;
         loop {
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || {
-                self.clear()?;
-                let output = self.render()?;
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-                self.term.write_all(output.as_bytes())?;
-                self.term.flush()
-            })?;
+            crate::synchronized_output::run(&term, || self.draw())?;
             match self.term.read_key()? {
                 Key::Char('e') => {
                     // The editor needs the whole terminal: take the prompt
@@ -276,9 +270,15 @@ impl<'a> Editor<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    /// Render a frame and draw it over the previous one, rewriting only
+    /// the lines that changed.
+    fn draw(&mut self) -> io::Result<()> {
+        let output = self.render()?;
+        self.frame.update(&self.term, output)
+    }
+
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
-        self.height = 0;
+        self.frame.clear(&self.term)?;
         Ok(())
     }
 }

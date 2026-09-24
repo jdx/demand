@@ -7,25 +7,56 @@ pub(crate) struct EventReader {
     resize: unix::ResizeListener,
 }
 
+// Only keys can be read on Windows; resizes and updates need `select()`.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) enum Event {
+    Key(Key),
+    /// The terminal was resized.
+    Resize,
+    /// A [`PromptHandle`](crate::PromptHandle) made an update.
+    Update,
+}
+
 impl EventReader {
     pub(crate) fn new() -> io::Result<Self> {
+        Self::with_updates(None)
+    }
+
+    /// Also wake up when `updates` receives one, so it can be drawn
+    /// without waiting for a key.
+    pub(crate) fn with_updates(updates: Option<&crate::handle::Updates>) -> io::Result<Self> {
+        #[cfg(not(unix))]
+        let _ = updates;
         Ok(Self {
             #[cfg(unix)]
-            resize: unix::ResizeListener::new()?,
+            resize: unix::ResizeListener::new(
+                updates
+                    .and_then(|u| u.waker())
+                    .map(|w| w.try_clone())
+                    .transpose()?,
+            )?,
         })
+    }
+
+    /// The next key, or `None` if the terminal was resized.
+    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
+        loop {
+            match self.read(term)? {
+                Event::Key(key) => return Ok(Some(key)),
+                Event::Resize => return Ok(None),
+                Event::Update => {}
+            }
+        }
     }
 
     #[cfg(unix)]
-    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
-        self.resize.read(term).map(|event| match event {
-            unix::Event::Key(key) => Some(key),
-            unix::Event::Resize => None,
-        })
+    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
+        self.resize.read(term)
     }
 
     #[cfg(not(unix))]
-    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
-        term.read_key().map(Some)
+    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
+        term.read_key().map(Event::Key)
     }
 }
 
@@ -40,19 +71,17 @@ mod unix {
     use console::Term;
     use signal_hook::{SigId, consts::SIGWINCH, low_level};
 
-    pub(super) enum Event {
-        Key(console::Key),
-        Resize,
-    }
+    use super::Event;
 
     pub(super) struct ResizeListener {
         input: Option<File>,
         read: UnixStream,
+        updates: Option<UnixStream>,
         signal_id: SigId,
     }
 
     impl ResizeListener {
-        pub(super) fn new() -> io::Result<Self> {
+        pub(super) fn new(updates: Option<UnixStream>) -> io::Result<Self> {
             let input = if unsafe { libc::isatty(libc::STDIN_FILENO) } == 1 {
                 None
             } else {
@@ -64,6 +93,7 @@ mod unix {
             Ok(Self {
                 input,
                 read,
+                updates,
                 signal_id,
             })
         }
@@ -75,47 +105,115 @@ mod unix {
                 .map(AsRawFd::as_raw_fd)
                 .unwrap_or(libc::STDIN_FILENO);
             let resize = self.read.as_raw_fd();
+            let updates = self.updates.as_ref().map(AsRawFd::as_raw_fd);
             let _raw_mode = RawMode::new(input)?;
 
+            let mut fds = vec![input, resize];
+            fds.extend(updates);
             loop {
-                let mut read_fds = unsafe { mem::zeroed::<libc::fd_set>() };
-                unsafe {
-                    libc::FD_ZERO(&mut read_fds);
-                    libc::FD_SET(input, &mut read_fds);
-                    libc::FD_SET(resize, &mut read_fds);
-                }
-
-                let result = unsafe {
-                    libc::select(
-                        input.max(resize) + 1,
-                        &mut read_fds,
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                    )
-                };
-                if result < 0 {
-                    let err = io::Error::last_os_error();
-                    if err.kind() == io::ErrorKind::Interrupted {
-                        continue;
-                    }
-                    return Err(err);
-                }
-
-                if unsafe { libc::FD_ISSET(resize, &read_fds) } {
-                    self.drain();
+                let ready = wait_readable(&fds)?;
+                if ready[1] {
+                    drain(&mut self.read);
                     return Ok(Event::Resize);
                 }
-                if unsafe { libc::FD_ISSET(input, &read_fds) } {
+                // Keys before updates: a handle updating faster than frames
+                // are drawn would otherwise keep the socket readable and
+                // starve the keyboard. Every frame applies all pending
+                // updates, so an update waiting behind a key isn't lost.
+                if ready[0] {
                     return term.read_key().map(Event::Key);
+                }
+                if ready.get(2) == Some(&true) {
+                    if let Some(stream) = self.updates.as_mut() {
+                        drain(stream);
+                    }
+                    return Ok(Event::Update);
                 }
             }
         }
+    }
 
-        fn drain(&mut self) {
-            let mut bytes = [0; 64];
-            while matches!(self.read.read(&mut bytes), Ok(n) if n > 0) {}
+    /// Block until at least one of `fds` is readable, and say which are.
+    /// Retries when interrupted by a signal.
+    ///
+    /// `poll` has no limit on descriptor numbers, unlike `select`'s
+    /// fixed-size `fd_set`. macOS's `poll` doesn't support terminal
+    /// devices, though, so there it's `select` with every descriptor
+    /// checked against `FD_SETSIZE` first.
+    #[cfg(not(target_os = "macos"))]
+    fn wait_readable(fds: &[RawFd]) -> io::Result<Vec<bool>> {
+        let mut pollfds: Vec<libc::pollfd> = fds
+            .iter()
+            .map(|&fd| libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            })
+            .collect();
+        loop {
+            let result =
+                unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as libc::nfds_t, -1) };
+            if result < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            // A hung-up or errored descriptor counts as readable, so the
+            // read that follows reports the problem instead of spinning.
+            return Ok(pollfds
+                .iter()
+                .map(|p| p.revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR) != 0)
+                .collect());
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn wait_readable(fds: &[RawFd]) -> io::Result<Vec<bool>> {
+        if let Some(&fd) = fds
+            .iter()
+            .find(|&&fd| fd < 0 || fd as usize >= libc::FD_SETSIZE)
+        {
+            return Err(io::Error::other(format!(
+                "file descriptor {fd} is out of range for select()"
+            )));
+        }
+        loop {
+            let mut read_fds = unsafe { mem::zeroed::<libc::fd_set>() };
+            unsafe {
+                libc::FD_ZERO(&mut read_fds);
+                for &fd in fds {
+                    libc::FD_SET(fd, &mut read_fds);
+                }
+            }
+            let nfds = fds.iter().copied().max().unwrap_or(0) + 1;
+            let result = unsafe {
+                libc::select(
+                    nfds,
+                    &mut read_fds,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if result < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(fds
+                .iter()
+                .map(|&fd| unsafe { libc::FD_ISSET(fd, &read_fds) })
+                .collect());
+        }
+    }
+
+    fn drain(stream: &mut UnixStream) {
+        let mut bytes = [0; 64];
+        while matches!(stream.read(&mut bytes), Ok(n) if n > 0) {}
     }
 
     impl Drop for ResizeListener {

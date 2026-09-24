@@ -187,7 +187,7 @@ pub struct Input<'a> {
 
     // Internal state
     cursor: usize,
-    height: usize,
+    frame: crate::frame::Frame,
     term: Term,
     err: Option<String>,
     suggestion: Option<String>,
@@ -197,6 +197,16 @@ pub struct Input<'a> {
     show_suggestions: bool,
     max_suggestions_display: usize,
     input_line_offset: usize,
+    /// The (row, column) of the caret within the input row, which can
+    /// wrap onto several rows.
+    caret: (usize, usize),
+    /// Physical rows the input row wraps into.
+    input_rows: usize,
+    /// Rows between where `set_cursor` parked the cursor and the end of
+    /// the frame, so `reset_cursor_to_end` can walk back down. Recorded
+    /// rather than recomputed: by the time the cursor goes back down, the
+    /// next frame has been rendered and the layout fields describe it.
+    rows_below_caret: usize,
     suggestions_scroll_offset: usize,
     /// Text removed by the last kill command, for ctrl-y to put back.
     kill_buffer: String,
@@ -229,7 +239,7 @@ impl<'a> Input<'a> {
 
             // Internal state
             cursor: 0,
-            height: 0,
+            frame: Default::default(),
             term: Term::stderr(),
             err: None,
             suggestion: None,
@@ -239,6 +249,9 @@ impl<'a> Input<'a> {
             show_suggestions: false,
             max_suggestions_display: 5,
             input_line_offset: 0,
+            caret: (0, 0),
+            input_rows: 1,
+            rows_below_caret: 0,
             suggestions_scroll_offset: 0,
             kill_buffer: String::new(),
         }
@@ -409,15 +422,7 @@ impl<'a> Input<'a> {
 
         loop {
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || {
-                self.clear()?;
-                let output = self.render()?;
-
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-                self.term.write_all(output.as_bytes())?;
-                self.term.flush()?;
-                self.set_cursor()
-            })?;
+            crate::synchronized_output::run(&term, || self.draw())?;
 
             let key = self.term.read_key()?;
             match key {
@@ -577,7 +582,16 @@ impl<'a> Input<'a> {
         let mut buf = [0; 4];
         for c in self.input.chars() {
             match clusters.last_mut() {
-                Some(last) if console::measure_text_width(c.encode_utf8(&mut buf)) == 0 => {
+                // A zero-width char (combining mark, variation selector,
+                // joiner) belongs to the character before it. After a
+                // zero-width joiner, an emoji continues the same emoji
+                // sequence (`👩‍💻`); any other character starts a new one.
+                Some(last)
+                    if console::measure_text_width(c.encode_utf8(&mut buf)) == 0
+                        || (last.ends_with('\u{200d}')
+                            && last.chars().next().is_some_and(is_pictographic)
+                            && is_pictographic(c)) =>
+                {
                     last.push(c)
                 }
                 _ => clusters.push(c.to_string()),
@@ -782,11 +796,33 @@ impl<'a> Input<'a> {
         // line count from it would put the caret on the wrong row as soon
         // as a title or description wrapped. Inline mode writes no
         // newline at all and correctly comes out as 0.
+        let width = self.term.size().1 as usize;
         let header = std::str::from_utf8(out.as_slice()).unwrap_or_default();
-        self.input_line_offset =
-            crate::height::rendered_height(header, self.term.size().1 as usize);
+        self.input_line_offset = crate::height::rendered_height(header, width);
+        let row_start = header.rfind('\n').map_or(0, |i| i + 1);
+        let prefix = header[row_start..].to_string();
 
-        self.render_input(&mut out)?;
+        let input = self.render_input(&mut out)?;
+        // Lay the row out as the terminal will: an inline title, the
+        // prompt and the input all share it, wide characters take two
+        // columns, and one that doesn't fit at the edge moves to the next
+        // row. The caret is where the char under it starts — or where the
+        // cursor block after the input starts. A zero-width char adds no
+        // columns, so the caret sits right where it would print.
+        let written = std::str::from_utf8(out.as_slice()).unwrap_or_default();
+        self.input_rows = crate::height::rows_for(&written[row_start..], width);
+        let caret_idx = self.get_char_idx(&input, self.cursor);
+        let under_caret = input[caret_idx..].chars().next().unwrap_or(' ');
+        let through_caret = format!("{prefix}{}{under_caret}", &input[..caret_idx]);
+        let (row, end) = crate::height::cursor_after(&through_caret, width);
+        let start = end.saturating_sub(console::measure_text_width(&under_caret.to_string()));
+        self.caret = if row < self.input_rows {
+            (row, start)
+        } else {
+            // Nothing is drawn after a caret at the very edge of the last
+            // row, so the terminal never wraps onto the row it'd be on.
+            (self.input_rows - 1, width.saturating_sub(1))
+        };
         writeln!(out)?;
 
         if self.show_suggestions && !self.suggestions_list.is_empty() {
@@ -845,10 +881,11 @@ impl<'a> Input<'a> {
                     .theme
                     .real_cursor_color(Some(&self.theme.input_placeholder)),
             )?;
-            write!(out, "{}", &self.placeholder[..1])?;
-            if self.placeholder.len() > 1 {
+            let split = first_char_len(&self.placeholder);
+            write!(out, "{}", &self.placeholder[..split])?;
+            if self.placeholder.len() > split {
                 out.set_color(&self.theme.input_placeholder)?;
-                write!(out, "{}", &self.placeholder[1..])?;
+                write!(out, "{}", &self.placeholder[split..])?;
                 out.reset()?;
             }
             return Ok(input);
@@ -857,14 +894,15 @@ impl<'a> Input<'a> {
         let cursor_idx = self.get_char_idx(&input, self.cursor);
         write!(out, "{}", &input[..cursor_idx])?;
 
+        let after_cursor = cursor_idx + first_char_len(&input[cursor_idx..]);
         if cursor_idx < input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
-            write!(out, "{}", &input[cursor_idx..cursor_idx + 1])?;
+            write!(out, "{}", &input[cursor_idx..after_cursor])?;
             out.reset()?;
         }
-        if cursor_idx + 1 < input.len() {
+        if after_cursor < input.len() {
             out.reset()?;
-            write!(out, "{}", &input[cursor_idx + 1..])?;
+            write!(out, "{}", &input[after_cursor..])?;
         }
 
         if let Some(suggestion) = &self.suggestion {
@@ -875,10 +913,11 @@ impl<'a> Input<'a> {
                             .theme
                             .real_cursor_color(Some(&self.theme.input_placeholder)),
                     )?;
-                    write!(out, "{}", &suggestion[..1])?;
-                    if suggestion.len() > 1 {
+                    let split = first_char_len(suggestion);
+                    write!(out, "{}", &suggestion[..split])?;
+                    if suggestion.len() > split {
                         out.set_color(&self.theme.input_placeholder)?;
-                        write!(out, "{}", &suggestion[1..])?;
+                        write!(out, "{}", &suggestion[split..])?;
                     }
                 } else {
                     out.set_color(&self.theme.input_placeholder)?;
@@ -978,36 +1017,53 @@ impl<'a> Input<'a> {
             .unwrap_or(input.len())
     }
 
+    /// Park the terminal cursor on the caret. When the input row wraps,
+    /// the caret can be on any of its rows: cursor movement stops at the
+    /// right edge rather than wrapping, so the row has to be picked
+    /// explicitly and only the remainder moved across.
     fn set_cursor(&mut self) -> io::Result<()> {
-        let lines_below_input = self.height - self.input_line_offset;
-        if lines_below_input > 0 {
-            self.term.move_cursor_up(lines_below_input)?;
+        let (row, col) = self.caret;
+        let rows_up = self.frame.height(&self.term) - self.input_line_offset - row;
+        self.rows_below_caret = rows_up;
+        if rows_up > 0 {
+            self.term.move_cursor_up(rows_up)?;
         }
-
         self.term.move_cursor_left(usize::MAX)?;
-
-        let mut offset = 0;
-        if self.inline {
-            offset += self.title.chars().count();
-            if !self.description.is_empty() {
-                offset += 1;
-                offset += self.description.chars().count();
-            }
+        if col > 0 {
+            self.term.move_cursor_right(col)?;
         }
-        offset += self.prompt.chars().count();
-        offset += self.cursor;
-
-        self.term.move_cursor_right(offset)?;
-
         Ok(())
     }
 
     fn reset_cursor_to_end(&mut self) -> io::Result<()> {
-        let lines_below_input = self.height - self.input_line_offset;
-        if lines_below_input > 0 {
-            self.term.move_cursor_down(lines_below_input)?;
+        if self.rows_below_caret > 0 {
+            self.term.move_cursor_down(self.rows_below_caret)?;
         }
+        self.rows_below_caret = 0;
         Ok(())
+    }
+
+    /// Draw a fresh frame over the previous one and park the cursor on the
+    /// caret. A frame identical to the one on screen leaves everything,
+    /// cursor included, where it is.
+    fn draw(&mut self) -> io::Result<()> {
+        let output = self.render()?;
+        if self.frame.is_current(&self.term, &output) {
+            return Ok(());
+        }
+        if self.frame.resized(&self.term) {
+            // The caret-to-end distance was measured at the old width, and
+            // the terminal has reflowed the rows it counted, so it can't be
+            // used to find the frame. Start over from a clear screen, as
+            // `Select` does on a resize.
+            self.term.clear_screen()?;
+            self.frame.forget();
+            self.rows_below_caret = 0;
+        } else {
+            self.reset_cursor_to_end()?;
+        }
+        self.frame.update(&self.term, output)?;
+        self.set_cursor()
     }
 
     fn clear_err(&mut self) -> io::Result<()> {
@@ -1018,13 +1074,28 @@ impl<'a> Input<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        if self.height > 0 {
+        if !self.frame.is_empty() {
             self.reset_cursor_to_end()?;
-            self.term.clear_last_lines(self.height)?;
+            self.frame.clear(&self.term)?;
         }
-        self.height = 0;
         Ok(())
     }
+}
+
+/// Whether `c` is an emoji that can take part in a zero-width-joiner
+/// sequence. This is an approximation of Unicode's Extended_Pictographic
+/// property, covering the blocks such sequences are built from.
+fn is_pictographic(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x1F000..=0x1FAFF | 0x2600..=0x27BF | 0x2300..=0x23FF | 0x2B00..=0x2BFF
+    )
+}
+
+/// Byte length of the first char of `s`, or 0 if it's empty. Slicing off
+/// one *byte* instead panics as soon as that char is multi-byte.
+fn first_char_len(s: &str) -> usize {
+    s.chars().next().map_or(0, char::len_utf8)
 }
 
 /// Input validator trait
@@ -1159,6 +1230,8 @@ impl InputValidator for fn(&str) -> Result<(), &str> {
 #[cfg(test)]
 mod tests {
     use crate::test::without_ansi;
+    #[cfg(unix)]
+    use crate::test::{Parser, capture_term, replay, snapshot};
 
     use super::*;
 
@@ -1331,6 +1404,176 @@ mod tests {
         input.render().unwrap();
         assert_eq!(input.input_line_offset, 0);
     }
+
+    /// The cursor highlight used to slice one byte off the input, which
+    /// panics when the char under the caret is multi-byte.
+    #[test]
+    fn renders_multibyte_char_under_the_caret() {
+        let mut input = Input::new("Name").placeholder("éé");
+        input.render().unwrap();
+        input.input = "日本語".to_string();
+        input.cursor = 1;
+        let rendered = input.render().unwrap();
+        assert!(without_ansi(&rendered).contains("> 日本語"));
+    }
+
+    /// Wide chars take two columns, so the caret has to be measured, not
+    /// counted.
+    #[test]
+    fn caret_on_a_zero_width_char_stays_in_the_input() {
+        let mut input = Input::new("Name");
+        input.input = "\u{200b}abc".to_string();
+        input.cursor = 0;
+        input.render().unwrap();
+        assert_eq!(input.caret, (0, "> ".len()));
+    }
+
+    #[test]
+    fn caret_measures_wide_chars() {
+        let mut input = Input::new("Name");
+        input.input = "日本語".to_string();
+        input.cursor = 2;
+        input.render().unwrap();
+        assert_eq!(input.caret, (0, "> ".len() + 4));
+    }
+
+    /// A wide char under the caret that doesn't fit at the end of a row is
+    /// drawn at the start of the next one, and so is the caret. Checked
+    /// against the terminal emulator, which wraps it for real.
+    #[cfg(unix)]
+    #[test]
+    fn caret_follows_a_wide_char_wrapped_at_the_edge() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Name");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        // "> " plus enough `x` to leave one column before the edge.
+        input.input = format!("{}日本", "x".repeat(width - 3));
+        input.cursor = width - 3;
+        input.draw().unwrap();
+        assert_eq!(input.caret, (1, 0));
+
+        let mut parser = Parser::new(24, width as u16, 0);
+        replay(&mut parser, &snapshot(&buf));
+        // Title on row 0, the input starts on row 1 and wraps onto row 2.
+        assert_eq!(parser.screen().cursor_position(), (2, 0));
+    }
+
+    /// Regression for jdx/demand#7 in `Input`: an input row wider than the
+    /// terminal wraps. Cursor movement stops at the right edge, so moving
+    /// right by the caret's char offset used to pin the cursor to the edge
+    /// of the input's first row, and the next clear started from there.
+    #[cfg(unix)]
+    #[test]
+    fn a_wrapped_input_row_keeps_the_caret_and_redraws_cleanly() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        input.input = "x".repeat(width + 10);
+        input.cursor = input.input.chars().count();
+
+        for _ in 0..3 {
+            input.draw().unwrap();
+            input.handle_arrow_left().unwrap();
+        }
+
+        let mut parser = Parser::new(24, width as u16, 0);
+        replay(&mut parser, &snapshot(&buf));
+        let screen = parser.screen().contents();
+        assert_eq!(
+            screen.matches("Command").count(),
+            1,
+            "prompt drawn more than once:\n{screen}"
+        );
+        // Title and description take rows 0 and 1; the input starts on
+        // row 2 and wraps onto row 3. After two left presses the caret is
+        // 8 columns into the wrapped row ("> " + width + 10 - 2).
+        assert_eq!(parser.screen().cursor_position(), (3, 10));
+    }
+    /// jdx/demand#123 for `Input`, where the cursor is parked on the caret
+    /// rather than at the end of the frame: typing and moving through a
+    /// wrapped row has to leave the screen, and the cursor, exactly where
+    /// a fresh draw of the final state would.
+    #[cfg(unix)]
+    #[test]
+    fn incremental_redraws_match_a_full_redraw() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1;
+        input.input = "x".repeat(width as usize - 3);
+        input.cursor = input.input.chars().count();
+
+        input.draw().unwrap();
+        for c in "yyyy".chars() {
+            input.handle_key(c).unwrap();
+            input.draw().unwrap();
+        }
+        input.handle_arrow_left().unwrap();
+        input.draw().unwrap();
+        input.handle_backspace().unwrap();
+        input.draw().unwrap();
+        // A no-op key: the frame doesn't change and nothing is written.
+        let before = snapshot(&buf).len();
+        input.draw().unwrap();
+        assert_eq!(snapshot(&buf).len(), before);
+
+        let (fresh_term, fresh_buf) = capture_term();
+        let mut fresh = Input::new("Command").description("run what?");
+        fresh.input = input.input.clone();
+        fresh.cursor = input.cursor;
+        fresh.term = fresh_term;
+        fresh.draw().unwrap();
+
+        let mut patched = Parser::new(24, width, 0);
+        replay(&mut patched, &snapshot(&buf));
+        let mut full = Parser::new(24, width, 0);
+        replay(&mut full, &snapshot(&fresh_buf));
+        assert_eq!(patched.screen().contents(), full.screen().contents());
+        assert_eq!(
+            patched.screen().cursor_position(),
+            full.screen().cursor_position()
+        );
+    }
+
+    /// After a resize, `Input` doesn't walk back down from the caret by a
+    /// row count measured at the old width: it clears the screen and
+    /// draws the frame fresh.
+    #[cfg(unix)]
+    #[test]
+    fn a_resize_redraws_from_a_clear_screen() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        input.input = "x".repeat(width + 10);
+        input.cursor = 0;
+        input.draw().unwrap();
+        let before = snapshot(&buf).len();
+
+        input.frame.set_width(width + 20);
+        input.draw().unwrap();
+        let redraw = String::from_utf8_lossy(&snapshot(&buf)[before..]).to_string();
+        assert!(
+            redraw.contains("\x1b[2J"),
+            "no clear screen: {}",
+            redraw.escape_debug()
+        );
+        // Nothing moves the cursor down (`ESC [ n B`) before the clear.
+        let before_clear = &redraw[..redraw.find("\x1b[2J").unwrap()];
+        let moved_down = before_clear.split("\x1b[").skip(1).any(|seq| {
+            let digits = seq.chars().take_while(char::is_ascii_digit).count();
+            digits > 0 && seq[digits..].starts_with('B')
+        });
+        assert!(
+            !moved_down,
+            "moved down by a stale row count: {}",
+            redraw.escape_debug()
+        );
+        assert!(redraw.contains("Command"), "frame not redrawn");
+    }
+
     fn editing(text: &str, cursor: usize) -> Input<'static> {
         let mut input = Input::new("t");
         input.input = text.to_string();
@@ -1429,5 +1672,29 @@ mod tests {
         let mut input = editing("xa\u{301}", 3);
         input.transpose_chars().unwrap();
         assert_eq!(input.input, "a\u{301}x");
+    }
+
+    /// An emoji joined with U+200D moves as one character.
+    #[test]
+    fn ctrl_t_keeps_joined_emoji_together() {
+        let coder = "\u{1f469}\u{200d}\u{1f4bb}";
+        let mut input = editing(&format!("{coder}x"), 3);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("x{coder}"));
+        assert_eq!(input.cursor, 4);
+        // ♀ from the Miscellaneous Symbols block joins too.
+        let runner = "\u{1f3c3}\u{200d}\u{2640}\u{fe0f}";
+        let mut input = editing(&format!("x{runner}"), 5);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("{runner}x"));
+    }
+
+    /// A joiner between letters doesn't make one character of them: the
+    /// letter after it still transposes on its own.
+    #[test]
+    fn ctrl_t_does_not_join_letters_across_a_joiner() {
+        let mut input = editing("xa\u{200d}b", 4);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, "xba\u{200d}");
     }
 }

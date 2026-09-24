@@ -52,7 +52,7 @@ pub struct Select<'a, T> {
 
     cursor_x: usize,
     cursor_y: usize,
-    last_frame: String,
+    frame: crate::frame::Frame,
     term: Term,
     filter: String,
     filtering: bool,
@@ -60,6 +60,7 @@ pub struct Select<'a, T> {
     cur_page: usize,
     capacity: usize,
     fuzzy_matcher: SkimMatcherV2,
+    updates: Option<crate::handle::Updates>,
 }
 
 impl<'a, T> Select<'a, T> {
@@ -73,7 +74,7 @@ impl<'a, T> Select<'a, T> {
             theme: &theme::DEFAULT,
             cursor_x: 0,
             cursor_y: 0,
-            last_frame: String::new(),
+            frame: Default::default(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -81,6 +82,7 @@ impl<'a, T> Select<'a, T> {
             cur_page: 0,
             capacity: 0,
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
+            updates: None,
         };
         let max_height = s.term.size().0 as usize;
         s.capacity = max_height.max(8) - 6;
@@ -111,6 +113,27 @@ impl<'a, T> Select<'a, T> {
         self
     }
 
+    /// A handle for changing the title or description from another thread
+    /// while the selector runs. See [`PromptHandle`](crate::PromptHandle).
+    pub fn handle(&mut self) -> crate::PromptHandle {
+        self.updates
+            .get_or_insert_with(crate::handle::Updates::new)
+            .handle()
+    }
+
+    /// Apply whatever the handle changed since the last frame.
+    fn apply_updates(&mut self) {
+        if let Some(updates) = &self.updates {
+            let pending = updates.take();
+            if let Some(title) = pending.title {
+                self.title = title;
+            }
+            if let Some(description) = pending.description {
+                self.description = description;
+            }
+        }
+    }
+
     /// Set whether the selector can be filtered with a query
     pub fn filterable(mut self, filterable: bool) -> Self {
         self.filterable = filterable;
@@ -135,24 +158,26 @@ impl<'a, T> Select<'a, T> {
     /// an error of type `io::ErrorKind::Interrupted` is returned.
     pub fn run(mut self) -> io::Result<T> {
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
-        let mut events = crate::event::EventReader::new()?;
+        let mut events = crate::event::EventReader::with_updates(self.updates.as_ref())?;
         let mut reset_viewport = false;
 
         loop {
+            self.apply_updates();
             self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
                 if reset_viewport {
                     self.term.clear_screen()?;
-                    self.last_frame.clear();
+                    self.frame.forget();
                     reset_viewport = false;
-                } else {
-                    self.clear()?;
                 }
                 self.draw()?;
                 self.term.hide_cursor()
             })?;
             let enter = |mut select: Select<T>| {
+                // An update may have arrived since the last frame: the final
+                // line should show the latest title, not the one drawn last.
+                select.apply_updates();
                 let id = select.visible_options().get(select.cursor_y).unwrap().id;
                 let selected = select.options.iter().find(|o| o.id == id).unwrap();
                 let output = select.render_success(&selected.label)?;
@@ -167,9 +192,13 @@ impl<'a, T> Select<'a, T> {
                 Ok::<T, io::Error>(selected.item)
             };
 
-            let Some(key) = events.read_key(&self.term)? else {
-                reset_viewport = true;
-                continue;
+            let key = match events.read(&self.term)? {
+                crate::event::Event::Key(key) => key,
+                crate::event::Event::Resize => {
+                    reset_viewport = true;
+                    continue;
+                }
+                crate::event::Event::Update => continue,
             };
             if self.filtering {
                 match key {
@@ -340,7 +369,22 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn resize_layout(&mut self, rows: usize) {
-        let capacity = rows.max(8) - 6;
+        // The fixed 6 rows assume a one-row title and description. A
+        // longer one — including one a handle just set — wraps onto more,
+        // and those come out of the options, or the help line would be
+        // pushed off the screen.
+        let width = self.term.size().1 as usize;
+        // Each line of a multi-line title or description is its own row
+        // (or rows), so count them all.
+        let header_rows = crate::height::rendered_rows(&self.title, width)
+            + if self.description.is_empty() {
+                0
+            } else {
+                crate::height::rendered_rows(&self.description, width)
+            };
+        let capacity = (rows.max(8) - 6)
+            .saturating_sub(header_rows.saturating_sub(2))
+            .max(1);
         if capacity == self.capacity {
             return;
         }
@@ -517,21 +561,14 @@ impl<'a, T> Select<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    /// Render a frame, write it out, and record how many rows it took so
-    /// the next `clear` erases exactly that much.
+    /// Render a frame and draw it over the previous one.
     fn draw(&mut self) -> io::Result<()> {
         let output = self.render()?;
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()?;
-        self.last_frame = output;
-        Ok(())
+        self.frame.update(&self.term, output)
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
-        self.term.clear_last_lines(height)?;
-        self.last_frame.clear();
-        Ok(())
+        self.frame.clear(&self.term)
     }
 }
 
@@ -662,6 +699,116 @@ mod tests {
             1,
             "prompt drawn more than once:\n{screen}"
         );
+    }
+
+    /// jdx/demand#123: pressing ↓ on the last option changes nothing, so
+    /// nothing is written.
+    #[cfg(unix)]
+    #[test]
+    fn an_unchanged_frame_writes_nothing() {
+        let (term, buf) = capture_term();
+        let mut select = Select::new("Pick")
+            .option(DemandOption::new("one"))
+            .option(DemandOption::new("two"));
+        select.term = term;
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        let written = snapshot(&buf).len();
+
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        assert_eq!(snapshot(&buf).len(), written);
+    }
+
+    /// Drawing only the changed lines has to leave the same screen as
+    /// drawing the final frame from scratch, through moves, filtering that
+    /// shrinks the frame, and an option that wraps.
+    #[cfg(unix)]
+    #[test]
+    fn incremental_redraws_match_a_full_redraw() {
+        let options = || {
+            vec![
+                DemandOption::new("alpha"),
+                DemandOption::new("beta").label(&"b".repeat(120)),
+                DemandOption::new("gamma"),
+            ]
+        };
+        let (term, buf) = capture_term();
+        let mut select = Select::new("Pick").description("one").options(options());
+        select.term = term;
+        let width = select.term.size().1;
+
+        select.draw().unwrap();
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        select.handle_start_filtering();
+        select.draw().unwrap();
+        select.handle_filter_key('g').unwrap();
+        select.draw().unwrap();
+
+        let (fresh_term, fresh_buf) = capture_term();
+        let mut fresh = Select::new("Pick").description("one").options(options());
+        fresh.cursor_y = select.cursor_y;
+        fresh.filtering = select.filtering;
+        fresh.filter = select.filter.clone();
+        fresh.term = fresh_term;
+        fresh.draw().unwrap();
+
+        let mut patched = Parser::new(24, width, 0);
+        replay(&mut patched, &snapshot(&buf));
+        let mut full = Parser::new(24, width, 0);
+        replay(&mut full, &snapshot(&fresh_buf));
+        assert_eq!(patched.screen().contents(), full.screen().contents());
+        assert_eq!(
+            patched.screen().cursor_position(),
+            full.screen().cursor_position()
+        );
+    }
+
+    #[test]
+    fn handle_updates_apply_before_the_next_frame() {
+        let mut select = Select::new("Coins: 0")
+            .description("price: 100")
+            .option(DemandOption::new("Pay"));
+        let handle = select.handle();
+        let from_thread = handle.clone();
+        std::thread::spawn(move || from_thread.set_title("Coins: 50"))
+            .join()
+            .unwrap();
+        handle.set_description("50 to go");
+
+        select.apply_updates();
+        let rendered = select.render().unwrap();
+        let rendered = without_ansi(&rendered);
+        assert!(rendered.starts_with("Coins: 50\n50 to go\n"), "{rendered}");
+
+        // Once taken, an update doesn't apply again over later changes.
+        select.title = "changed".to_string();
+        select.apply_updates();
+        assert_eq!(select.title, "changed");
+    }
+
+    /// A title that wraps onto more rows leaves fewer for the options.
+    #[test]
+    fn a_wrapping_title_takes_rows_from_the_options() {
+        let mut select = Select::new("Pick")
+            .description("one row")
+            .option(DemandOption::new("a"));
+        select.resize_layout(20);
+        assert_eq!(select.capacity, 14);
+
+        let width = select.term.size().1 as usize;
+        select.title = "t".repeat(width * 2 + 1);
+        select.resize_layout(20);
+        // Three rows of title instead of one.
+        assert_eq!(select.capacity, 12);
+
+        // Lines of a multi-line header each take a row.
+        select.title = "one\ntwo\nthree".to_string();
+        select.resize_layout(20);
+        assert_eq!(select.capacity, 12);
     }
 
     #[test]

@@ -53,7 +53,7 @@ pub struct List<'a> {
     filterable: bool,
     filter: String,
     cur_page: usize,
-    last_frame: String,
+    frame: crate::frame::Frame,
     pages: usize,
     scroll: usize,
 }
@@ -71,7 +71,7 @@ impl<'a> List<'a> {
             filtering: false,
             filterable: false,
             filter: String::new(),
-            last_frame: String::new(),
+            frame: Default::default(),
             cur_page: 0,
             pages: 0,
             success_items: 4,
@@ -133,18 +133,17 @@ impl<'a> List<'a> {
             self.refresh_layout();
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
+                if self.frame.is_empty() {
+                    // Start the first frame on a clean line.
+                    self.term.clear_line()?;
+                }
                 if reset_viewport {
                     self.term.clear_screen()?;
-                    self.last_frame.clear();
+                    self.frame.forget();
                     reset_viewport = false;
-                } else {
-                    self.clear()?;
                 }
                 let output = self.render()?;
-                self.term.write_all(output.as_bytes())?;
-                self.term.flush()?;
-                self.last_frame = output;
-                Ok(())
+                self.frame.update(&self.term, output)
             })?;
             let Some(key) = events.read_key(&self.term)? else {
                 reset_viewport = true;
@@ -378,15 +377,7 @@ impl<'a> List<'a> {
     }
 
     fn clear(&mut self) -> Result<(), io::Error> {
-        if self.last_frame.is_empty() {
-            self.term.clear_line()?;
-        } else {
-            let height =
-                crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
-            self.term.clear_last_lines(height)?;
-        }
-        self.last_frame.clear();
-        Ok(())
+        self.frame.clear(&self.term)
     }
 }
 
