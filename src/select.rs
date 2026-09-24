@@ -175,6 +175,9 @@ impl<'a, T> Select<'a, T> {
                 self.term.hide_cursor()
             })?;
             let enter = |mut select: Select<T>| {
+                // An update may have arrived since the last frame: the final
+                // line should show the latest title, not the one drawn last.
+                select.apply_updates();
                 let id = select.visible_options().get(select.cursor_y).unwrap().id;
                 let selected = select.options.iter().find(|o| o.id == id).unwrap();
                 let output = select.render_success(&selected.label)?;
@@ -371,11 +374,13 @@ impl<'a, T> Select<'a, T> {
         // and those come out of the options, or the help line would be
         // pushed off the screen.
         let width = self.term.size().1 as usize;
-        let header_rows = crate::height::rows_for(&self.title, width)
+        // Each line of a multi-line title or description is its own row
+        // (or rows), so count them all.
+        let header_rows = crate::height::rendered_rows(&self.title, width)
             + if self.description.is_empty() {
                 0
             } else {
-                crate::height::rows_for(&self.description, width)
+                crate::height::rendered_rows(&self.description, width)
             };
         let capacity = (rows.max(8) - 6)
             .saturating_sub(header_rows.saturating_sub(2))
@@ -798,6 +803,11 @@ mod tests {
         select.title = "t".repeat(width * 2 + 1);
         select.resize_layout(20);
         // Three rows of title instead of one.
+        assert_eq!(select.capacity, 12);
+
+        // Lines of a multi-line header each take a row.
+        select.title = "one\ntwo\nthree".to_string();
+        select.resize_layout(20);
         assert_eq!(select.capacity, 12);
     }
 
