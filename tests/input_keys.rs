@@ -57,7 +57,14 @@ fn submit(keys: &[&[u8]]) -> String {
             output.extend(chunk);
         }
     }
+    let fd = pair.master.as_raw_fd().expect("pty fd");
     for key in keys.iter().chain([&b"\r"[..]].iter()) {
+        // Between keys the pty is in canonical mode (`console` only enters
+        // raw mode while reading one), where ctrl-d, ctrl-u, backspace and
+        // others are the terminal's own editing keys: sent then, the
+        // terminal acts on them and the prompt never sees them. Wait for
+        // the prompt to be reading before each key.
+        wait_for_raw_mode(fd);
         writer.write_all(key).expect("write key");
         writer.flush().expect("flush");
         thread::sleep(Duration::from_millis(30));
@@ -87,6 +94,24 @@ fn submit(keys: &[&[u8]]) -> String {
         .nth(1)
         .unwrap_or_else(|| panic!("no result in output: {}", output.escape_debug()));
     result.lines().next().unwrap_or_default().trim().to_string()
+}
+
+/// Block until the pty is out of canonical mode, i.e. the prompt is
+/// waiting for a key in raw mode.
+fn wait_for_raw_mode(fd: std::os::fd::RawFd) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let mut termios = unsafe { std::mem::zeroed::<libc::termios>() };
+        let got = unsafe { libc::tcgetattr(fd, &mut termios) } == 0;
+        if got && termios.c_lflag & libc::ICANON == 0 {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "prompt never started reading keys"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
 }
 
 #[test]
