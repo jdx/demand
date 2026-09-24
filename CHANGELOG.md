@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.2.0](https://github.com/jdx/demand/compare/v2.1.0...v2.2.0) - 2026-09-24
+
+### Added
+
+- add Editor prompt for multi-line text ([#227](https://github.com/jdx/demand/pull/227))
+- *(select)* update title and description while running ([#228](https://github.com/jdx/demand/pull/228))
+- redraw only the lines of a prompt that changed ([#224](https://github.com/jdx/demand/pull/224))
+- *(input)* add run_parsed to validate and parse in one step ([#226](https://github.com/jdx/demand/pull/226))
+- *(input)* readline-style line editing ([#225](https://github.com/jdx/demand/pull/225))
+
+### Fixed
+
+- *(input)* place the caret correctly when the input row wraps ([#223](https://github.com/jdx/demand/pull/223))
+
+### Other
+
+- *(input)* kill a key-binding prompt that never submits ([#230](https://github.com/jdx/demand/pull/230))
+- float jdx tools on latest without a release-age delay ([#222](https://github.com/jdx/demand/pull/222))
+- *(deps)* upgrade mise.lock to lockfile format v2
+- remove Entire trail runners ([#221](https://github.com/jdx/demand/pull/221))
+- *(deps)* lock file maintenance ([#220](https://github.com/jdx/demand/pull/220))
+- add entire trail runners ([#219](https://github.com/jdx/demand/pull/219))
+- *(deps)* update dependency hk to v2 ([#217](https://github.com/jdx/demand/pull/217))
+- remove entire and codex agent hooks
+- lock tool versions with mise.lock ([#218](https://github.com/jdx/demand/pull/218))
+- *(deps)* update dtolnay/rust-toolchain digest to 6bed076 ([#216](https://github.com/jdx/demand/pull/216))
+- *(deps)* update dependency hk to v1.58.1 ([#215](https://github.com/jdx/demand/pull/215))
+- *(deps)* update jdx/mise-action digest to c2a8761 ([#213](https://github.com/jdx/demand/pull/213))
+- *(deps)* update dependency hk to v1.57.0 ([#214](https://github.com/jdx/demand/pull/214))
+- add sponsor logos to readme ([#212](https://github.com/jdx/demand/pull/212))
+- *(sponsors)* replace 37signals with omacom foundation ([#210](https://github.com/jdx/demand/pull/210))
+
 ## [2.1.0](https://github.com/jdx/demand/compare/v2.0.5...v2.1.0) - 2026-08-25
 
 ### Added
