@@ -81,6 +81,12 @@ mod tests {
         // Four of them fit exactly and leave the wrap pending.
         assert_eq!(cursor_after("日本語日", 8), (0, 8));
         assert_eq!(rows_for("日本語日", 8), 1);
+        // "> " and eight CJK chars in 9 columns: three rows, not two.
+        assert_eq!(rows_for(&format!("> {}", "日".repeat(8)), 9), 3);
+        // In 5 columns, "> ab日abcd" takes three rows, not the two its
+        // total width suggests, and `日` starts the second row.
+        assert_eq!(rows_for("> ab日abcd", 5), 3);
+        assert_eq!(cursor_after("> ab日", 5), (1, 2));
     }
 
     /// The trailing reset fragment is not a row.
