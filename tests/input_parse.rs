@@ -54,6 +54,11 @@ fn a_parse_error_is_shown_and_a_corrected_answer_submits() {
     type_keys(&mut writer, b"http\r");
     let shown_error = wait_for(&rx, &mut output, "not a port number");
     // Clear the line and give a valid answer.
+    // ctrl-u is the terminal's line-kill character while it's in canonical
+    // mode, which it is between keys: `console` only switches to raw mode
+    // while reading one. Sent then, the terminal eats it and the prompt
+    // never sees it. Wait for the prompt to be reading again first.
+    wait_for_raw_mode(pair.master.as_raw_fd().expect("pty fd"));
     type_keys(&mut writer, b"\x15");
     thread::sleep(Duration::from_millis(50));
     type_keys(&mut writer, b"8080\r");
@@ -80,6 +85,24 @@ fn a_parse_error_is_shown_and_a_corrected_answer_submits() {
         String::from_utf8_lossy(&output).contains("RESULT=8080"),
         "wrong value returned: {shown}"
     );
+}
+
+/// Block until the pty is out of canonical mode, i.e. the prompt is
+/// waiting for a key in raw mode.
+fn wait_for_raw_mode(fd: std::os::fd::RawFd) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let mut termios = unsafe { std::mem::zeroed::<libc::termios>() };
+        let got = unsafe { libc::tcgetattr(fd, &mut termios) } == 0;
+        if got && termios.c_lflag & libc::ICANON == 0 {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "prompt never started reading keys"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
 }
 
 fn type_keys(writer: &mut impl Write, keys: &[u8]) {

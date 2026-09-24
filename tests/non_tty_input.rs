@@ -295,3 +295,17 @@ fn test_piped_stdin_run_parsed_error() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn test_piped_stdin_editor_reads_to_end() {
+    // Without a terminal there's no editor to open: the whole of stdin is
+    // the text.
+    let output = run_example_with_input("editor", b"line one\nline two\n");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("line one\nline two\n"));
+    assert_no_escape_sequences(&output);
+}

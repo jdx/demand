@@ -3,6 +3,7 @@
 pub use confirm::Confirm;
 pub use dialog::Dialog;
 pub use dialog::DialogButton;
+pub use editor::Editor;
 pub use handle::PromptHandle;
 pub use input::{
     Autocomplete, AutocompleteClone, FnAutocomplete, Input, InputParser, InputValidator,
@@ -21,6 +22,7 @@ mod confirm;
 #[cfg_attr(any(windows), path = "ctrlc_stub.rs")]
 mod ctrlc;
 mod dialog;
+mod editor;
 mod event;
 mod frame;
 mod fuzzy;

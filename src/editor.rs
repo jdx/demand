@@ -1,0 +1,608 @@
+use std::ffi::OsString;
+use std::fs;
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use console::{Key, Term};
+use termcolor::{Buffer, WriteColor};
+
+use crate::theme::Theme;
+use crate::{ctrlc, theme};
+
+/// Multi-line text input, entered in the user's text editor
+///
+/// Shows the title and a preview of the text so far. `e` opens the text in
+/// `$VISUAL` or `$EDITOR` (falling back to `vi`, or `notepad` on Windows),
+/// and saving and closing the editor brings the user back to the prompt
+/// with the new text. `enter` submits it.
+///
+/// Without a terminal, the text is read from stdin until it ends instead.
+///
+/// # Example
+/// ```no_run
+/// use demand::Editor;
+///
+/// let description = Editor::new("Description")
+///     .description("What does this task involve?")
+///     .default_value("TODO: \n")
+///     .extension("md")
+///     .run()
+///     .expect("error running editor");
+/// ```
+pub struct Editor<'a> {
+    /// The title of the prompt
+    pub title: String,
+    /// A description to display after the title
+    pub description: String,
+    /// The colors/style of the prompt
+    pub theme: &'a Theme,
+    /// Lines of the text shown in the preview before it's cut off
+    pub preview_lines: usize,
+
+    text: String,
+    extension: String,
+    command: Option<OsString>,
+    term: Term,
+    frame: crate::frame::Frame,
+    err: Option<String>,
+}
+
+impl<'a> Editor<'a> {
+    /// Create a new editor prompt with the given title
+    pub fn new<S: Into<String>>(title: S) -> Self {
+        Self {
+            title: title.into(),
+            description: String::new(),
+            theme: &*theme::DEFAULT,
+            preview_lines: 5,
+            text: String::new(),
+            extension: "txt".to_string(),
+            command: None,
+            term: Term::stderr(),
+            frame: Default::default(),
+            err: None,
+        }
+    }
+
+    /// Set the description of the prompt
+    pub fn description(mut self, description: &str) -> Self {
+        self.description = description.to_string();
+        self
+    }
+
+    /// Set the text the editor starts with
+    pub fn default_value(mut self, text: impl Into<String>) -> Self {
+        self.text = text.into();
+        self
+    }
+
+    /// Set the extension of the file the text is edited in, without the
+    /// dot. Editors use it to pick syntax highlighting. Defaults to `txt`.
+    pub fn extension(mut self, extension: &str) -> Self {
+        self.extension = extension.trim_start_matches('.').to_string();
+        self
+    }
+
+    /// Set the editor to run instead of `$VISUAL` / `$EDITOR`. Like those,
+    /// it may include arguments, like `code --wait`.
+    ///
+    /// On Unix it's run the way git runs an editor: through `sh` whenever
+    /// it contains anything the shell would interpret, so it's quoted as
+    /// it would be in a shell (`vim --cmd="set number"`). On Windows it's
+    /// split on whitespace, with double quotes keeping spaces together
+    /// (`"C:\Program Files\Editor\edit.exe" --wait`).
+    pub fn editor_command(mut self, command: impl Into<OsString>) -> Self {
+        self.command = Some(command.into());
+        self
+    }
+
+    /// Set the number of lines of text shown in the preview
+    pub fn preview_lines(mut self, lines: usize) -> Self {
+        self.preview_lines = lines;
+        self
+    }
+
+    /// Set the theme of the prompt
+    pub fn theme(mut self, theme: &'a Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// Displays the prompt to the user and returns the text they entered
+    ///
+    /// This function will block until the user submits the text. If the user cancels,
+    /// an error of type `io::ErrorKind::Interrupted` is returned.
+    pub fn run(mut self) -> io::Result<String> {
+        if !crate::tty::is_tty() {
+            crate::tty::write_prompt(&self.title, &self.description, "")?;
+            let mut text = String::new();
+            io::stdin().read_to_string(&mut text)?;
+            return Ok(text);
+        }
+
+        let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
+        self.term.hide_cursor()?;
+        loop {
+            let term = self.term.clone();
+            crate::synchronized_output::run(&term, || self.draw())?;
+            match self.term.read_key()? {
+                Key::Char('e') => {
+                    // The editor needs the whole terminal: take the prompt
+                    // down and hand over a visible cursor until it exits.
+                    self.clear()?;
+                    self.term.show_cursor()?;
+                    let edited = self.edit();
+                    self.term.hide_cursor()?;
+                    match edited {
+                        Ok(text) => {
+                            self.text = text;
+                            self.err = None;
+                        }
+                        Err(err) => self.err = Some(err.to_string()),
+                    }
+                }
+                Key::Enter => {
+                    ctrlc_handle.close();
+                    let term = self.term.clone();
+                    crate::synchronized_output::run(&term, || {
+                        self.clear()?;
+                        self.term.show_cursor()?;
+                        let output = self.render_success()?;
+                        self.term.write_all(output.as_bytes())
+                    })?;
+                    return Ok(self.text);
+                }
+                Key::Escape => {
+                    self.clear()?;
+                    self.term.show_cursor()?;
+                    ctrlc_handle.close();
+                    return Err(io::Error::new(io::ErrorKind::Interrupted, "user cancelled"));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Write the text to a temporary file, open it in the editor, and read
+    /// it back once the editor exits.
+    fn edit(&self) -> io::Result<String> {
+        let file = TempFile::create(&self.extension, &self.text)?;
+        let command = self.command.clone().unwrap_or_else(default_editor);
+        let mut child = editor_command(&command, file.path())?;
+        // The prompt is on stderr so callers can capture stdout, as in
+        // `notes=$(my-cli)`. The editor must not inherit that capture, or
+        // its UI ends up in the caller's output: give it the terminal.
+        // Without `/dev/tty`, stderr is the terminal (the prompt only runs
+        // when it is), so the editor's output goes there instead.
+        #[cfg(unix)]
+        let tty = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+            .ok();
+        #[cfg(not(unix))]
+        let tty: Option<fs::File> = None;
+        match tty {
+            Some(tty) => {
+                child
+                    .stdin(tty.try_clone()?)
+                    .stdout(tty.try_clone()?)
+                    .stderr(tty);
+            }
+            None => {
+                child.stdout(Stdio::from(io::stderr()));
+            }
+        }
+        let status = child.status().map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!("could not run editor {}: {err}", command.to_string_lossy()),
+            )
+        })?;
+        if !status.success() {
+            return Err(io::Error::other(format!(
+                "editor {} exited with {status}",
+                command.to_string_lossy()
+            )));
+        }
+        fs::read_to_string(file.path())
+    }
+
+    fn render(&self) -> io::Result<String> {
+        let mut out = Buffer::ansi();
+
+        out.set_color(&self.theme.title)?;
+        writeln!(out, "{}", self.title)?;
+        if !self.description.is_empty() {
+            out.set_color(&self.theme.description)?;
+            writeln!(out, "{}", self.description)?;
+        }
+
+        let lines: Vec<&str> = self.text.lines().collect();
+        if lines.is_empty() {
+            out.set_color(&self.theme.input_placeholder)?;
+            writeln!(out, "  (empty)")?;
+        } else {
+            out.set_color(&self.theme.unselected_option)?;
+            for line in lines.iter().take(self.preview_lines) {
+                writeln!(out, "  {line}")?;
+            }
+            if lines.len() > self.preview_lines {
+                out.set_color(&self.theme.description)?;
+                writeln!(out, "  … {} more lines", lines.len() - self.preview_lines)?;
+            }
+        }
+
+        if let Some(err) = &self.err {
+            out.set_color(&self.theme.error_indicator)?;
+            writeln!(out, "✗ {err}")?;
+        }
+
+        writeln!(out)?;
+        for (i, (key, desc)) in [("e", "edit"), ("enter", "submit"), ("esc", "cancel")]
+            .iter()
+            .enumerate()
+        {
+            if i > 0 {
+                out.set_color(&self.theme.help_sep)?;
+                write!(out, " • ")?;
+            }
+            out.set_color(&self.theme.help_key)?;
+            write!(out, "{key}")?;
+            out.set_color(&self.theme.help_desc)?;
+            write!(out, " {desc}")?;
+        }
+        writeln!(out)?;
+
+        out.reset()?;
+        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    fn render_success(&self) -> io::Result<String> {
+        let mut out = Buffer::ansi();
+        out.set_color(&self.theme.title)?;
+        write!(out, "{}", self.title)?;
+        out.set_color(&self.theme.selected_option)?;
+        let mut lines = self.text.lines();
+        let first = lines.next().unwrap_or_default();
+        match lines.count() {
+            0 => writeln!(out, " {first}")?,
+            n => writeln!(out, " {first} (+{n} more lines)")?,
+        }
+        out.reset()?;
+        Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
+    }
+
+    /// Render a frame and draw it over the previous one, rewriting only
+    /// the lines that changed.
+    fn draw(&mut self) -> io::Result<()> {
+        let output = self.render()?;
+        self.frame.update(&self.term, output)
+    }
+
+    fn clear(&mut self) -> io::Result<()> {
+        self.frame.clear(&self.term)?;
+        Ok(())
+    }
+}
+
+/// `$VISUAL`, then `$EDITOR`, then the platform's stock editor.
+fn default_editor() -> OsString {
+    ["VISUAL", "EDITOR"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .find(|v| !v.is_empty())
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                "notepad".into()
+            } else {
+                "vi".into()
+            }
+        })
+}
+
+/// The command to open `path` in `editor`.
+///
+/// `$EDITOR` is a shell string by convention — git, crontab and less all
+/// hand it to `sh` — so on Unix it goes through the shell too, exactly as
+/// git does it: `sh -c '<editor> "$@"' <editor> <path>` when the setting
+/// has anything the shell would interpret, and a direct exec when it's a
+/// plain program name.
+#[cfg(unix)]
+fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
+    const SHELL_CHARS: &[char] = &[
+        '|', '&', ';', '<', '>', '(', ')', '$', '`', '\\', '"', '\'', ' ', '\t', '\n', '*', '?',
+        '[', '#', '~', '=', '%',
+    ];
+    let editor_str = editor.to_string_lossy();
+    if editor_str.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "no editor configured",
+        ));
+    }
+    let mut command = if editor_str.contains(SHELL_CHARS) {
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg(format!("{editor_str} \"$@\""))
+            .arg(editor);
+        command
+    } else {
+        Command::new(editor)
+    };
+    command.arg(path);
+    Ok(command)
+}
+
+/// The command to open `path` in `editor`: split on whitespace, with
+/// double quotes keeping spaces together, as Windows command lines are.
+#[cfg(not(unix))]
+fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
+    let words = split_words(&editor.to_string_lossy());
+    let (program, args) = words
+        .split_first()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no editor configured"))?;
+    let mut command = Command::new(program);
+    command.args(args).arg(path);
+    Ok(command)
+}
+
+/// Split on whitespace into words, the way a Windows command line is,
+/// plus the single-quoting people carry over from Git Bash:
+///
+/// - Double quotes group text wherever they appear and are removed, so
+///   `"C:\\Program Files\\edit.exe"` and `--cmd="set number"` are one word
+///   each.
+/// - Single quotes group a whole word: one that starts a word, with its
+///   match ending one, as in `vim -c 'set number'`. Any other single quote
+///   is an ordinary character, so an apostrophe in a path
+///   (`C:\\Users\\o'brien\\edit.exe`) needs no quoting and can't pair with
+///   a quote later on.
+///
+/// Backslashes are ordinary characters, since they separate Windows paths.
+#[cfg(any(not(unix), test))]
+fn split_words(s: &str) -> Vec<String> {
+    let chars: Vec<char> = s.chars().collect();
+    let mut words = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+            continue;
+        }
+        if chars[i] == '\'' {
+            let close = (i + 1..chars.len())
+                .find(|&j| chars[j] == '\'' && chars.get(j + 1).is_none_or(|c| c.is_whitespace()));
+            if let Some(close) = close {
+                words.push(chars[i + 1..close].iter().collect());
+                i = close + 1;
+                continue;
+            }
+        }
+        let mut word = String::new();
+        let mut quoted = false;
+        while i < chars.len() && (quoted || !chars[i].is_whitespace()) {
+            match chars[i] {
+                '"' => quoted = !quoted,
+                c => word.push(c),
+            }
+            i += 1;
+        }
+        words.push(word);
+    }
+    words
+}
+
+/// A file in the temp dir that is removed when dropped.
+struct TempFile {
+    path: PathBuf,
+}
+
+impl TempFile {
+    fn create(extension: &str, contents: &str) -> io::Result<Self> {
+        static COUNT: AtomicUsize = AtomicUsize::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or_default();
+        let path = std::env::temp_dir().join(format!(
+            "demand-{}-{nanos}-{}.{extension}",
+            std::process::id(),
+            COUNT.fetch_add(1, Ordering::Relaxed),
+        ));
+        // `create_new` refuses to follow or reuse anything already at the
+        // path, so another user can't plant a file there first, and on Unix
+        // the file is readable only by its owner: the temp dir is usually
+        // shared and the text stays there while the editor is open.
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let mut file = options.open(&path)?;
+        // Take ownership before writing, so a failed write still removes
+        // the file.
+        let temp = Self { path };
+        file.write_all(contents.as_bytes())?;
+        Ok(temp)
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::without_ansi;
+    use indoc::indoc;
+
+    #[test]
+    fn test_render_empty() {
+        let editor = Editor::new("Notes").description("Anything else?");
+        assert_eq!(
+            indoc! {"
+                Notes
+                Anything else?
+                  (empty)
+
+                e edit • enter submit • esc cancel
+            "},
+            without_ansi(&editor.render().unwrap())
+        );
+    }
+
+    #[test]
+    fn test_render_preview_is_cut_off() {
+        let editor = Editor::new("Notes")
+            .default_value("one\ntwo\nthree\nfour\n")
+            .preview_lines(2);
+        assert_eq!(
+            indoc! {"
+                Notes
+                  one
+                  two
+                  … 2 more lines
+
+                e edit • enter submit • esc cancel
+            "},
+            without_ansi(&editor.render().unwrap())
+        );
+    }
+
+    #[test]
+    fn test_render_success() {
+        let editor = Editor::new("Notes").default_value("first\nsecond\nthird\n");
+        assert_eq!(
+            "Notes first (+2 more lines)\n",
+            without_ansi(&editor.render_success().unwrap())
+        );
+        let editor = Editor::new("Notes").default_value("only");
+        assert_eq!(
+            "Notes only\n",
+            without_ansi(&editor.render_success().unwrap())
+        );
+    }
+
+    #[test]
+    fn split_words_keeps_double_quoted_spaces_together() {
+        assert_eq!(
+            split_words(r#""C:\Program Files\Editor\edit.exe" --wait"#),
+            [r"C:\Program Files\Editor\edit.exe", "--wait"]
+        );
+        assert_eq!(
+            split_words(r#"vim --cmd="set number""#),
+            ["vim", "--cmd=set number"]
+        );
+        // Single quotes around a whole word, as in Git Bash.
+        assert_eq!(
+            split_words("vim -c 'set number'"),
+            ["vim", "-c", "set number"]
+        );
+        // An apostrophe inside a word is an ordinary character, and can't
+        // pair with a quote later on.
+        assert_eq!(
+            split_words(r"C:\Users\o'brien\edit.exe --wait"),
+            [r"C:\Users\o'brien\edit.exe", "--wait"]
+        );
+        assert_eq!(
+            split_words(r"C:\Users\o'brien\edit.exe -c 'set number'"),
+            [r"C:\Users\o'brien\edit.exe", "-c", "set number"]
+        );
+        assert!(split_words("   ").is_empty());
+    }
+
+    /// A plain program name is run directly; anything the shell would
+    /// interpret goes through `sh`, with the file passed as `"$@"`.
+    #[cfg(unix)]
+    #[test]
+    fn editor_command_uses_the_shell_like_git() {
+        let command = editor_command(&"code".into(), Path::new("/tmp/x.md")).unwrap();
+        assert_eq!(command.get_program(), "code");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args, ["/tmp/x.md"]);
+
+        let command = editor_command(&"code --wait".into(), Path::new("/tmp/x.md")).unwrap();
+        assert_eq!(command.get_program(), "sh");
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(
+            args,
+            ["-c", r#"code --wait "$@""#, "code --wait", "/tmp/x.md"]
+        );
+
+        assert!(editor_command(&"  ".into(), Path::new("x")).is_err());
+    }
+
+    /// Quoting in the setting is the shell's, so a quoted option value
+    /// reaches the editor as one argument.
+    #[cfg(unix)]
+    #[test]
+    fn edit_passes_shell_quoted_arguments_through() {
+        let script = TempFile::create("sh", "printf '%s\\n' \"$1\" >> \"$2\"\n").unwrap();
+        let editor = Editor::new("Notes")
+            .default_value("hello\n")
+            .editor_command(format!(
+                r#"sh {} --cmd="set number""#,
+                script.path().display()
+            ));
+        assert_eq!(editor.edit().unwrap(), "hello\n--cmd=set number\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn edit_reports_an_editor_that_isnt_found() {
+        // The shell prints its own "not found". demand reports the exit
+        // status as it is, since 127 could also come from the editor.
+        let editor = Editor::new("Notes").editor_command("no-such-editor-xyz --wait");
+        let err = editor.edit().unwrap_err();
+        assert!(err.to_string().contains("exited with"), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn temp_file_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+        let file = TempFile::create("txt", "secret").unwrap();
+        let mode = fs::metadata(file.path()).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    /// Round-trips through a real process standing in for the editor: it
+    /// appends a line to the file it's given.
+    #[cfg(unix)]
+    #[test]
+    fn edit_returns_what_the_editor_saved() {
+        let script = TempFile::create("sh", "echo world >> \"$1\"\n").unwrap();
+        let editor = Editor::new("Notes")
+            .default_value("hello\n")
+            .editor_command(format!("sh {}", script.path().display()));
+        assert_eq!(editor.edit().unwrap(), "hello\nworld\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn edit_reports_an_editor_that_fails() {
+        let editor = Editor::new("Notes").editor_command("false");
+        let err = editor.edit().unwrap_err();
+        assert!(err.to_string().contains("exited with"), "{err}");
+    }
+
+    #[test]
+    fn temp_file_is_removed_on_drop() {
+        let file = TempFile::create("txt", "x").unwrap();
+        let path = file.path().to_path_buf();
+        assert!(path.exists());
+        drop(file);
+        assert!(!path.exists());
+    }
+}
