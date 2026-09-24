@@ -60,6 +60,11 @@ fn a_parse_error_is_shown_and_a_corrected_answer_submits() {
     let submitted = wait_for(&rx, &mut output, "RESULT=");
 
     drop(writer);
+    if !submitted {
+        // The prompt is still waiting for input and would never exit on
+        // its own; stop it so the assertions below can report why.
+        child.kill().expect("kill child");
+    }
     child.wait().expect("wait child");
     drop(pair.master);
     reader_thread.join().expect("join reader");
