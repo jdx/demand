@@ -62,8 +62,10 @@ fn a_parse_error_is_shown_and_a_corrected_answer_submits() {
     drop(writer);
     if !submitted {
         // The prompt is still waiting for input and would never exit on
-        // its own; stop it so the assertions below can report why.
-        child.kill().expect("kill child");
+        // its own; stop it so the assertions below can report why. It may
+        // have exited early instead, and then there's nothing to kill: the
+        // error is ignored so the captured output still gets reported.
+        let _ = child.kill();
     }
     child.wait().expect("wait child");
     drop(pair.master);
