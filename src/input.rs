@@ -537,18 +537,38 @@ impl<'a> Input<'a> {
         Ok(())
     }
 
-    /// ctrl-t: swap the char before the cursor with the one under it,
+    /// ctrl-t: swap the character before the cursor with the one under it,
     /// moving the cursor forward. At the end of the line, swap the last
-    /// two chars instead.
+    /// two instead. Combining marks (zero-width chars such as the accent
+    /// in `a\u{301}`) stay with the character they're drawn on.
     fn transpose_chars(&mut self) -> io::Result<()> {
-        let mut chars: Vec<char> = self.input.chars().collect();
-        if chars.len() < 2 || self.cursor == 0 {
+        let mut clusters: Vec<String> = Vec::new();
+        let mut buf = [0; 4];
+        for c in self.input.chars() {
+            match clusters.last_mut() {
+                Some(last) if console::measure_text_width(c.encode_utf8(&mut buf)) == 0 => {
+                    last.push(c)
+                }
+                _ => clusters.push(c.to_string()),
+            }
+        }
+        // Clusters that start before the cursor.
+        let mut start = 0;
+        let before = clusters
+            .iter()
+            .take_while(|cluster| {
+                let starts_before = start < self.cursor;
+                start += cluster.chars().count();
+                starts_before
+            })
+            .count();
+        if clusters.len() < 2 || before == 0 {
             return Ok(());
         }
-        let at = self.cursor.min(chars.len() - 1);
-        chars.swap(at - 1, at);
-        self.input = chars.into_iter().collect();
-        self.cursor = at + 1;
+        let at = before.min(clusters.len() - 1);
+        clusters.swap(at - 1, at);
+        self.cursor = clusters[..=at].iter().map(|c| c.chars().count()).sum();
+        self.input = clusters.concat();
         self.update_suggestions()
     }
 
@@ -1321,5 +1341,17 @@ mod tests {
         let mut input = editing("abcd", 4);
         input.transpose_chars().unwrap();
         assert_eq!((input.input.as_str(), input.cursor), ("abdc", 4));
+    }
+
+    /// A combining accent moves with its letter rather than being swapped
+    /// on its own.
+    #[test]
+    fn ctrl_t_keeps_combining_marks_with_their_letter() {
+        let mut input = editing("a\u{301}b", 2);
+        input.transpose_chars().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("ba\u{301}", 3));
+        let mut input = editing("xa\u{301}", 3);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, "a\u{301}x");
     }
 }
