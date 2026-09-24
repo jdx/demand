@@ -197,6 +197,14 @@ pub struct Input<'a> {
     show_suggestions: bool,
     max_suggestions_display: usize,
     input_line_offset: usize,
+    /// The (row, column) of the caret within the input row, which can
+    /// wrap onto several rows.
+    caret: (usize, usize),
+    /// Physical rows the input row wraps into.
+    input_rows: usize,
+    /// Which of those rows `set_cursor` left the cursor on, so
+    /// `reset_cursor_to_end` can walk back down from the same place.
+    caret_row: usize,
     suggestions_scroll_offset: usize,
     /// Text removed by the last kill command, for ctrl-y to put back.
     kill_buffer: String,
@@ -239,6 +247,9 @@ impl<'a> Input<'a> {
             show_suggestions: false,
             max_suggestions_display: 5,
             input_line_offset: 0,
+            caret: (0, 0),
+            input_rows: 1,
+            caret_row: 0,
             suggestions_scroll_offset: 0,
             kill_buffer: String::new(),
         }
@@ -409,15 +420,7 @@ impl<'a> Input<'a> {
 
         loop {
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || {
-                self.clear()?;
-                let output = self.render()?;
-
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-                self.term.write_all(output.as_bytes())?;
-                self.term.flush()?;
-                self.set_cursor()
-            })?;
+            crate::synchronized_output::run(&term, || self.draw())?;
 
             let key = self.term.read_key()?;
             match key {
@@ -782,11 +785,33 @@ impl<'a> Input<'a> {
         // line count from it would put the caret on the wrong row as soon
         // as a title or description wrapped. Inline mode writes no
         // newline at all and correctly comes out as 0.
+        let width = self.term.size().1 as usize;
         let header = std::str::from_utf8(out.as_slice()).unwrap_or_default();
-        self.input_line_offset =
-            crate::height::rendered_height(header, self.term.size().1 as usize);
+        self.input_line_offset = crate::height::rendered_height(header, width);
+        let row_start = header.rfind('\n').map_or(0, |i| i + 1);
+        let prefix = header[row_start..].to_string();
 
-        self.render_input(&mut out)?;
+        let input = self.render_input(&mut out)?;
+        // Lay the row out as the terminal will: an inline title, the
+        // prompt and the input all share it, wide characters take two
+        // columns, and one that doesn't fit at the edge moves to the next
+        // row. The caret is where the char under it starts — or where the
+        // cursor block after the input starts. A zero-width char adds no
+        // columns, so the caret sits right where it would print.
+        let written = std::str::from_utf8(out.as_slice()).unwrap_or_default();
+        self.input_rows = crate::height::rows_for(&written[row_start..], width);
+        let caret_idx = self.get_char_idx(&input, self.cursor);
+        let under_caret = input[caret_idx..].chars().next().unwrap_or(' ');
+        let through_caret = format!("{prefix}{}{under_caret}", &input[..caret_idx]);
+        let (row, end) = crate::height::cursor_after(&through_caret, width);
+        let start = end.saturating_sub(console::measure_text_width(&under_caret.to_string()));
+        self.caret = if row < self.input_rows {
+            (row, start)
+        } else {
+            // Nothing is drawn after a caret at the very edge of the last
+            // row, so the terminal never wraps onto the row it'd be on.
+            (self.input_rows - 1, width.saturating_sub(1))
+        };
         writeln!(out)?;
 
         if self.show_suggestions && !self.suggestions_list.is_empty() {
@@ -845,10 +870,11 @@ impl<'a> Input<'a> {
                     .theme
                     .real_cursor_color(Some(&self.theme.input_placeholder)),
             )?;
-            write!(out, "{}", &self.placeholder[..1])?;
-            if self.placeholder.len() > 1 {
+            let split = first_char_len(&self.placeholder);
+            write!(out, "{}", &self.placeholder[..split])?;
+            if self.placeholder.len() > split {
                 out.set_color(&self.theme.input_placeholder)?;
-                write!(out, "{}", &self.placeholder[1..])?;
+                write!(out, "{}", &self.placeholder[split..])?;
                 out.reset()?;
             }
             return Ok(input);
@@ -857,14 +883,15 @@ impl<'a> Input<'a> {
         let cursor_idx = self.get_char_idx(&input, self.cursor);
         write!(out, "{}", &input[..cursor_idx])?;
 
+        let after_cursor = cursor_idx + first_char_len(&input[cursor_idx..]);
         if cursor_idx < input.len() {
             out.set_color(&self.theme.real_cursor_color(None))?;
-            write!(out, "{}", &input[cursor_idx..cursor_idx + 1])?;
+            write!(out, "{}", &input[cursor_idx..after_cursor])?;
             out.reset()?;
         }
-        if cursor_idx + 1 < input.len() {
+        if after_cursor < input.len() {
             out.reset()?;
-            write!(out, "{}", &input[cursor_idx + 1..])?;
+            write!(out, "{}", &input[after_cursor..])?;
         }
 
         if let Some(suggestion) = &self.suggestion {
@@ -875,10 +902,11 @@ impl<'a> Input<'a> {
                             .theme
                             .real_cursor_color(Some(&self.theme.input_placeholder)),
                     )?;
-                    write!(out, "{}", &suggestion[..1])?;
-                    if suggestion.len() > 1 {
+                    let split = first_char_len(suggestion);
+                    write!(out, "{}", &suggestion[..split])?;
+                    if suggestion.len() > split {
                         out.set_color(&self.theme.input_placeholder)?;
-                        write!(out, "{}", &suggestion[1..])?;
+                        write!(out, "{}", &suggestion[split..])?;
                     }
                 } else {
                     out.set_color(&self.theme.input_placeholder)?;
@@ -978,36 +1006,42 @@ impl<'a> Input<'a> {
             .unwrap_or(input.len())
     }
 
+    /// Park the terminal cursor on the caret. When the input row wraps,
+    /// the caret can be on any of its rows: cursor movement stops at the
+    /// right edge rather than wrapping, so the row has to be picked
+    /// explicitly and only the remainder moved across.
     fn set_cursor(&mut self) -> io::Result<()> {
-        let lines_below_input = self.height - self.input_line_offset;
-        if lines_below_input > 0 {
-            self.term.move_cursor_up(lines_below_input)?;
-        }
+        let (row, col) = self.caret;
+        self.caret_row = row;
 
+        let rows_up = self.height - self.input_line_offset - row;
+        if rows_up > 0 {
+            self.term.move_cursor_up(rows_up)?;
+        }
         self.term.move_cursor_left(usize::MAX)?;
-
-        let mut offset = 0;
-        if self.inline {
-            offset += self.title.chars().count();
-            if !self.description.is_empty() {
-                offset += 1;
-                offset += self.description.chars().count();
-            }
+        if col > 0 {
+            self.term.move_cursor_right(col)?;
         }
-        offset += self.prompt.chars().count();
-        offset += self.cursor;
-
-        self.term.move_cursor_right(offset)?;
-
         Ok(())
     }
 
     fn reset_cursor_to_end(&mut self) -> io::Result<()> {
-        let lines_below_input = self.height - self.input_line_offset;
-        if lines_below_input > 0 {
-            self.term.move_cursor_down(lines_below_input)?;
+        let rows_down = self.height - self.input_line_offset - self.caret_row;
+        if rows_down > 0 {
+            self.term.move_cursor_down(rows_down)?;
         }
         Ok(())
+    }
+
+    /// Replace the previous frame with a fresh one and park the cursor on
+    /// the caret.
+    fn draw(&mut self) -> io::Result<()> {
+        self.clear()?;
+        let output = self.render()?;
+        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        self.term.write_all(output.as_bytes())?;
+        self.term.flush()?;
+        self.set_cursor()
     }
 
     fn clear_err(&mut self) -> io::Result<()> {
@@ -1025,6 +1059,12 @@ impl<'a> Input<'a> {
         self.height = 0;
         Ok(())
     }
+}
+
+/// Byte length of the first char of `s`, or 0 if it's empty. Slicing off
+/// one *byte* instead panics as soon as that char is multi-byte.
+fn first_char_len(s: &str) -> usize {
+    s.chars().next().map_or(0, char::len_utf8)
 }
 
 /// Input validator trait
@@ -1159,6 +1199,8 @@ impl InputValidator for fn(&str) -> Result<(), &str> {
 #[cfg(test)]
 mod tests {
     use crate::test::without_ansi;
+    #[cfg(unix)]
+    use crate::test::{Parser, capture_term, replay, snapshot};
 
     use super::*;
 
@@ -1331,6 +1373,94 @@ mod tests {
         input.render().unwrap();
         assert_eq!(input.input_line_offset, 0);
     }
+
+    /// The cursor highlight used to slice one byte off the input, which
+    /// panics when the char under the caret is multi-byte.
+    #[test]
+    fn renders_multibyte_char_under_the_caret() {
+        let mut input = Input::new("Name").placeholder("éé");
+        input.render().unwrap();
+        input.input = "日本語".to_string();
+        input.cursor = 1;
+        let rendered = input.render().unwrap();
+        assert!(without_ansi(&rendered).contains("> 日本語"));
+    }
+
+    /// Wide chars take two columns, so the caret has to be measured, not
+    /// counted.
+    #[test]
+    fn caret_on_a_zero_width_char_stays_in_the_input() {
+        let mut input = Input::new("Name");
+        input.input = "\u{200b}abc".to_string();
+        input.cursor = 0;
+        input.render().unwrap();
+        assert_eq!(input.caret, (0, "> ".len()));
+    }
+
+    #[test]
+    fn caret_measures_wide_chars() {
+        let mut input = Input::new("Name");
+        input.input = "日本語".to_string();
+        input.cursor = 2;
+        input.render().unwrap();
+        assert_eq!(input.caret, (0, "> ".len() + 4));
+    }
+
+    /// A wide char under the caret that doesn't fit at the end of a row is
+    /// drawn at the start of the next one, and so is the caret. Checked
+    /// against the terminal emulator, which wraps it for real.
+    #[cfg(unix)]
+    #[test]
+    fn caret_follows_a_wide_char_wrapped_at_the_edge() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Name");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        // "> " plus enough `x` to leave one column before the edge.
+        input.input = format!("{}日本", "x".repeat(width - 3));
+        input.cursor = width - 3;
+        input.draw().unwrap();
+        assert_eq!(input.caret, (1, 0));
+
+        let mut parser = Parser::new(24, width as u16, 0);
+        replay(&mut parser, &snapshot(&buf));
+        // Title on row 0, the input starts on row 1 and wraps onto row 2.
+        assert_eq!(parser.screen().cursor_position(), (2, 0));
+    }
+
+    /// Regression for jdx/demand#7 in `Input`: an input row wider than the
+    /// terminal wraps. Cursor movement stops at the right edge, so moving
+    /// right by the caret's char offset used to pin the cursor to the edge
+    /// of the input's first row, and the next clear started from there.
+    #[cfg(unix)]
+    #[test]
+    fn a_wrapped_input_row_keeps_the_caret_and_redraws_cleanly() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        input.input = "x".repeat(width + 10);
+        input.cursor = input.input.chars().count();
+
+        for _ in 0..3 {
+            input.draw().unwrap();
+            input.handle_arrow_left().unwrap();
+        }
+
+        let mut parser = Parser::new(24, width as u16, 0);
+        replay(&mut parser, &snapshot(&buf));
+        let screen = parser.screen().contents();
+        assert_eq!(
+            screen.matches("Command").count(),
+            1,
+            "prompt drawn more than once:\n{screen}"
+        );
+        // Title and description take rows 0 and 1; the input starts on
+        // row 2 and wraps onto row 3. After two left presses the caret is
+        // 8 columns into the wrapped row ("> " + width + 10 - 2).
+        assert_eq!(parser.screen().cursor_position(), (3, 10));
+    }
+
     fn editing(text: &str, cursor: usize) -> Input<'static> {
         let mut input = Input::new("t");
         input.input = text.to_string();
