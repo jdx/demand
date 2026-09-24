@@ -47,22 +47,56 @@ fn submit(keys: &[&[u8]]) -> String {
         }
     });
 
-    // Wait for the prompt before typing, then send each key on its own so
-    // escape sequences aren't split or merged differently than a terminal
-    // would send them.
+    // Send one key at a time, and only once the prompt is ready for it.
+    //
+    // Between keys the pty is in canonical mode (`console` only enters raw
+    // mode while reading one), where ctrl-d, ctrl-u, backspace and others
+    // are the terminal's own editing keys: sent then, the terminal acts on
+    // them and the prompt never sees them. Seeing raw mode isn't enough on
+    // its own, though: it could still be the read of the previous key. So
+    // after each key, first wait for the frame the prompt draws once it
+    // has handled it (every loop ends one synchronized update), and only
+    // then for raw mode, which can then only be the next read.
+    let presses: Vec<&[u8]> = keys
+        .iter()
+        .flat_map(|key| {
+            // An escape sequence is one key; anything else is one per byte.
+            if key.starts_with(b"\x1b") {
+                vec![*key]
+            } else {
+                key.chunks(1).collect()
+            }
+        })
+        .chain([&b"\r"[..]])
+        .collect();
+    let fd = pair.master.as_raw_fd().expect("pty fd");
     let mut output = Vec::new();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !String::from_utf8_lossy(&output).contains("Name") && Instant::now() < deadline {
-        if let Ok(chunk) = rx.recv_timeout(Duration::from_millis(100)) {
-            output.extend(chunk);
+    let mut ready = wait_for_frames(&rx, &mut output, 1) && wait_for_raw_mode(fd);
+    for (i, key) in presses.iter().enumerate() {
+        if !ready {
+            break;
         }
-    }
-    for key in keys.iter().chain([&b"\r"[..]].iter()) {
         writer.write_all(key).expect("write key");
         writer.flush().expect("flush");
-        thread::sleep(Duration::from_millis(30));
+        // Enter submits: there's no next read to wait for.
+        if i + 1 < presses.len() {
+            ready = wait_for_frames(&rx, &mut output, i + 2) && wait_for_raw_mode(fd);
+        }
     }
     drop(writer);
+    // If a key sequence never submits, or the prompt stopped responding
+    // while keys were being sent, it's still waiting for input and would
+    // never exit: stop it so the panic below can show the output instead
+    // of hanging. It may have exited on its own already, and then there's
+    // nothing to kill, so the error is ignored.
+    let deadline = Instant::now() + Duration::from_secs(if ready { 10 } else { 0 });
+    while child.try_wait().expect("poll child").is_none() {
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
     child.wait().expect("wait child");
     drop(pair.master);
     reader_thread.join().expect("join reader");
@@ -70,11 +104,57 @@ fn submit(keys: &[&[u8]]) -> String {
         output.extend(chunk);
     }
     let output = String::from_utf8_lossy(&output).to_string();
-    let result = output
-        .split("RESULT=")
-        .nth(1)
-        .unwrap_or_else(|| panic!("no result in output: {}", output.escape_debug()));
+    let result = output.split("RESULT=").nth(1).unwrap_or_else(|| {
+        let why = if ready {
+            "no result in output"
+        } else {
+            "prompt stopped responding to keys"
+        };
+        panic!("{why}: {}", output.escape_debug())
+    });
     result.lines().next().unwrap_or_default().trim().to_string()
+}
+
+/// The end of a synchronized update, which the prompt writes once per
+/// frame it draws.
+const FRAME_END: &[u8] = b"\x1b[?2026l";
+
+/// Wait until the prompt has drawn `frames` frames in total, collecting
+/// its output. False if it doesn't within 10 seconds.
+fn wait_for_frames(rx: &mpsc::Receiver<Vec<u8>>, output: &mut Vec<u8>, frames: usize) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while output
+        .windows(FRAME_END.len())
+        .filter(|w| *w == FRAME_END)
+        .count()
+        < frames
+    {
+        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+            return false;
+        };
+        match rx.recv_timeout(remaining) {
+            Ok(chunk) => output.extend(chunk),
+            Err(_) => return false,
+        }
+    }
+    true
+}
+
+/// Wait until the pty is out of canonical mode, i.e. the prompt is
+/// reading a key in raw mode. False if it isn't within 10 seconds.
+fn wait_for_raw_mode(fd: std::os::fd::RawFd) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let mut termios = unsafe { std::mem::zeroed::<libc::termios>() };
+        let got = unsafe { libc::tcgetattr(fd, &mut termios) } == 0;
+        if got && termios.c_lflag & libc::ICANON == 0 {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
 }
 
 #[test]
