@@ -90,6 +90,24 @@ Run example with [`cargo run --example input-password`](./examples/input-passwor
 
 ![Input](./assets/input-password.gif)
 
+## Editor
+
+Multi-line text, entered in the user's `$VISUAL` / `$EDITOR`. Press `e` to open the editor and `enter` to submit.
+Run example with [`cargo run --example editor`](./examples/editor.rs).
+
+```rust
+use demand::Editor;
+
+fn main() {
+    let notes = Editor::new("Release notes")
+        .description("Summarize what changed in this release.")
+        .default_value("## Changes\n\n- \n")
+        .extension("md")
+        .run()
+        .expect("error running editor");
+}
+```
+
 ## List
 
 Shows a list of options. Run example with [`cargo run --example list`](./examples/list.rs).
