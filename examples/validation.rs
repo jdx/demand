@@ -1,11 +1,10 @@
 use demand::{Input, InputValidator};
 
 fn main() {
+    // `run_parsed` validates and parses in one step, returning a `usize`.
     let max_length = Input::new("What is the max. length of a name?")
-        .validation(validate_usize)
-        .run()
+        .run_parsed(parse_usize)
         .expect("a max length");
-    let max_length = max_length.parse().expect("valid usize");
 
     let name_validator = NameValidation { max_length };
 
@@ -17,11 +16,8 @@ fn main() {
     println!("Welcome {name}");
 }
 
-fn validate_usize(input: &str) -> Result<(), &'static str> {
-    input
-        .parse::<usize>()
-        .map_err(|_| "Expected a positive integer")?;
-    Ok(())
+fn parse_usize(input: &str) -> Result<usize, &'static str> {
+    input.parse().map_err(|_| "Expected a positive integer")
 }
 
 struct NameValidation {
