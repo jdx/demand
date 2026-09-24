@@ -552,12 +552,14 @@ impl<'a> Input<'a> {
         for c in self.input.chars() {
             match clusters.last_mut() {
                 // A zero-width char (combining mark, variation selector,
-                // joiner) belongs to the character before it, and a
-                // character after a zero-width joiner is part of the same
-                // emoji sequence (`👩‍💻`).
+                // joiner) belongs to the character before it. After a
+                // zero-width joiner, an emoji continues the same emoji
+                // sequence (`👩‍💻`); any other character starts a new one.
                 Some(last)
                     if console::measure_text_width(c.encode_utf8(&mut buf)) == 0
-                        || last.ends_with('\u{200d}') =>
+                        || (last.ends_with('\u{200d}')
+                            && last.chars().next().is_some_and(is_pictographic)
+                            && is_pictographic(c)) =>
                 {
                     last.push(c)
                 }
@@ -1047,6 +1049,16 @@ impl<'a> Input<'a> {
         }
         Ok(())
     }
+}
+
+/// Whether `c` is an emoji that can take part in a zero-width-joiner
+/// sequence. This is an approximation of Unicode's Extended_Pictographic
+/// property, covering the blocks such sequences are built from.
+fn is_pictographic(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x1F000..=0x1FAFF | 0x2600..=0x27BF | 0x2300..=0x23FF | 0x2B00..=0x2BFF
+    )
 }
 
 /// Byte length of the first char of `s`, or 0 if it's empty. Slicing off
@@ -1594,5 +1606,19 @@ mod tests {
         input.transpose_chars().unwrap();
         assert_eq!(input.input, format!("x{coder}"));
         assert_eq!(input.cursor, 4);
+        // ♀ from the Miscellaneous Symbols block joins too.
+        let runner = "\u{1f3c3}\u{200d}\u{2640}\u{fe0f}";
+        let mut input = editing(&format!("x{runner}"), 5);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("{runner}x"));
+    }
+
+    /// A joiner between letters doesn't make one character of them: the
+    /// letter after it still transposes on its own.
+    #[test]
+    fn ctrl_t_does_not_join_letters_across_a_joiner() {
+        let mut input = editing("xa\u{200d}b", 4);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, "xba\u{200d}");
     }
 }
