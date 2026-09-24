@@ -366,7 +366,20 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn resize_layout(&mut self, rows: usize) {
-        let capacity = rows.max(8) - 6;
+        // The fixed 6 rows assume a one-row title and description. A
+        // longer one — including one a handle just set — wraps onto more,
+        // and those come out of the options, or the help line would be
+        // pushed off the screen.
+        let width = self.term.size().1 as usize;
+        let header_rows = crate::height::rows_for(&self.title, width)
+            + if self.description.is_empty() {
+                0
+            } else {
+                crate::height::rows_for(&self.description, width)
+            };
+        let capacity = (rows.max(8) - 6)
+            .saturating_sub(header_rows.saturating_sub(2))
+            .max(1);
         if capacity == self.capacity {
             return;
         }
@@ -770,6 +783,22 @@ mod tests {
         select.title = "changed".to_string();
         select.apply_updates();
         assert_eq!(select.title, "changed");
+    }
+
+    /// A title that wraps onto more rows leaves fewer for the options.
+    #[test]
+    fn a_wrapping_title_takes_rows_from_the_options() {
+        let mut select = Select::new("Pick")
+            .description("one row")
+            .option(DemandOption::new("a"));
+        select.resize_layout(20);
+        assert_eq!(select.capacity, 14);
+
+        let width = select.term.size().1 as usize;
+        select.title = "t".repeat(width * 2 + 1);
+        select.resize_layout(20);
+        // Three rows of title instead of one.
+        assert_eq!(select.capacity, 12);
     }
 
     #[test]

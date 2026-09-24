@@ -71,6 +71,17 @@ fn handle_update_redraws_without_keyboard_input() {
     writer.write_all(b"\r").expect("submit prompt");
     writer.flush().expect("flush input");
     drop(writer);
+    // If the prompt missed the update or the Enter, it's still waiting for
+    // input and would never exit: stop it so the assertions below can say
+    // what went wrong instead of hanging.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while child.try_wait().expect("poll child").is_none() {
+        if Instant::now() >= deadline {
+            child.kill().expect("kill child");
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
     let status = child.wait().expect("wait child");
     drop(pair.master);
     reader_thread.join().expect("join reader");

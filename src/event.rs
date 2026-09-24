@@ -108,35 +108,11 @@ mod unix {
             let updates = self.updates.as_ref().map(AsRawFd::as_raw_fd);
             let _raw_mode = RawMode::new(input)?;
 
+            let mut fds = vec![input, resize];
+            fds.extend(updates);
             loop {
-                let mut read_fds = unsafe { mem::zeroed::<libc::fd_set>() };
-                unsafe {
-                    libc::FD_ZERO(&mut read_fds);
-                    libc::FD_SET(input, &mut read_fds);
-                    libc::FD_SET(resize, &mut read_fds);
-                    if let Some(fd) = updates {
-                        libc::FD_SET(fd, &mut read_fds);
-                    }
-                }
-
-                let result = unsafe {
-                    libc::select(
-                        input.max(resize).max(updates.unwrap_or(0)) + 1,
-                        &mut read_fds,
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                        std::ptr::null_mut(),
-                    )
-                };
-                if result < 0 {
-                    let err = io::Error::last_os_error();
-                    if err.kind() == io::ErrorKind::Interrupted {
-                        continue;
-                    }
-                    return Err(err);
-                }
-
-                if unsafe { libc::FD_ISSET(resize, &read_fds) } {
+                let ready = wait_readable(&fds)?;
+                if ready[1] {
                     drain(&mut self.read);
                     return Ok(Event::Resize);
                 }
@@ -144,18 +120,94 @@ mod unix {
                 // are drawn would otherwise keep the socket readable and
                 // starve the keyboard. Every frame applies all pending
                 // updates, so an update waiting behind a key isn't lost.
-                if unsafe { libc::FD_ISSET(input, &read_fds) } {
+                if ready[0] {
                     return term.read_key().map(Event::Key);
                 }
-                if let Some(fd) = updates
-                    && unsafe { libc::FD_ISSET(fd, &read_fds) }
-                {
+                if ready.get(2) == Some(&true) {
                     if let Some(stream) = self.updates.as_mut() {
                         drain(stream);
                     }
                     return Ok(Event::Update);
                 }
             }
+        }
+    }
+
+    /// Block until at least one of `fds` is readable, and say which are.
+    /// Retries when interrupted by a signal.
+    ///
+    /// `poll` has no limit on descriptor numbers, unlike `select`'s
+    /// fixed-size `fd_set`. macOS's `poll` doesn't support terminal
+    /// devices, though, so there it's `select` with every descriptor
+    /// checked against `FD_SETSIZE` first.
+    #[cfg(not(target_os = "macos"))]
+    fn wait_readable(fds: &[RawFd]) -> io::Result<Vec<bool>> {
+        let mut pollfds: Vec<libc::pollfd> = fds
+            .iter()
+            .map(|&fd| libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            })
+            .collect();
+        loop {
+            let result =
+                unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as libc::nfds_t, -1) };
+            if result < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            // A hung-up or errored descriptor counts as readable, so the
+            // read that follows reports the problem instead of spinning.
+            return Ok(pollfds
+                .iter()
+                .map(|p| p.revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR) != 0)
+                .collect());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn wait_readable(fds: &[RawFd]) -> io::Result<Vec<bool>> {
+        if let Some(&fd) = fds
+            .iter()
+            .find(|&&fd| fd < 0 || fd as usize >= libc::FD_SETSIZE)
+        {
+            return Err(io::Error::other(format!(
+                "file descriptor {fd} is out of range for select()"
+            )));
+        }
+        loop {
+            let mut read_fds = unsafe { mem::zeroed::<libc::fd_set>() };
+            unsafe {
+                libc::FD_ZERO(&mut read_fds);
+                for &fd in fds {
+                    libc::FD_SET(fd, &mut read_fds);
+                }
+            }
+            let nfds = fds.iter().copied().max().unwrap_or(0) + 1;
+            let result = unsafe {
+                libc::select(
+                    nfds,
+                    &mut read_fds,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            };
+            if result < 0 {
+                let err = io::Error::last_os_error();
+                if err.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            return Ok(fds
+                .iter()
+                .map(|&fd| unsafe { libc::FD_ISSET(fd, &read_fds) })
+                .collect());
         }
     }
 
