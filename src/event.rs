@@ -7,25 +7,54 @@ pub(crate) struct EventReader {
     resize: unix::ResizeListener,
 }
 
+pub(crate) enum Event {
+    Key(Key),
+    /// The terminal was resized.
+    Resize,
+    /// A [`PromptHandle`](crate::PromptHandle) made an update.
+    Update,
+}
+
 impl EventReader {
     pub(crate) fn new() -> io::Result<Self> {
+        Self::with_updates(None)
+    }
+
+    /// Also wake up when `updates` receives one, so it can be drawn
+    /// without waiting for a key.
+    pub(crate) fn with_updates(updates: Option<&crate::handle::Updates>) -> io::Result<Self> {
+        #[cfg(not(unix))]
+        let _ = updates;
         Ok(Self {
             #[cfg(unix)]
-            resize: unix::ResizeListener::new()?,
+            resize: unix::ResizeListener::new(
+                updates
+                    .and_then(|u| u.waker())
+                    .map(|w| w.try_clone())
+                    .transpose()?,
+            )?,
         })
+    }
+
+    /// The next key, or `None` if the terminal was resized.
+    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
+        loop {
+            match self.read(term)? {
+                Event::Key(key) => return Ok(Some(key)),
+                Event::Resize => return Ok(None),
+                Event::Update => {}
+            }
+        }
     }
 
     #[cfg(unix)]
-    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
-        self.resize.read(term).map(|event| match event {
-            unix::Event::Key(key) => Some(key),
-            unix::Event::Resize => None,
-        })
+    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
+        self.resize.read(term)
     }
 
     #[cfg(not(unix))]
-    pub(crate) fn read_key(&mut self, term: &Term) -> io::Result<Option<Key>> {
-        term.read_key().map(Some)
+    pub(crate) fn read(&mut self, term: &Term) -> io::Result<Event> {
+        term.read_key().map(Event::Key)
     }
 }
 
@@ -40,19 +69,17 @@ mod unix {
     use console::Term;
     use signal_hook::{SigId, consts::SIGWINCH, low_level};
 
-    pub(super) enum Event {
-        Key(console::Key),
-        Resize,
-    }
+    use super::Event;
 
     pub(super) struct ResizeListener {
         input: Option<File>,
         read: UnixStream,
+        updates: Option<UnixStream>,
         signal_id: SigId,
     }
 
     impl ResizeListener {
-        pub(super) fn new() -> io::Result<Self> {
+        pub(super) fn new(updates: Option<UnixStream>) -> io::Result<Self> {
             let input = if unsafe { libc::isatty(libc::STDIN_FILENO) } == 1 {
                 None
             } else {
@@ -64,6 +91,7 @@ mod unix {
             Ok(Self {
                 input,
                 read,
+                updates,
                 signal_id,
             })
         }
@@ -75,6 +103,7 @@ mod unix {
                 .map(AsRawFd::as_raw_fd)
                 .unwrap_or(libc::STDIN_FILENO);
             let resize = self.read.as_raw_fd();
+            let updates = self.updates.as_ref().map(AsRawFd::as_raw_fd);
             let _raw_mode = RawMode::new(input)?;
 
             loop {
@@ -83,11 +112,14 @@ mod unix {
                     libc::FD_ZERO(&mut read_fds);
                     libc::FD_SET(input, &mut read_fds);
                     libc::FD_SET(resize, &mut read_fds);
+                    if let Some(fd) = updates {
+                        libc::FD_SET(fd, &mut read_fds);
+                    }
                 }
 
                 let result = unsafe {
                     libc::select(
-                        input.max(resize) + 1,
+                        input.max(resize).max(updates.unwrap_or(0)) + 1,
                         &mut read_fds,
                         std::ptr::null_mut(),
                         std::ptr::null_mut(),
@@ -103,19 +135,27 @@ mod unix {
                 }
 
                 if unsafe { libc::FD_ISSET(resize, &read_fds) } {
-                    self.drain();
+                    drain(&mut self.read);
                     return Ok(Event::Resize);
+                }
+                if let Some(fd) = updates
+                    && unsafe { libc::FD_ISSET(fd, &read_fds) }
+                {
+                    if let Some(stream) = self.updates.as_mut() {
+                        drain(stream);
+                    }
+                    return Ok(Event::Update);
                 }
                 if unsafe { libc::FD_ISSET(input, &read_fds) } {
                     return term.read_key().map(Event::Key);
                 }
             }
         }
+    }
 
-        fn drain(&mut self) {
-            let mut bytes = [0; 64];
-            while matches!(self.read.read(&mut bytes), Ok(n) if n > 0) {}
-        }
+    fn drain(stream: &mut UnixStream) {
+        let mut bytes = [0; 64];
+        while matches!(stream.read(&mut bytes), Ok(n) if n > 0) {}
     }
 
     impl Drop for ResizeListener {
