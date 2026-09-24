@@ -627,16 +627,16 @@ impl<'a> Input<'a> {
         // Lay the row out as the terminal will: an inline title, the
         // prompt and the input all share it, wide characters take two
         // columns, and one that doesn't fit at the edge moves to the next
-        // row. The caret is where the char under it starts — or the
-        // cursor block after the input, which is one column wide.
+        // row. The caret is where the char under it starts — or where the
+        // cursor block after the input starts. A zero-width char adds no
+        // columns, so the caret sits right where it would print.
         let written = std::str::from_utf8(out.as_slice()).unwrap_or_default();
         self.input_rows = crate::height::rows_for(&written[row_start..], width);
         let caret_idx = self.get_char_idx(&input, self.cursor);
         let under_caret = input[caret_idx..].chars().next().unwrap_or(' ');
         let through_caret = format!("{prefix}{}{under_caret}", &input[..caret_idx]);
         let (row, end) = crate::height::cursor_after(&through_caret, width);
-        let start =
-            end.saturating_sub(console::measure_text_width(&under_caret.to_string()).max(1));
+        let start = end.saturating_sub(console::measure_text_width(&under_caret.to_string()));
         self.caret = if row < self.input_rows {
             (row, start)
         } else {
@@ -1175,6 +1175,15 @@ mod tests {
 
     /// Wide chars take two columns, so the caret has to be measured, not
     /// counted.
+    #[test]
+    fn caret_on_a_zero_width_char_stays_in_the_input() {
+        let mut input = Input::new("Name");
+        input.input = "\u{200b}abc".to_string();
+        input.cursor = 0;
+        input.render().unwrap();
+        assert_eq!(input.caret, (0, "> ".len()));
+    }
+
     #[test]
     fn caret_measures_wide_chars() {
         let mut input = Input::new("Name");
