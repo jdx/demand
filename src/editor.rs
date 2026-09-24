@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -175,16 +175,26 @@ impl<'a> Editor<'a> {
         // The prompt is on stderr so callers can capture stdout, as in
         // `notes=$(my-cli)`. The editor must not inherit that capture, or
         // its UI ends up in the caller's output: give it the terminal.
+        // Without `/dev/tty`, stderr is the terminal (the prompt only runs
+        // when it is), so the editor's output goes there instead.
         #[cfg(unix)]
-        if let Ok(tty) = fs::OpenOptions::new()
+        let tty = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .open("/dev/tty")
-        {
-            child
-                .stdin(tty.try_clone()?)
-                .stdout(tty.try_clone()?)
-                .stderr(tty);
+            .ok();
+        #[cfg(not(unix))]
+        let tty: Option<fs::File> = None;
+        match tty {
+            Some(tty) => {
+                child
+                    .stdin(tty.try_clone()?)
+                    .stdout(tty.try_clone()?)
+                    .stderr(tty);
+            }
+            None => {
+                child.stdout(Stdio::from(io::stderr()));
+            }
         }
         let status = child.status().map_err(|err| {
             io::Error::new(
@@ -303,18 +313,20 @@ fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
 }
 
 /// Split on whitespace, except inside single or double quotes, which are
-/// removed. Backslashes are kept as they are, since they separate Windows
-/// paths.
+/// removed. A quote with no closing match is an ordinary character, so an
+/// apostrophe in a path (`/home/o'brien/bin/edit`) needs no quoting.
+/// Backslashes are kept as they are, since they separate Windows paths.
 fn split_words(s: &str) -> Vec<String> {
+    let chars: Vec<char> = s.chars().collect();
     let mut words = Vec::new();
     let mut word = String::new();
     let mut in_word = false;
     let mut quote = None;
-    for c in s.chars() {
+    for (i, &c) in chars.iter().enumerate() {
         match quote {
             Some(q) if c == q => quote = None,
             Some(_) => word.push(c),
-            None if c == '"' || c == '\'' => {
+            None if (c == '"' || c == '\'') && chars[i + 1..].contains(&c) => {
                 quote = Some(c);
                 in_word = true;
             }
@@ -457,6 +469,15 @@ mod tests {
             ["vim", "-c", "set tw=72"]
         );
         assert_eq!(split_words(r#"a"b c"d"#), ["ab cd"]);
+        // A lone apostrophe is part of the word, not an opening quote.
+        assert_eq!(
+            split_words("/home/o'brien/bin/editor --wait"),
+            ["/home/o'brien/bin/editor", "--wait"]
+        );
+        assert_eq!(
+            split_words(r#""/home/o'brien/edit" -w"#),
+            ["/home/o'brien/edit", "-w"]
+        );
     }
 
     #[cfg(unix)]
