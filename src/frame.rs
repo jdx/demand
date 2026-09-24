@@ -22,7 +22,10 @@ impl Frame {
     /// Draw `next` in place of the frame currently on screen.
     pub(crate) fn update(&mut self, term: &Term, next: String) -> io::Result<()> {
         let width = term.size().1 as usize;
-        if let Some(patch) = patch(&self.last, &next, width) {
+        // A resize reflows what's on screen, so nothing of the old frame
+        // can be kept — even when its text hasn't changed.
+        let reflowed = !self.last.is_empty() && width != self.width;
+        if let Some(patch) = patch(&self.last, &next, width, reflowed) {
             term.write_str(&patch)?;
             term.flush()?;
         }
@@ -63,8 +66,11 @@ impl Frame {
 
 /// Bytes that turn `prev`, drawn with the cursor at its end, into `next`.
 /// `None` when the two are identical and there is nothing to do.
-fn patch(prev: &str, next: &str, width: usize) -> Option<String> {
-    if prev == next {
+///
+/// With `reflowed`, the terminal was resized since `prev` was drawn: the
+/// whole frame is cleared and written again.
+fn patch(prev: &str, next: &str, width: usize, reflowed: bool) -> Option<String> {
+    if prev == next && !reflowed {
         return None;
     }
     if prev.is_empty() {
@@ -79,7 +85,7 @@ fn patch(prev: &str, next: &str, width: usize) -> Option<String> {
         .iter()
         .zip(&next_lines)
         .take(prev_lines.len().min(next_lines.len()) - 1)
-        .take_while(|(a, b)| a == b)
+        .take_while(|(a, b)| !reflowed && a == b)
         .count();
 
     let rows_up: usize = prev_lines[unchanged..prev_lines.len() - 1]
@@ -154,12 +160,12 @@ mod tests {
 
     #[test]
     fn an_identical_frame_writes_nothing() {
-        assert_eq!(patch("a\nb\n\x1b[0m", "a\nb\n\x1b[0m", 80), None);
+        assert_eq!(patch("a\nb\n\x1b[0m", "a\nb\n\x1b[0m", 80, false), None);
     }
 
     #[test]
     fn the_first_frame_is_written_whole() {
-        assert_eq!(patch("", "a\nb\n", 80).as_deref(), Some("a\nb\n"));
+        assert_eq!(patch("", "a\nb\n", 80, false).as_deref(), Some("a\nb\n"));
     }
 
     /// Only the lines from the first change down are rewritten.
@@ -168,7 +174,7 @@ mod tests {
         let prev = "title\n❯ one\n  two\nhelp\n";
         let next = "title\n  one\n❯ two\nhelp\n";
         assert_eq!(
-            patch(prev, next, 80).as_deref(),
+            patch(prev, next, 80, false).as_deref(),
             Some(format!("{}  one\n❯ two\nhelp\n", clear(3)).as_str())
         );
     }
@@ -180,7 +186,7 @@ mod tests {
         let prev = format!("title\n{}\n", "x".repeat(20));
         let next = format!("title\n{}\n", "y".repeat(20));
         assert_eq!(
-            patch(&prev, &next, 8).as_deref(),
+            patch(&prev, &next, 8, false).as_deref(),
             Some(format!("{}{}\n", clear(3), "y".repeat(20)).as_str())
         );
     }
@@ -189,14 +195,26 @@ mod tests {
     #[test]
     fn a_change_on_the_cursor_row_stays_put() {
         assert_eq!(
-            patch("a\n/ Loading", "a\n- Loading", 80).as_deref(),
+            patch("a\n/ Loading", "a\n- Loading", 80, false).as_deref(),
             Some(format!("{}- Loading", clear(0)).as_str())
+        );
+    }
+
+    /// After a resize, an unchanged frame is still rewritten in full: the
+    /// old one has reflowed, and keeping any of it would misplace the
+    /// cursor for widgets like `Input` that move it afterwards.
+    #[test]
+    fn a_reflowed_frame_is_rewritten_whole() {
+        let frame = "title\n❯ one\n";
+        assert_eq!(
+            patch(frame, frame, 80, true).as_deref(),
+            Some(format!("{}{frame}", clear(2)).as_str())
         );
     }
 
     #[test]
     fn a_shorter_frame_clears_what_it_no_longer_covers() {
-        let out = patch("a\nb\nc\n", "a\n", 80).unwrap();
+        let out = patch("a\nb\nc\n", "a\n", 80, false).unwrap();
         assert_eq!(out, clear(2));
     }
 
@@ -207,7 +225,7 @@ mod tests {
         // The change is on line 1, which starts with its own color, but
         // the bold from line 0 is still in effect.
         assert_eq!(
-            patch(prev, next, 80).as_deref(),
+            patch(prev, next, 80, false).as_deref(),
             Some(format!("{}\x1b[1m\x1b[32mtwo\n", clear(1)).as_str())
         );
     }
@@ -235,7 +253,10 @@ mod tests {
         // Something else wrote two rows further down, then put the cursor
         // back where the frame left it.
         replay(&mut parser, b"\x1b7\x1b[2Bkeep me\x1b8");
-        replay(&mut parser, patch(prev, next, 20).unwrap().as_bytes());
+        replay(
+            &mut parser,
+            patch(prev, next, 20, false).unwrap().as_bytes(),
+        );
 
         let screen = parser.screen().contents();
         assert!(screen.contains("❯ two"), "{screen}");
