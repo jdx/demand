@@ -63,6 +63,18 @@ fn submit(keys: &[&[u8]]) -> String {
         thread::sleep(Duration::from_millis(30));
     }
     drop(writer);
+    // If a key sequence never submits, the prompt is still waiting for
+    // input and would never exit: stop it so the panic below can show the
+    // output instead of hanging. It may have exited on its own already,
+    // and then there's nothing to kill, so the error is ignored.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while child.try_wait().expect("poll child").is_none() {
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
     child.wait().expect("wait child");
     drop(pair.master);
     reader_thread.join().expect("join reader");
