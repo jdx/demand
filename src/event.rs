@@ -140,6 +140,13 @@ mod unix {
                     drain(&mut self.read);
                     return Ok(Event::Resize);
                 }
+                // Keys before updates: a handle updating faster than frames
+                // are drawn would otherwise keep the socket readable and
+                // starve the keyboard. Every frame applies all pending
+                // updates, so an update waiting behind a key isn't lost.
+                if unsafe { libc::FD_ISSET(input, &read_fds) } {
+                    return term.read_key().map(Event::Key);
+                }
                 if let Some(fd) = updates
                     && unsafe { libc::FD_ISSET(fd, &read_fds) }
                 {
@@ -147,9 +154,6 @@ mod unix {
                         drain(stream);
                     }
                     return Ok(Event::Update);
-                }
-                if unsafe { libc::FD_ISSET(input, &read_fds) } {
-                    return term.read_key().map(Event::Key);
                 }
             }
         }
