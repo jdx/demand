@@ -4,7 +4,8 @@ pub use confirm::Confirm;
 pub use dialog::Dialog;
 pub use dialog::DialogButton;
 pub use input::{
-    Autocomplete, AutocompleteClone, FnAutocomplete, Input, InputValidator, NoAutocompletion,
+    Autocomplete, AutocompleteClone, FnAutocomplete, Input, InputParser, InputValidator,
+    NoAutocompletion,
 };
 pub use list::List;
 pub use multiselect::MultiSelect;

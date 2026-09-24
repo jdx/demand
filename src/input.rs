@@ -357,7 +357,30 @@ impl<'a> Input<'a> {
     ///
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
-    pub fn run(mut self) -> io::Result<String> {
+    pub fn run(self) -> io::Result<String> {
+        self.run_parsed(|input: &str| Ok::<_, String>(input.to_string()))
+    }
+
+    /// Displays the input to the user and returns the response parsed by
+    /// `parser`.
+    ///
+    /// The parser doubles as validation: while it returns an error, the
+    /// error is shown and the input can't be submitted, just like a
+    /// [validator](Input::validator). Any validator set on the input runs
+    /// first. This saves parsing the input twice — once to validate it and
+    /// again after `run` returns it as a string.
+    ///
+    /// Without a TTY, a parse error is returned as an
+    /// `io::ErrorKind::InvalidInput` error, as validation errors are.
+    ///
+    /// ```no_run
+    /// use demand::Input;
+    ///
+    /// let port: u16 = Input::new("Port")
+    ///     .run_parsed(|s: &str| s.parse::<u16>())
+    ///     .expect("a port");
+    /// ```
+    pub fn run_parsed<P: InputParser>(mut self, parser: P) -> io::Result<P::Output> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
         if !crate::tty::is_tty() {
@@ -374,7 +397,9 @@ impl<'a> Input<'a> {
             if let Some(err) = self.err {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
             }
-            return Ok(self.input);
+            return parser
+                .parse(&self.input)
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err));
         }
 
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
@@ -427,11 +452,17 @@ impl<'a> Input<'a> {
                     self.clear_err()?;
                     self.validate()?;
                     if self.err.is_none() {
-                        self.reset_cursor_to_end()?;
-                        self.term.clear_to_end_of_screen()?;
-                        self.term.show_cursor()?;
-                        ctrlc_handle.close();
-                        return self.handle_submit();
+                        match parser.parse(&self.input) {
+                            Ok(value) => {
+                                self.reset_cursor_to_end()?;
+                                self.term.clear_to_end_of_screen()?;
+                                self.term.show_cursor()?;
+                                ctrlc_handle.close();
+                                self.handle_submit()?;
+                                return Ok(value);
+                            }
+                            Err(err) => self.err = Some(err),
+                        }
                     }
                 }
                 Key::Tab => self.handle_tab()?,
@@ -1045,6 +1076,51 @@ impl<'a> Input<'a> {
 /// ```
 pub trait InputValidator {
     fn check(&self, input: &str) -> Result<(), String>;
+}
+
+/// Turns the submitted text of an [Input] into a value, for
+/// [Input::run_parsed].
+///
+/// Closures returning `Result<T, E>` for any `E: ToString` implement it,
+/// so `|s: &str| s.parse::<u16>()` works as is. Implement it on a type for
+/// parsers that carry configuration:
+///
+/// ```no_run
+/// use demand::{Input, InputParser};
+///
+/// struct Percentage;
+///
+/// impl InputParser for Percentage {
+///     type Output = u8;
+///
+///     fn parse(&self, input: &str) -> Result<u8, String> {
+///         let n: u8 = input.trim_end_matches('%').parse().map_err(|_| "not a number")?;
+///         if n > 100 {
+///             return Err("must be at most 100%".to_string());
+///         }
+///         Ok(n)
+///     }
+/// }
+///
+/// let pct = Input::new("Discount").run_parsed(Percentage).expect("a percentage");
+/// ```
+pub trait InputParser {
+    type Output;
+
+    /// Parse the input, or return the error to show the user.
+    fn parse(&self, input: &str) -> Result<Self::Output, String>;
+}
+
+impl<F, T, Err> InputParser for F
+where
+    F: Fn(&str) -> Result<T, Err>,
+    Err: ToString,
+{
+    type Output = T;
+
+    fn parse(&self, input: &str) -> Result<T, String> {
+        self(input).map_err(|err| err.to_string())
+    }
 }
 
 /// No validation
