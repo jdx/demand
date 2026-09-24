@@ -202,16 +202,6 @@ impl<'a> Editor<'a> {
                 format!("could not run editor {}: {err}", command.to_string_lossy()),
             )
         })?;
-        // The shell's exit status for a command it can't find.
-        if status.code() == Some(127) {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!(
-                    "could not run editor {}: not found",
-                    command.to_string_lossy()
-                ),
-            ));
-        }
         if !status.success() {
             return Err(io::Error::other(format!(
                 "editor {} exited with {status}",
@@ -361,35 +351,47 @@ fn editor_command(editor: &OsString, path: &Path) -> io::Result<Command> {
     Ok(command)
 }
 
-/// Split on whitespace, except between double quotes, which are removed
-/// wherever they appear: `"C:\\Program Files\\edit.exe"` is one word and
-/// so is `--cmd="set number"`. Single quotes and backslashes are ordinary
-/// characters, as in a Windows command line.
+/// Split on whitespace into words, the way a Windows command line is,
+/// plus the single-quoting people carry over from Git Bash:
+///
+/// - Double quotes group text wherever they appear and are removed, so
+///   `"C:\\Program Files\\edit.exe"` and `--cmd="set number"` are one word
+///   each.
+/// - Single quotes group a whole word: one that starts a word, with its
+///   match ending one, as in `vim -c 'set number'`. Any other single quote
+///   is an ordinary character, so an apostrophe in a path
+///   (`C:\\Users\\o'brien\\edit.exe`) needs no quoting and can't pair with
+///   a quote later on.
+///
+/// Backslashes are ordinary characters, since they separate Windows paths.
 #[cfg(any(not(unix), test))]
 fn split_words(s: &str) -> Vec<String> {
+    let chars: Vec<char> = s.chars().collect();
     let mut words = Vec::new();
-    let mut word = String::new();
-    let mut in_word = false;
-    let mut quoted = false;
-    for c in s.chars() {
-        match c {
-            '"' => {
-                quoted = !quoted;
-                in_word = true;
-            }
-            c if c.is_whitespace() && !quoted => {
-                if in_word {
-                    words.push(std::mem::take(&mut word));
-                    in_word = false;
-                }
-            }
-            c => {
-                word.push(c);
-                in_word = true;
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_whitespace() {
+            i += 1;
+            continue;
+        }
+        if chars[i] == '\'' {
+            let close = (i + 1..chars.len())
+                .find(|&j| chars[j] == '\'' && chars.get(j + 1).is_none_or(|c| c.is_whitespace()));
+            if let Some(close) = close {
+                words.push(chars[i + 1..close].iter().collect());
+                i = close + 1;
+                continue;
             }
         }
-    }
-    if in_word {
+        let mut word = String::new();
+        let mut quoted = false;
+        while i < chars.len() && (quoted || !chars[i].is_whitespace()) {
+            match chars[i] {
+                '"' => quoted = !quoted,
+                c => word.push(c),
+            }
+            i += 1;
+        }
         words.push(word);
     }
     words
@@ -502,10 +504,20 @@ mod tests {
             split_words(r#"vim --cmd="set number""#),
             ["vim", "--cmd=set number"]
         );
-        // Apostrophes aren't quotes on Windows.
+        // Single quotes around a whole word, as in Git Bash.
+        assert_eq!(
+            split_words("vim -c 'set number'"),
+            ["vim", "-c", "set number"]
+        );
+        // An apostrophe inside a word is an ordinary character, and can't
+        // pair with a quote later on.
         assert_eq!(
             split_words(r"C:\Users\o'brien\edit.exe --wait"),
             [r"C:\Users\o'brien\edit.exe", "--wait"]
+        );
+        assert_eq!(
+            split_words(r"C:\Users\o'brien\edit.exe -c 'set number'"),
+            [r"C:\Users\o'brien\edit.exe", "-c", "set number"]
         );
         assert!(split_words("   ").is_empty());
     }
@@ -549,9 +561,11 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn edit_reports_an_editor_that_isnt_found() {
+        // The shell prints its own "not found". demand reports the exit
+        // status as it is, since 127 could also come from the editor.
         let editor = Editor::new("Notes").editor_command("no-such-editor-xyz --wait");
         let err = editor.edit().unwrap_err();
-        assert!(err.to_string().contains("not found"), "{err}");
+        assert!(err.to_string().contains("exited with"), "{err}");
     }
 
     #[cfg(unix)]
