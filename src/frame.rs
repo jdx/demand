@@ -45,6 +45,21 @@ impl Frame {
         self.last.is_empty()
     }
 
+    /// Whether the terminal has been resized since the frame was drawn.
+    /// The terminal may have reflowed the frame's wrapped rows in ways it
+    /// doesn't report, so row counts from before the resize can't be
+    /// trusted to find it.
+    pub(crate) fn resized(&self, term: &Term) -> bool {
+        !self.last.is_empty() && self.width != term.size().1 as usize
+    }
+
+    /// Pretend the frame was drawn at `width`, to exercise resize handling
+    /// with a terminal whose size can't change.
+    #[cfg(test)]
+    pub(crate) fn set_width(&mut self, width: usize) {
+        self.width = width;
+    }
+
     /// Erase the frame from the screen.
     pub(crate) fn clear(&mut self, term: &Term) -> io::Result<()> {
         term.clear_last_lines(self.height(term))?;

@@ -874,7 +874,17 @@ impl<'a> Input<'a> {
         if self.frame.is_current(&self.term, &output) {
             return Ok(());
         }
-        self.reset_cursor_to_end()?;
+        if self.frame.resized(&self.term) {
+            // The caret-to-end distance was measured at the old width, and
+            // the terminal has reflowed the rows it counted, so it can't be
+            // used to find the frame. Start over from a clear screen, as
+            // `Select` does on a resize.
+            self.term.clear_screen()?;
+            self.frame.forget();
+            self.rows_below_caret = 0;
+        } else {
+            self.reset_cursor_to_end()?;
+        }
         self.frame.update(&self.term, output)?;
         self.set_cursor()
     }
@@ -1293,5 +1303,42 @@ mod tests {
             patched.screen().cursor_position(),
             full.screen().cursor_position()
         );
+    }
+
+    /// After a resize, `Input` doesn't walk back down from the caret by a
+    /// row count measured at the old width: it clears the screen and
+    /// draws the frame fresh.
+    #[cfg(unix)]
+    #[test]
+    fn a_resize_redraws_from_a_clear_screen() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        input.input = "x".repeat(width + 10);
+        input.cursor = 0;
+        input.draw().unwrap();
+        let before = snapshot(&buf).len();
+
+        input.frame.set_width(width + 20);
+        input.draw().unwrap();
+        let redraw = String::from_utf8_lossy(&snapshot(&buf)[before..]).to_string();
+        assert!(
+            redraw.contains("\x1b[2J"),
+            "no clear screen: {}",
+            redraw.escape_debug()
+        );
+        // Nothing moves the cursor down (`ESC [ n B`) before the clear.
+        let before_clear = &redraw[..redraw.find("\x1b[2J").unwrap()];
+        let moved_down = before_clear.split("\x1b[").skip(1).any(|seq| {
+            let digits = seq.chars().take_while(char::is_ascii_digit).count();
+            digits > 0 && seq[digits..].starts_with('B')
+        });
+        assert!(
+            !moved_down,
+            "moved down by a stale row count: {}",
+            redraw.escape_debug()
+        );
+        assert!(redraw.contains("Command"), "frame not redrawn");
     }
 }
