@@ -33,7 +33,7 @@ pub(crate) fn rendered_rows(output: &str, width: usize) -> usize {
 /// Rows one logical line wraps into. A line exactly `width` wide still
 /// occupies a single row — terminals defer the wrap until the next
 /// character arrives.
-fn rows_for(line: &str, width: usize) -> usize {
+pub(crate) fn rows_for(line: &str, width: usize) -> usize {
     let printed = console::measure_text_width(line);
     if width == 0 || printed <= width {
         1

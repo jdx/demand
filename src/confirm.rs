@@ -199,13 +199,7 @@ impl<'a> Confirm<'a> {
         self.term.hide_cursor()?;
         loop {
             let term = self.term.clone();
-            crate::synchronized_output::run(&term, || {
-                self.clear()?;
-                let output = self.render()?;
-                self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-                self.term.write_all(output.as_bytes())?;
-                self.term.flush()
-            })?;
+            crate::synchronized_output::run(&term, || self.draw())?;
             match self.term.read_key()? {
                 Key::ArrowLeft | Key::Char('h') => self.handle_left(),
                 Key::ArrowRight | Key::Char('l') => self.handle_right(),
@@ -326,6 +320,16 @@ impl<'a> Confirm<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
+    /// Replace the previous frame with a fresh one, recording how many rows
+    /// it took so the next `clear` erases exactly that much.
+    fn draw(&mut self) -> io::Result<()> {
+        self.clear()?;
+        let output = self.render()?;
+        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
+        self.term.write_all(output.as_bytes())?;
+        self.term.flush()
+    }
+
     fn clear(&mut self) -> io::Result<()> {
         self.term.clear_last_lines(self.height)?;
         if self.clear_screen {
@@ -340,6 +344,8 @@ impl<'a> Confirm<'a> {
 mod tests {
     use super::*;
     use crate::test::without_ansi;
+    #[cfg(unix)]
+    use crate::test::{Parser, capture_term, replay, snapshot};
     use insta::assert_snapshot;
 
     #[test]
@@ -434,5 +440,34 @@ mod tests {
         assert_eq!(aff_hint, "complete");
         assert_eq!(neg_hint, "completed");
         assert!(has_conflict);
+    }
+    /// Regression for jdx/demand#7: help text or a description wider than
+    /// the terminal wraps, and redrawing must clear every wrapped row or
+    /// the prompt stacks a copy of itself on each keypress.
+    #[cfg(unix)]
+    #[test]
+    fn a_wrapped_description_does_not_stack_copies_of_the_frame() {
+        let (term, buf) = capture_term();
+        let mut prompt = Confirm::new("Proceed?").description(&"d".repeat(200));
+        prompt.term = term;
+        let width = prompt.term.size().1 as usize;
+        assert!(
+            width < 200,
+            "test needs a description wider than the terminal"
+        );
+
+        for _ in 0..3 {
+            prompt.draw().unwrap();
+            prompt.handle_right();
+        }
+
+        let mut parser = Parser::new(24, width as u16, 0);
+        replay(&mut parser, &snapshot(&buf));
+        let screen = parser.screen().contents();
+        assert_eq!(
+            screen.matches("Proceed?").count(),
+            1,
+            "prompt drawn more than once:\n{screen}"
+        );
     }
 }
