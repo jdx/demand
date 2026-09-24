@@ -52,7 +52,7 @@ pub struct Select<'a, T> {
 
     cursor_x: usize,
     cursor_y: usize,
-    last_frame: String,
+    frame: crate::frame::Frame,
     term: Term,
     filter: String,
     filtering: bool,
@@ -73,7 +73,7 @@ impl<'a, T> Select<'a, T> {
             theme: &theme::DEFAULT,
             cursor_x: 0,
             cursor_y: 0,
-            last_frame: String::new(),
+            frame: Default::default(),
             term: Term::stderr(),
             filter: String::new(),
             filtering: false,
@@ -144,10 +144,8 @@ impl<'a, T> Select<'a, T> {
             crate::synchronized_output::run(&term, || {
                 if reset_viewport {
                     self.term.clear_screen()?;
-                    self.last_frame.clear();
+                    self.frame.forget();
                     reset_viewport = false;
-                } else {
-                    self.clear()?;
                 }
                 self.draw()?;
                 self.term.hide_cursor()
@@ -517,21 +515,14 @@ impl<'a, T> Select<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    /// Render a frame, write it out, and record how many rows it took so
-    /// the next `clear` erases exactly that much.
+    /// Render a frame and draw it over the previous one.
     fn draw(&mut self) -> io::Result<()> {
         let output = self.render()?;
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()?;
-        self.last_frame = output;
-        Ok(())
+        self.frame.update(&self.term, output)
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        let height = crate::height::rendered_height(&self.last_frame, self.term.size().1 as usize);
-        self.term.clear_last_lines(height)?;
-        self.last_frame.clear();
-        Ok(())
+        self.frame.clear(&self.term)
     }
 }
 
@@ -661,6 +652,72 @@ mod tests {
             screen.matches("Pick a script").count(),
             1,
             "prompt drawn more than once:\n{screen}"
+        );
+    }
+
+    /// jdx/demand#123: pressing ↓ on the last option changes nothing, so
+    /// nothing is written.
+    #[cfg(unix)]
+    #[test]
+    fn an_unchanged_frame_writes_nothing() {
+        let (term, buf) = capture_term();
+        let mut select = Select::new("Pick")
+            .option(DemandOption::new("one"))
+            .option(DemandOption::new("two"));
+        select.term = term;
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        let written = snapshot(&buf).len();
+
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        assert_eq!(snapshot(&buf).len(), written);
+    }
+
+    /// Drawing only the changed lines has to leave the same screen as
+    /// drawing the final frame from scratch, through moves, filtering that
+    /// shrinks the frame, and an option that wraps.
+    #[cfg(unix)]
+    #[test]
+    fn incremental_redraws_match_a_full_redraw() {
+        let options = || {
+            vec![
+                DemandOption::new("alpha"),
+                DemandOption::new("beta").label(&"b".repeat(120)),
+                DemandOption::new("gamma"),
+            ]
+        };
+        let (term, buf) = capture_term();
+        let mut select = Select::new("Pick").description("one").options(options());
+        select.term = term;
+        let width = select.term.size().1;
+
+        select.draw().unwrap();
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        select.handle_down().unwrap();
+        select.draw().unwrap();
+        select.handle_start_filtering();
+        select.draw().unwrap();
+        select.handle_filter_key('g').unwrap();
+        select.draw().unwrap();
+
+        let (fresh_term, fresh_buf) = capture_term();
+        let mut fresh = Select::new("Pick").description("one").options(options());
+        fresh.cursor_y = select.cursor_y;
+        fresh.filtering = select.filtering;
+        fresh.filter = select.filter.clone();
+        fresh.term = fresh_term;
+        fresh.draw().unwrap();
+
+        let mut patched = Parser::new(24, width, 0);
+        replay(&mut patched, &snapshot(&buf));
+        let mut full = Parser::new(24, width, 0);
+        replay(&mut full, &snapshot(&fresh_buf));
+        assert_eq!(patched.screen().contents(), full.screen().contents());
+        assert_eq!(
+            patched.screen().cursor_position(),
+            full.screen().cursor_position()
         );
     }
 

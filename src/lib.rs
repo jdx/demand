@@ -21,6 +21,7 @@ mod confirm;
 mod ctrlc;
 mod dialog;
 mod event;
+mod frame;
 mod fuzzy;
 mod height;
 mod input;

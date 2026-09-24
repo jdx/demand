@@ -187,7 +187,7 @@ pub struct Input<'a> {
 
     // Internal state
     cursor: usize,
-    height: usize,
+    frame: crate::frame::Frame,
     term: Term,
     err: Option<String>,
     suggestion: Option<String>,
@@ -202,9 +202,11 @@ pub struct Input<'a> {
     caret: (usize, usize),
     /// Physical rows the input row wraps into.
     input_rows: usize,
-    /// Which of those rows `set_cursor` left the cursor on, so
-    /// `reset_cursor_to_end` can walk back down from the same place.
-    caret_row: usize,
+    /// Rows between where `set_cursor` parked the cursor and the end of
+    /// the frame, so `reset_cursor_to_end` can walk back down. Recorded
+    /// rather than recomputed: by the time the cursor goes back down, the
+    /// next frame has been rendered and the layout fields describe it.
+    rows_below_caret: usize,
     suggestions_scroll_offset: usize,
     /// Text removed by the last kill command, for ctrl-y to put back.
     kill_buffer: String,
@@ -237,7 +239,7 @@ impl<'a> Input<'a> {
 
             // Internal state
             cursor: 0,
-            height: 0,
+            frame: Default::default(),
             term: Term::stderr(),
             err: None,
             suggestion: None,
@@ -249,7 +251,7 @@ impl<'a> Input<'a> {
             input_line_offset: 0,
             caret: (0, 0),
             input_rows: 1,
-            caret_row: 0,
+            rows_below_caret: 0,
             suggestions_scroll_offset: 0,
             kill_buffer: String::new(),
         }
@@ -580,7 +582,16 @@ impl<'a> Input<'a> {
         let mut buf = [0; 4];
         for c in self.input.chars() {
             match clusters.last_mut() {
-                Some(last) if console::measure_text_width(c.encode_utf8(&mut buf)) == 0 => {
+                // A zero-width char (combining mark, variation selector,
+                // joiner) belongs to the character before it. After a
+                // zero-width joiner, an emoji continues the same emoji
+                // sequence (`👩‍💻`); any other character starts a new one.
+                Some(last)
+                    if console::measure_text_width(c.encode_utf8(&mut buf)) == 0
+                        || (last.ends_with('\u{200d}')
+                            && last.chars().next().is_some_and(is_pictographic)
+                            && is_pictographic(c)) =>
+                {
                     last.push(c)
                 }
                 _ => clusters.push(c.to_string()),
@@ -1012,9 +1023,8 @@ impl<'a> Input<'a> {
     /// explicitly and only the remainder moved across.
     fn set_cursor(&mut self) -> io::Result<()> {
         let (row, col) = self.caret;
-        self.caret_row = row;
-
-        let rows_up = self.height - self.input_line_offset - row;
+        let rows_up = self.frame.height(&self.term) - self.input_line_offset - row;
+        self.rows_below_caret = rows_up;
         if rows_up > 0 {
             self.term.move_cursor_up(rows_up)?;
         }
@@ -1026,21 +1036,33 @@ impl<'a> Input<'a> {
     }
 
     fn reset_cursor_to_end(&mut self) -> io::Result<()> {
-        let rows_down = self.height - self.input_line_offset - self.caret_row;
-        if rows_down > 0 {
-            self.term.move_cursor_down(rows_down)?;
+        if self.rows_below_caret > 0 {
+            self.term.move_cursor_down(self.rows_below_caret)?;
         }
+        self.rows_below_caret = 0;
         Ok(())
     }
 
-    /// Replace the previous frame with a fresh one and park the cursor on
-    /// the caret.
+    /// Draw a fresh frame over the previous one and park the cursor on the
+    /// caret. A frame identical to the one on screen leaves everything,
+    /// cursor included, where it is.
     fn draw(&mut self) -> io::Result<()> {
-        self.clear()?;
         let output = self.render()?;
-        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()?;
+        if self.frame.is_current(&self.term, &output) {
+            return Ok(());
+        }
+        if self.frame.resized(&self.term) {
+            // The caret-to-end distance was measured at the old width, and
+            // the terminal has reflowed the rows it counted, so it can't be
+            // used to find the frame. Start over from a clear screen, as
+            // `Select` does on a resize.
+            self.term.clear_screen()?;
+            self.frame.forget();
+            self.rows_below_caret = 0;
+        } else {
+            self.reset_cursor_to_end()?;
+        }
+        self.frame.update(&self.term, output)?;
         self.set_cursor()
     }
 
@@ -1052,13 +1074,22 @@ impl<'a> Input<'a> {
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        if self.height > 0 {
+        if !self.frame.is_empty() {
             self.reset_cursor_to_end()?;
-            self.term.clear_last_lines(self.height)?;
+            self.frame.clear(&self.term)?;
         }
-        self.height = 0;
         Ok(())
     }
+}
+
+/// Whether `c` is an emoji that can take part in a zero-width-joiner
+/// sequence. This is an approximation of Unicode's Extended_Pictographic
+/// property, covering the blocks such sequences are built from.
+fn is_pictographic(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x1F000..=0x1FAFF | 0x2600..=0x27BF | 0x2300..=0x23FF | 0x2B00..=0x2BFF
+    )
 }
 
 /// Byte length of the first char of `s`, or 0 if it's empty. Slicing off
@@ -1460,6 +1491,88 @@ mod tests {
         // 8 columns into the wrapped row ("> " + width + 10 - 2).
         assert_eq!(parser.screen().cursor_position(), (3, 10));
     }
+    /// jdx/demand#123 for `Input`, where the cursor is parked on the caret
+    /// rather than at the end of the frame: typing and moving through a
+    /// wrapped row has to leave the screen, and the cursor, exactly where
+    /// a fresh draw of the final state would.
+    #[cfg(unix)]
+    #[test]
+    fn incremental_redraws_match_a_full_redraw() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1;
+        input.input = "x".repeat(width as usize - 3);
+        input.cursor = input.input.chars().count();
+
+        input.draw().unwrap();
+        for c in "yyyy".chars() {
+            input.handle_key(c).unwrap();
+            input.draw().unwrap();
+        }
+        input.handle_arrow_left().unwrap();
+        input.draw().unwrap();
+        input.handle_backspace().unwrap();
+        input.draw().unwrap();
+        // A no-op key: the frame doesn't change and nothing is written.
+        let before = snapshot(&buf).len();
+        input.draw().unwrap();
+        assert_eq!(snapshot(&buf).len(), before);
+
+        let (fresh_term, fresh_buf) = capture_term();
+        let mut fresh = Input::new("Command").description("run what?");
+        fresh.input = input.input.clone();
+        fresh.cursor = input.cursor;
+        fresh.term = fresh_term;
+        fresh.draw().unwrap();
+
+        let mut patched = Parser::new(24, width, 0);
+        replay(&mut patched, &snapshot(&buf));
+        let mut full = Parser::new(24, width, 0);
+        replay(&mut full, &snapshot(&fresh_buf));
+        assert_eq!(patched.screen().contents(), full.screen().contents());
+        assert_eq!(
+            patched.screen().cursor_position(),
+            full.screen().cursor_position()
+        );
+    }
+
+    /// After a resize, `Input` doesn't walk back down from the caret by a
+    /// row count measured at the old width: it clears the screen and
+    /// draws the frame fresh.
+    #[cfg(unix)]
+    #[test]
+    fn a_resize_redraws_from_a_clear_screen() {
+        let (term, buf) = capture_term();
+        let mut input = Input::new("Command").description("run what?");
+        input.term = term;
+        let width = input.term.size().1 as usize;
+        input.input = "x".repeat(width + 10);
+        input.cursor = 0;
+        input.draw().unwrap();
+        let before = snapshot(&buf).len();
+
+        input.frame.set_width(width + 20);
+        input.draw().unwrap();
+        let redraw = String::from_utf8_lossy(&snapshot(&buf)[before..]).to_string();
+        assert!(
+            redraw.contains("\x1b[2J"),
+            "no clear screen: {}",
+            redraw.escape_debug()
+        );
+        // Nothing moves the cursor down (`ESC [ n B`) before the clear.
+        let before_clear = &redraw[..redraw.find("\x1b[2J").unwrap()];
+        let moved_down = before_clear.split("\x1b[").skip(1).any(|seq| {
+            let digits = seq.chars().take_while(char::is_ascii_digit).count();
+            digits > 0 && seq[digits..].starts_with('B')
+        });
+        assert!(
+            !moved_down,
+            "moved down by a stale row count: {}",
+            redraw.escape_debug()
+        );
+        assert!(redraw.contains("Command"), "frame not redrawn");
+    }
 
     fn editing(text: &str, cursor: usize) -> Input<'static> {
         let mut input = Input::new("t");
@@ -1559,5 +1672,29 @@ mod tests {
         let mut input = editing("xa\u{301}", 3);
         input.transpose_chars().unwrap();
         assert_eq!(input.input, "a\u{301}x");
+    }
+
+    /// An emoji joined with U+200D moves as one character.
+    #[test]
+    fn ctrl_t_keeps_joined_emoji_together() {
+        let coder = "\u{1f469}\u{200d}\u{1f4bb}";
+        let mut input = editing(&format!("{coder}x"), 3);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("x{coder}"));
+        assert_eq!(input.cursor, 4);
+        // ♀ from the Miscellaneous Symbols block joins too.
+        let runner = "\u{1f3c3}\u{200d}\u{2640}\u{fe0f}";
+        let mut input = editing(&format!("x{runner}"), 5);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, format!("{runner}x"));
+    }
+
+    /// A joiner between letters doesn't make one character of them: the
+    /// letter after it still transposes on its own.
+    #[test]
+    fn ctrl_t_does_not_join_letters_across_a_joiner() {
+        let mut input = editing("xa\u{200d}b", 4);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, "xba\u{200d}");
     }
 }

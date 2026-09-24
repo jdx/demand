@@ -44,7 +44,7 @@ pub struct Confirm<'a> {
 
     term: Term,
     clear_screen: bool,
-    height: usize,
+    frame: crate::frame::Frame,
 }
 
 impl<'a> Confirm<'a> {
@@ -59,7 +59,7 @@ impl<'a> Confirm<'a> {
             negative: "No".to_string(),
             selected: true,
             clear_screen: false,
-            height: 0,
+            frame: Default::default(),
         }
     }
 
@@ -320,22 +320,22 @@ impl<'a> Confirm<'a> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    /// Replace the previous frame with a fresh one, recording how many rows
-    /// it took so the next `clear` erases exactly that much.
+    /// Render a frame and draw it over the previous one. With
+    /// `clear_screen` the screen is wiped first, so there is nothing left
+    /// to draw over and the frame goes out whole.
     fn draw(&mut self) -> io::Result<()> {
-        self.clear()?;
+        if self.clear_screen {
+            self.clear()?;
+        }
         let output = self.render()?;
-        self.height = crate::height::rendered_height(&output, self.term.size().1 as usize);
-        self.term.write_all(output.as_bytes())?;
-        self.term.flush()
+        self.frame.update(&self.term, output)
     }
 
     fn clear(&mut self) -> io::Result<()> {
-        self.term.clear_last_lines(self.height)?;
+        self.frame.clear(&self.term)?;
         if self.clear_screen {
             self.term.clear_screen()?;
         }
-        self.height = 0;
         Ok(())
     }
 }
