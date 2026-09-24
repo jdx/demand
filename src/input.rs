@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use console::{Key, Term, measure_text_width};
+use console::{Key, Term};
 use termcolor::{Buffer, WriteColor};
 
 use crate::ctrlc;
@@ -198,10 +198,18 @@ pub struct Input<'a> {
     max_suggestions_display: usize,
     input_line_offset: usize,
     suggestions_scroll_offset: usize,
+    /// Text removed by the last kill command, for ctrl-y to put back.
+    kill_buffer: String,
 }
 
+const CTRL_B: char = '\u{02}';
+const CTRL_D: char = '\u{04}';
+const CTRL_F: char = '\u{06}';
+const CTRL_K: char = '\u{0b}';
+const CTRL_T: char = '\u{14}';
 const CTRL_U: char = '\u{15}';
 const CTRL_W: char = '\u{17}';
+const CTRL_Y: char = '\u{19}';
 
 impl<'a> Input<'a> {
     /// Creates a new input with the given title.
@@ -232,6 +240,7 @@ impl<'a> Input<'a> {
             max_suggestions_display: 5,
             input_line_offset: 0,
             suggestions_scroll_offset: 0,
+            kill_buffer: String::new(),
         }
     }
 
@@ -348,7 +357,30 @@ impl<'a> Input<'a> {
     ///
     /// This function will block until the user submits the input. If the user cancels the input,
     /// an error of type `io::ErrorKind::Interrupted` is returned.
-    pub fn run(mut self) -> io::Result<String> {
+    pub fn run(self) -> io::Result<String> {
+        self.run_parsed(|input: &str| Ok::<_, String>(input.to_string()))
+    }
+
+    /// Displays the input to the user and returns the response parsed by
+    /// `parser`.
+    ///
+    /// The parser doubles as validation: while it returns an error, the
+    /// error is shown and the input can't be submitted, just like a
+    /// [validator](Input::validator). Any validator set on the input runs
+    /// first. This saves parsing the input twice — once to validate it and
+    /// again after `run` returns it as a string.
+    ///
+    /// Without a TTY, a parse error is returned as an
+    /// `io::ErrorKind::InvalidInput` error, as validation errors are.
+    ///
+    /// ```no_run
+    /// use demand::Input;
+    ///
+    /// let port: u16 = Input::new("Port")
+    ///     .run_parsed(|s: &str| s.parse::<u16>())
+    ///     .expect("a port");
+    /// ```
+    pub fn run_parsed<P: InputParser>(mut self, parser: P) -> io::Result<P::Output> {
         // If not a TTY (e.g., piped input or non-interactive environment),
         // write a simple prompt and read from stdin
         if !crate::tty::is_tty() {
@@ -365,7 +397,9 @@ impl<'a> Input<'a> {
             if let Some(err) = self.err {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
             }
-            return Ok(self.input);
+            return parser
+                .parse(&self.input)
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err));
         }
 
         let ctrlc_handle = ctrlc::show_cursor_after_ctrlc(&self.term)?;
@@ -389,7 +423,24 @@ impl<'a> Input<'a> {
             match key {
                 Key::Char(CTRL_U) => self.handle_ctrl_u()?,
                 Key::Char(CTRL_W) => self.handle_ctrl_w()?,
+                Key::Char(CTRL_K) => self.kill_to_end()?,
+                Key::Char(CTRL_Y) => self.yank()?,
+                Key::Char(CTRL_T) => self.transpose_chars()?,
+                Key::Char(CTRL_D) | Key::Del => self.delete_char()?,
+                Key::Char(CTRL_B) => self.handle_arrow_left()?,
+                Key::Char(CTRL_F) => self.handle_arrow_right()?,
+                // Any other control char has no binding; inserting it
+                // would put an invisible byte in the input.
+                Key::Char(c) if c.is_control() => {}
                 Key::Char(c) => self.handle_key(c)?,
+                // The terminal sends alt+<key> as escape followed by the key.
+                Key::UnknownEscSeq(ref seq) => match seq.as_slice() {
+                    ['b'] => self.cursor = self.word_start_before(self.cursor),
+                    ['f'] => self.cursor = self.word_end_after(self.cursor),
+                    ['d'] => self.kill_word_forward()?,
+                    ['\x7f'] | ['\x08'] => self.kill_word_backward()?,
+                    _ => {}
+                },
                 Key::Backspace => self.handle_backspace()?,
                 Key::ArrowLeft => self.handle_arrow_left()?,
                 Key::ArrowRight => self.handle_arrow_right()?,
@@ -401,11 +452,17 @@ impl<'a> Input<'a> {
                     self.clear_err()?;
                     self.validate()?;
                     if self.err.is_none() {
-                        self.reset_cursor_to_end()?;
-                        self.term.clear_to_end_of_screen()?;
-                        self.term.show_cursor()?;
-                        ctrlc_handle.close();
-                        return self.handle_submit();
+                        match parser.parse(&self.input) {
+                            Ok(value) => {
+                                self.reset_cursor_to_end()?;
+                                self.term.clear_to_end_of_screen()?;
+                                self.term.show_cursor()?;
+                                ctrlc_handle.close();
+                                self.handle_submit()?;
+                                return Ok(value);
+                            }
+                            Err(err) => self.err = Some(err),
+                        }
                     }
                 }
                 Key::Tab => self.handle_tab()?,
@@ -432,11 +489,7 @@ impl<'a> Input<'a> {
     }
 
     fn handle_ctrl_u(&mut self) -> io::Result<()> {
-        let idx = self.get_char_idx(&self.input, self.cursor);
-        self.input.replace_range(..idx, "");
-        self.cursor = 0;
-        self.update_suggestions()?;
-        Ok(())
+        self.kill(0, self.cursor)
     }
 
     fn handle_ctrl_w(&mut self) -> io::Result<()> {
@@ -457,16 +510,131 @@ impl<'a> Input<'a> {
             true => offset + 1,
             false => offset,
         };
-        let len = measure_text_width(&self.input[from..idx]);
+        // `from` is a byte index; the cursor counts chars.
+        let from_char = self.input[..from].chars().count();
+        self.kill(from_char, self.cursor)
+    }
 
-        self.input.replace_range(from..idx, "");
-
-        match offset > 0 {
-            true => self.cursor -= len,
-            false => self.cursor = 0,
+    /// Remove the chars in `from..to` into the kill buffer, leaving the
+    /// cursor where they were.
+    fn kill(&mut self, from: usize, to: usize) -> io::Result<()> {
+        if from >= to {
+            return Ok(());
         }
-        self.update_suggestions()?;
+        let start = self.get_char_idx(&self.input, from);
+        let end = self.get_char_idx(&self.input, to);
+        self.kill_buffer = self.input[start..end].to_string();
+        self.input.replace_range(start..end, "");
+        self.cursor = from;
+        self.update_suggestions()
+    }
+
+    /// ctrl-k: kill from the cursor to the end of the line.
+    fn kill_to_end(&mut self) -> io::Result<()> {
+        self.kill(self.cursor, self.input.chars().count())
+    }
+
+    /// alt-d: kill from the cursor to the end of the word.
+    fn kill_word_forward(&mut self) -> io::Result<()> {
+        if self.password {
+            return self.kill_to_end();
+        }
+        self.kill(self.cursor, self.word_end_after(self.cursor))
+    }
+
+    /// alt-backspace: kill from the start of the word to the cursor.
+    fn kill_word_backward(&mut self) -> io::Result<()> {
+        if self.password {
+            return self.handle_ctrl_u();
+        }
+        self.kill(self.word_start_before(self.cursor), self.cursor)
+    }
+
+    /// ctrl-y: insert the last killed text at the cursor.
+    fn yank(&mut self) -> io::Result<()> {
+        let idx = self.get_char_idx(&self.input, self.cursor);
+        self.input.insert_str(idx, &self.kill_buffer);
+        self.cursor += self.kill_buffer.chars().count();
+        self.update_suggestions()
+    }
+
+    /// ctrl-d / delete: remove the char under the cursor.
+    fn delete_char(&mut self) -> io::Result<()> {
+        if self.cursor < self.input.chars().count() {
+            let idx = self.get_char_idx(&self.input, self.cursor);
+            self.input.remove(idx);
+            self.update_suggestions()?;
+        }
         Ok(())
+    }
+
+    /// ctrl-t: swap the character before the cursor with the one under it,
+    /// moving the cursor forward. At the end of the line, swap the last
+    /// two instead. Combining marks (zero-width chars such as the accent
+    /// in `a\u{301}`) stay with the character they're drawn on.
+    fn transpose_chars(&mut self) -> io::Result<()> {
+        let mut clusters: Vec<String> = Vec::new();
+        let mut buf = [0; 4];
+        for c in self.input.chars() {
+            match clusters.last_mut() {
+                Some(last) if console::measure_text_width(c.encode_utf8(&mut buf)) == 0 => {
+                    last.push(c)
+                }
+                _ => clusters.push(c.to_string()),
+            }
+        }
+        // Clusters that start before the cursor.
+        let mut start = 0;
+        let before = clusters
+            .iter()
+            .take_while(|cluster| {
+                let starts_before = start < self.cursor;
+                start += cluster.chars().count();
+                starts_before
+            })
+            .count();
+        if clusters.len() < 2 || before == 0 {
+            return Ok(());
+        }
+        let at = before.min(clusters.len() - 1);
+        clusters.swap(at - 1, at);
+        self.cursor = clusters[..=at].iter().map(|c| c.chars().count()).sum();
+        self.input = clusters.concat();
+        self.update_suggestions()
+    }
+
+    /// Where alt-b lands: the start of the word before `cursor`. Words
+    /// are runs of alphanumeric chars, as in readline. Password input has
+    /// no visible words, so it jumps to the start.
+    fn word_start_before(&self, cursor: usize) -> usize {
+        if self.password {
+            return 0;
+        }
+        let chars: Vec<char> = self.input.chars().collect();
+        let mut i = cursor.min(chars.len());
+        while i > 0 && !chars[i - 1].is_alphanumeric() {
+            i -= 1;
+        }
+        while i > 0 && chars[i - 1].is_alphanumeric() {
+            i -= 1;
+        }
+        i
+    }
+
+    /// Where alt-f lands: the end of the word after `cursor`.
+    fn word_end_after(&self, cursor: usize) -> usize {
+        let chars: Vec<char> = self.input.chars().collect();
+        if self.password {
+            return chars.len();
+        }
+        let mut i = cursor.min(chars.len());
+        while i < chars.len() && !chars[i].is_alphanumeric() {
+            i += 1;
+        }
+        while i < chars.len() && chars[i].is_alphanumeric() {
+            i += 1;
+        }
+        i
     }
 
     fn handle_backspace(&mut self) -> io::Result<()> {
@@ -910,6 +1078,51 @@ pub trait InputValidator {
     fn check(&self, input: &str) -> Result<(), String>;
 }
 
+/// Turns the submitted text of an [Input] into a value, for
+/// [Input::run_parsed].
+///
+/// Closures returning `Result<T, E>` for any `E: ToString` implement it,
+/// so `|s: &str| s.parse::<u16>()` works as is. Implement it on a type for
+/// parsers that carry configuration:
+///
+/// ```no_run
+/// use demand::{Input, InputParser};
+///
+/// struct Percentage;
+///
+/// impl InputParser for Percentage {
+///     type Output = u8;
+///
+///     fn parse(&self, input: &str) -> Result<u8, String> {
+///         let n: u8 = input.trim_end_matches('%').parse().map_err(|_| "not a number")?;
+///         if n > 100 {
+///             return Err("must be at most 100%".to_string());
+///         }
+///         Ok(n)
+///     }
+/// }
+///
+/// let pct = Input::new("Discount").run_parsed(Percentage).expect("a percentage");
+/// ```
+pub trait InputParser {
+    type Output;
+
+    /// Parse the input, or return the error to show the user.
+    fn parse(&self, input: &str) -> Result<Self::Output, String>;
+}
+
+impl<F, T, Err> InputParser for F
+where
+    F: Fn(&str) -> Result<T, Err>,
+    Err: ToString,
+{
+    type Output = T;
+
+    fn parse(&self, input: &str) -> Result<T, String> {
+        self(input).map_err(|err| err.to_string())
+    }
+}
+
 /// No validation
 ///
 /// Every input is accepted
@@ -1117,5 +1330,104 @@ mod tests {
         let mut input = Input::new("Name").inline(true);
         input.render().unwrap();
         assert_eq!(input.input_line_offset, 0);
+    }
+    fn editing(text: &str, cursor: usize) -> Input<'static> {
+        let mut input = Input::new("t");
+        input.input = text.to_string();
+        input.cursor = cursor;
+        input
+    }
+
+    #[test]
+    fn ctrl_k_kills_to_end_and_ctrl_y_yanks_it_back() {
+        let mut input = editing("hello world", 5);
+        input.kill_to_end().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("hello", 5));
+        input.handle_home().unwrap();
+        input.yank().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), (" worldhello", 6));
+    }
+
+    #[test]
+    fn ctrl_u_and_ctrl_w_fill_the_kill_buffer() {
+        let mut input = editing("one two three", 7);
+        input.handle_ctrl_w().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("one  three", 4));
+        assert_eq!(input.kill_buffer, "two");
+        input.handle_ctrl_u().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), (" three", 0));
+        assert_eq!(input.kill_buffer, "one ");
+    }
+
+    /// The cursor counts chars; ctrl-w used to subtract the killed text's
+    /// display width, which differs for wide chars.
+    #[test]
+    fn ctrl_w_keeps_the_cursor_in_chars_for_wide_text() {
+        let mut input = editing("ab 日本語", 6);
+        input.handle_ctrl_w().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("ab ", 3));
+    }
+
+    #[test]
+    fn alt_b_and_alt_f_move_by_words() {
+        let input = editing("git commit --amend", 18);
+        assert_eq!(input.word_start_before(18), 13);
+        assert_eq!(input.word_start_before(13), 4);
+        assert_eq!(input.word_start_before(4), 0);
+        assert_eq!(input.word_end_after(0), 3);
+        assert_eq!(input.word_end_after(3), 10);
+        assert_eq!(input.word_end_after(10), 18);
+    }
+
+    #[test]
+    fn alt_d_and_alt_backspace_kill_words() {
+        let mut input = editing("foo bar baz", 4);
+        input.kill_word_forward().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("foo  baz", 4));
+        let mut input = editing("foo bar baz", 7);
+        input.kill_word_backward().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("foo  baz", 4));
+    }
+
+    #[test]
+    fn word_motions_in_a_password_do_not_reveal_word_boundaries() {
+        let mut input = editing("hunter 2", 8);
+        input.password = true;
+        assert_eq!(input.word_start_before(8), 0);
+        input.kill_word_backward().unwrap();
+        assert_eq!(input.input, "");
+    }
+
+    #[test]
+    fn ctrl_d_deletes_under_the_cursor() {
+        let mut input = editing("abc", 1);
+        input.delete_char().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("ac", 1));
+        let mut input = editing("abc", 3);
+        input.delete_char().unwrap();
+        assert_eq!(input.input, "abc");
+    }
+
+    #[test]
+    fn ctrl_t_transposes() {
+        let mut input = editing("abcd", 2);
+        input.transpose_chars().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("acbd", 3));
+        // At the end of the line, the last two chars swap.
+        let mut input = editing("abcd", 4);
+        input.transpose_chars().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("abdc", 4));
+    }
+
+    /// A combining accent moves with its letter rather than being swapped
+    /// on its own.
+    #[test]
+    fn ctrl_t_keeps_combining_marks_with_their_letter() {
+        let mut input = editing("a\u{301}b", 2);
+        input.transpose_chars().unwrap();
+        assert_eq!((input.input.as_str(), input.cursor), ("ba\u{301}", 3));
+        let mut input = editing("xa\u{301}", 3);
+        input.transpose_chars().unwrap();
+        assert_eq!(input.input, "a\u{301}x");
     }
 }

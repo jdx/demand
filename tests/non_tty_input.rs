@@ -267,6 +267,36 @@ fn test_confirm_custom_labels_prompt_shows_unique_prefix() {
 }
 
 #[test]
+fn test_piped_stdin_run_parsed() {
+    // The validation example parses the first answer with `run_parsed`
+    // and uses the resulting `usize` to validate the second.
+    let output = run_example_with_input("validation", b"10\nFerris\n");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Welcome Ferris"));
+
+    let output = run_example_with_input("validation", b"3\nFerris\n");
+    assert!(
+        !output.status.success(),
+        "a name longer than the parsed max length should be rejected"
+    );
+}
+
+#[test]
+fn test_piped_stdin_run_parsed_error() {
+    let output = run_example_with_input("validation", b"lots\n");
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Expected a positive integer"),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn test_piped_stdin_editor_reads_to_end() {
     // Without a terminal there's no editor to open: the whole of stdin is
     // the text.

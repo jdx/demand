@@ -78,6 +78,25 @@ fn main() {
 }
 ```
 
+### Line editing
+
+`Input` supports the common emacs-style (GNU Readline default) bindings:
+
+| Keys                  | Action                                      |
+| --------------------- | ------------------------------------------- |
+| ←/→, ctrl-b/ctrl-f    | move one character                          |
+| alt-b/alt-f           | move one word                               |
+| home/end, ctrl-a/ctrl-e | move to start/end of line                 |
+| backspace             | delete the character before the cursor      |
+| delete, ctrl-d        | delete the character under the cursor       |
+| ctrl-w, alt-backspace | delete the word before the cursor           |
+| alt-d                 | delete the word after the cursor            |
+| ctrl-u/ctrl-k         | delete to the start/end of the line         |
+| ctrl-y                | paste the text last deleted with the above  |
+| ctrl-t                | swap the two characters around the cursor   |
+
+In password inputs, word commands act on the whole line so they don't reveal where the spaces are.
+
 ### Autocomplete
 
 Run example with [`cargo run --example autocomplete_basic`](./examples/autocomplete_basic.rs).
