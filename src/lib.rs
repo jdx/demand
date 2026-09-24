@@ -3,6 +3,7 @@
 pub use confirm::Confirm;
 pub use dialog::Dialog;
 pub use dialog::DialogButton;
+pub use handle::PromptHandle;
 pub use input::{
     Autocomplete, AutocompleteClone, FnAutocomplete, Input, InputParser, InputValidator,
     NoAutocompletion,
@@ -23,6 +24,7 @@ mod dialog;
 mod event;
 mod frame;
 mod fuzzy;
+mod handle;
 mod height;
 mod input;
 mod list;

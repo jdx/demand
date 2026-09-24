@@ -161,6 +161,21 @@ fn main() {
 }
 ```
 
+### Updating a running select
+
+`Select::handle` returns a `PromptHandle` that another thread can use to change the title or description while the select is waiting for input.
+On Windows, a change is shown at the next keypress rather than right away.
+Run example with [`cargo run --example select_dynamic`](./examples/select_dynamic.rs).
+
+```rust
+let mut select = Select::new("Coins inserted: 0")
+    .option(DemandOption::new("Complete payment"))
+    .option(DemandOption::new("Quit"));
+let handle = select.handle();
+std::thread::spawn(move || handle.set_title("Coins inserted: 50"));
+let choice = select.run()?;
+```
+
 ## Multiselect
 
 Select multiple options from a list.
