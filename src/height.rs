@@ -34,17 +34,54 @@ pub(crate) fn rendered_rows(output: &str, width: usize) -> usize {
 /// occupies a single row — terminals defer the wrap until the next
 /// character arrives.
 pub(crate) fn rows_for(line: &str, width: usize) -> usize {
-    let printed = console::measure_text_width(line);
-    if width == 0 || printed <= width {
-        1
-    } else {
-        printed.div_ceil(width)
+    if width == 0 {
+        return 1;
     }
+    cursor_after(line, width).0 + 1
+}
+
+/// The (row, column) the cursor is left at after printing `text` from the
+/// start of a row, wrapping the way a terminal does.
+///
+/// Dividing the printed width by `width` isn't enough: a two-column
+/// character that reaches the last column doesn't split — the terminal
+/// leaves that column blank and moves the whole character to the next
+/// row. The column can equal `width` when the text ends exactly at the
+/// edge, since the terminal defers that wrap until more text arrives.
+pub(crate) fn cursor_after(text: &str, width: usize) -> (usize, usize) {
+    let (mut row, mut col) = (0, 0);
+    let mut buf = [0; 4];
+    for c in console::strip_ansi_codes(text).chars() {
+        let w = console::measure_text_width(c.encode_utf8(&mut buf));
+        if w == 0 {
+            continue;
+        }
+        if width > 0 && col + w > width {
+            row += 1;
+            col = 0;
+        }
+        col += w;
+    }
+    (row, col)
 }
 
 #[cfg(test)]
 mod tests {
     use super::rendered_height;
+
+    /// A wide char that would straddle the edge moves whole to the next
+    /// row, leaving the last column blank.
+    #[test]
+    fn a_wide_char_at_the_edge_wraps_whole() {
+        use super::{cursor_after, rows_for};
+        // 7 columns of `x`, then a 2-column char that doesn't fit in the
+        // one column left.
+        assert_eq!(cursor_after("xxxxxxx日", 8), (1, 2));
+        assert_eq!(rows_for("xxxxxxx日", 8), 2);
+        // Four of them fit exactly and leave the wrap pending.
+        assert_eq!(cursor_after("日本語日", 8), (0, 8));
+        assert_eq!(rows_for("日本語日", 8), 1);
+    }
 
     /// The trailing reset fragment is not a row.
     #[test]
