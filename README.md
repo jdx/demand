@@ -168,6 +168,9 @@ Run example with [`cargo run --example select`](./examples/select.rs).
 
 ![Select](./assets/select.gif)
 
+The abbreviated example below shows a few countries; the runnable demo includes
+more options to demonstrate pagination.
+
 ```rust
 use demand::{DemandOption, Select};
 
@@ -180,8 +183,7 @@ fn main() {
         .option(DemandOption::new("BR").label("Brazil").selected(true))
         .option(DemandOption::new("CA").label("Canada"))
         .option(DemandOption::new("GB").label("United Kingdom"));
-    let country = select.run().expect("error running select");
-    println!("Country code: {country}");
+    select.run().expect("error running select");
 }
 ```
 
@@ -241,14 +243,15 @@ Run example with [`cargo run --example grid_select`](./examples/grid_select.rs).
 use demand::{GridRow, GridSelect};
 
 fn main() {
+    let columns = ["Current", "Range", "Latest"];
     let grid = GridSelect::new("Pick the packages you want to upgrade")
-        .columns(["Current", "Range", "Latest"])
+        .columns(columns)
         .filterable(true)
         .row(GridRow::new("react").cell("^18.2.0").cell("^18.3.1").cell("^19.0.0"))
         .row(GridRow::new("chalk").cell("^4.1.2").empty_cell().cell("^5.0.0"))
         .row(GridRow::new("jest").cell("^27.4.7").cell("^27.5.1"));
     for (package, column) in grid.run().expect("error running grid select") {
-        println!("{package}: {column}");
+        println!("{package}: {}", columns[column]);
     }
 }
 ```
