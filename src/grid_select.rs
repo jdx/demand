@@ -15,7 +15,8 @@ use crate::{ctrlc, theme};
 /// empty, meaning that choice isn't available for the row. ↑/↓ move
 /// between rows and ←/→ move the row's choice between its available
 /// cells. `run` returns every row's item with the index of the column
-/// chosen for it.
+/// chosen for it. A row with no available cell has nothing to choose,
+/// so it is neither shown nor returned.
 ///
 /// The first column is the row's baseline: the summary printed after
 /// confirming lists only the rows moved off it.
@@ -97,7 +98,7 @@ impl<T> GridRow<T> {
     pub fn with_label<S: Into<String>>(label: S, item: T) -> Self {
         Self {
             item,
-            label: label.into(),
+            label: single_line(label.into()),
             cells: vec![],
             selected: 0,
         }
@@ -105,13 +106,13 @@ impl<T> GridRow<T> {
 
     /// Set the display label for this row
     pub fn label(mut self, label: &str) -> Self {
-        self.label = label.to_string();
+        self.label = single_line(label.to_string());
         self
     }
 
     /// Append a choice in the next column
     pub fn cell<S: Into<String>>(mut self, text: S) -> Self {
-        self.cells.push(Some(text.into()));
+        self.cells.push(Some(single_line(text.into())));
         self
     }
 
@@ -150,20 +151,35 @@ impl<T> GridRow<T> {
     }
 
     /// Make sure the chosen column holds an available cell, falling back
-    /// to the first one that does.
-    fn normalize(&mut self) {
-        if !self.is_available(self.selected) {
-            self.selected = (0..self.cells.len())
-                .find(|&c| self.is_available(c))
-                .unwrap_or(0);
+    /// to the first one that does. `false` when the row has none.
+    fn normalize(&mut self) -> bool {
+        if self.is_available(self.selected) {
+            return true;
         }
+        match (0..self.cells.len()).find(|&c| self.is_available(c)) {
+            Some(column) => {
+                self.selected = column;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// Rows are laid out one terminal line each, so line breaks in labels and
+/// cells are shown as spaces.
+fn single_line(text: String) -> String {
+    if text.contains(['\n', '\r']) {
+        text.replace("\r\n", " ").replace(['\n', '\r'], " ")
+    } else {
+        text
     }
 }
 
 impl<'a, T> GridSelect<'a, T> {
     /// Create a new grid select with the given title
     pub fn new<S: Into<String>>(title: S) -> Self {
-        let mut gs = GridSelect {
+        GridSelect {
             title: title.into(),
             theme: &theme::DEFAULT,
             description: String::new(),
@@ -173,13 +189,11 @@ impl<'a, T> GridSelect<'a, T> {
             filtering: false,
             filter: String::new(),
             cursor: 0,
-            capacity: 0,
+            capacity: 1,
             frame: Default::default(),
             term: Term::stderr(),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
-        };
-        gs.capacity = Self::capacity_for(gs.term.size().0 as usize);
-        gs
+        }
     }
 
     /// Set the description of the selector
@@ -236,7 +250,8 @@ impl<'a, T> GridSelect<'a, T> {
         self.prepare();
 
         loop {
-            self.capacity = Self::capacity_for(self.term.size().0 as usize);
+            let (term_rows, term_cols) = self.term.size();
+            self.capacity = self.capacity_for(term_rows as usize, term_cols as usize);
             let term = self.term.clone();
             crate::synchronized_output::run(&term, || {
                 if reset_viewport {
@@ -294,10 +309,12 @@ impl<'a, T> GridSelect<'a, T> {
             .max()
             .unwrap_or(0)
             .max(self.columns.len());
-        for row in &mut self.rows {
+        self.rows.retain_mut(|row| {
             row.cells.resize(width, None);
-            row.normalize();
-        }
+            row.normalize()
+        });
+        let (term_rows, term_cols) = self.term.size();
+        self.capacity = self.capacity_for(term_rows as usize, term_cols as usize);
         while self.columns.len() < width {
             self.columns.push(String::new());
         }
@@ -319,9 +336,44 @@ impl<'a, T> GridSelect<'a, T> {
             .collect())
     }
 
-    fn capacity_for(term_rows: usize) -> usize {
-        // title, description, header, page, filter/help, trailing line
-        term_rows.max(8) - 6
+    /// How many rows fit on one page of a `term_rows` × `term_cols`
+    /// terminal, after the lines drawn around them and any wrapping.
+    fn capacity_for(&self, term_rows: usize, term_cols: usize) -> usize {
+        let lines = |text: &str| -> usize {
+            text.split('\n')
+                .map(|line| crate::height::rows_for(line, term_cols))
+                .sum()
+        };
+        let mut reserved = lines(&self.title);
+        if !self.description.is_empty() {
+            reserved += lines(&self.description);
+        }
+        let label_width = self
+            .rows
+            .iter()
+            .map(|r| console::measure_text_width(&r.label))
+            .max()
+            .unwrap_or(0);
+        let row_width = 3 + label_width + self.column_widths().iter().map(|w| 2 + w).sum::<usize>();
+        // Every row, the header included, is as wide as the widest one.
+        let header = lines(&" ".repeat(row_width)).max(1);
+        // Assume paging, since whether it's needed depends on the result.
+        let help = self
+            .help_keys(2)
+            .iter()
+            .map(|(key, desc)| format!("{key} {desc}"))
+            .join(" • ");
+        // An applied filter shares the help line; one being typed gets its own.
+        let help = if !self.filtering && !self.filter.is_empty() {
+            format!("/{} {help}", self.filter)
+        } else {
+            help
+        };
+        let page = lines(&format!(" (page {0}/{0})", self.rows.len()));
+        let filter = usize::from(self.filtering);
+        // header, page indicator, filter, help, and the line the cursor rests on
+        let reserved = reserved + header + page + filter + lines(&help) + 1;
+        (term_rows.saturating_sub(reserved) / header).max(1)
     }
 
     /// Indices into `rows` that match the filter, best match first.
@@ -517,7 +569,7 @@ impl<'a, T> GridSelect<'a, T> {
         Ok(std::str::from_utf8(out.as_slice()).unwrap().to_string())
     }
 
-    fn print_help_keys(&self, out: &mut Buffer, pages: usize) -> io::Result<()> {
+    fn help_keys(&self, pages: usize) -> Vec<(&'static str, &'static str)> {
         let mut help_keys = if self.filtering {
             vec![("↑/↓", "up/down"), ("←/→", "choose")]
         } else {
@@ -532,7 +584,11 @@ impl<'a, T> GridSelect<'a, T> {
             help_keys.push(("/", "filter"));
         }
         help_keys.push(("enter", "confirm"));
-        for (i, (key, desc)) in help_keys.iter().enumerate() {
+        help_keys
+    }
+
+    fn print_help_keys(&self, out: &mut Buffer, pages: usize) -> io::Result<()> {
+        for (i, (key, desc)) in self.help_keys(pages).iter().enumerate() {
             if i > 0 {
                 out.set_color(&self.theme.help_sep)?;
                 write!(out, " • ")?;
@@ -685,6 +741,48 @@ mod tests {
             "Upgrade react ^19.0.0, jest ^27.5.1\n",
             without_ansi(&grid.render_success().unwrap())
         );
+    }
+
+    #[test]
+    fn rows_without_a_choice_are_left_out() {
+        let mut grid = GridSelect::new("t")
+            .row(GridRow::new("a").empty_cell().empty_cell())
+            .row(GridRow::new("b").cell("x"));
+        grid.prepare();
+        assert_eq!(grid.rows.len(), 1);
+        assert_eq!(grid.rows[0].item, "b");
+    }
+
+    #[test]
+    fn line_breaks_in_labels_and_cells_become_spaces() {
+        let row = GridRow::new("a\nb").cell("1\r\n2");
+        assert_eq!(row.label, "a b");
+        assert_eq!(row.cells[0].as_deref(), Some("1 2"));
+    }
+
+    #[test]
+    fn full_page_fits_the_terminal() {
+        let mut grid = GridSelect::new("t").description("d").filterable(true).rows(
+            (0..50)
+                .map(|i| GridRow::new(i.to_string()).cell("a").cell("b"))
+                .collect(),
+        );
+        grid.prepare();
+        grid.filtering = true;
+        grid.capacity = grid.capacity_for(20, 80);
+        let frame = grid.render().unwrap();
+        assert!(frame.contains("(page 1/"), "{frame}");
+        assert!(
+            crate::height::rendered_height(&frame, 80) < 20,
+            "{} rows:\n{frame}",
+            crate::height::rendered_height(&frame, 80)
+        );
+
+        // Rows wider than the terminal wrap, and take two lines each.
+        let narrow = grid.capacity_for(20, 10);
+        grid.capacity = narrow;
+        let frame = grid.render().unwrap();
+        assert!(crate::height::rendered_height(&frame, 10) < 20, "{frame}");
     }
 
     #[test]
