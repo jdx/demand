@@ -221,6 +221,39 @@ fn main() {
 }
 ```
 
+## Grid Select
+
+Pick one column for each row of a table, e.g. which version to upgrade each
+package to. ↑/↓ move between rows, ←/→ move the row's choice between its
+cells. Empty cells aren't selectable.
+
+Run example with [`cargo run --example grid_select`](./examples/grid_select.rs).
+
+```rust
+use demand::{GridRow, GridSelect};
+
+fn main() {
+    let grid = GridSelect::new("Pick the packages you want to upgrade")
+        .columns(["Current", "Range", "Latest"])
+        .filterable(true)
+        .row(GridRow::new("react").cell("^18.2.0").cell("^18.3.1").cell("^19.0.0"))
+        .row(GridRow::new("chalk").cell("^4.1.2").empty_cell().cell("^5.0.0"))
+        .row(GridRow::new("jest").cell("^27.4.7").cell("^27.5.1"));
+    for (package, column) in grid.run().expect("error running grid select") {
+        println!("{package}: {column}");
+    }
+}
+```
+
+```
+Pick the packages you want to upgrade
+         Current      Range        Latest
+ > react  [•] ^18.2.0  [ ] ^18.3.1  [ ] ^19.0.0
+   chalk  [•] ^4.1.2                [ ] ^5.0.0
+   jest   [•] ^27.4.7  [ ] ^27.5.1
+↑/↓/k/j up/down • ←/→/h/l choose • / filter • enter confirm
+```
+
 ## Confirm
 
 Confirm a question with a yes or no.
