@@ -151,17 +151,12 @@ impl<T> GridRow<T> {
     }
 
     /// Make sure the chosen column holds an available cell, falling back
-    /// to the first one that does. `false` when the row has none.
-    fn normalize(&mut self) -> bool {
-        if self.is_available(self.selected) {
-            return true;
-        }
-        match (0..self.cells.len()).find(|&c| self.is_available(c)) {
-            Some(column) => {
-                self.selected = column;
-                true
-            }
-            None => false,
+    /// to the first one that does.
+    fn normalize(&mut self) {
+        if !self.is_available(self.selected)
+            && let Some(column) = (0..self.cells.len()).find(|&c| self.is_available(c))
+        {
+            self.selected = column;
         }
     }
 }
@@ -302,22 +297,25 @@ impl<'a, T> GridSelect<'a, T> {
     }
 
     fn prepare(&mut self) {
+        self.rows
+            .retain(|row| row.cells.iter().any(Option::is_some));
+        // Columns past the last available cell of every row would only
+        // take up space, unless they have a header.
         let width = self
             .rows
             .iter()
-            .map(|r| r.cells.len())
+            .filter_map(|r| r.cells.iter().rposition(Option::is_some))
+            .map(|last| last + 1)
             .max()
             .unwrap_or(0)
             .max(self.columns.len());
-        self.rows.retain_mut(|row| {
+        for row in &mut self.rows {
             row.cells.resize(width, None);
-            row.normalize()
-        });
+            row.normalize();
+        }
+        self.columns.resize(width, String::new());
         let (term_rows, term_cols) = self.term.size();
         self.capacity = self.capacity_for(term_rows as usize, term_cols as usize);
-        while self.columns.len() < width {
-            self.columns.push(String::new());
-        }
     }
 
     fn finish(mut self) -> io::Result<Vec<(T, usize)>> {
@@ -751,6 +749,17 @@ mod tests {
         grid.prepare();
         assert_eq!(grid.rows.len(), 1);
         assert_eq!(grid.rows[0].item, "b");
+    }
+
+    #[test]
+    fn trailing_empty_columns_are_dropped() {
+        let mut grid = GridSelect::new("t")
+            .columns(["A"])
+            .row(GridRow::new("gone").empty_cell().empty_cell().empty_cell())
+            .row(GridRow::new("kept").cell("x").cell("y").empty_cell());
+        grid.prepare();
+        assert_eq!(grid.columns.len(), 2);
+        assert_eq!(grid.rows[0].cells.len(), 2);
     }
 
     #[test]
