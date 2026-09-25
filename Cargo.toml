@@ -1,6 +1,6 @@
 [package]
 name = "demand"
-version = "2.3.0"
+version = "2.3.1"
 edition = "2024"
 description = "A CLI prompt library"
 license = "MIT"
