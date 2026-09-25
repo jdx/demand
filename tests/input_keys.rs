@@ -1,5 +1,5 @@
-//! Drives `Input` through a real pty to check that the readline-style
-//! bindings see the key events `console` actually produces for them.
+//! Drives prompts through a real pty to check that their key bindings see
+//! the key events `console` actually produces for them.
 #![cfg(unix)]
 
 use std::io::{Read, Write};
@@ -19,8 +19,35 @@ fn input_keys_child_scenario() {
     std::process::exit(0);
 }
 
+#[test]
+fn grid_select_child_scenario() {
+    if std::env::var_os("DEMAND_GRID_SELECT_SCENARIO").is_none() {
+        return;
+    }
+    let choices = demand::GridSelect::new("Packages")
+        .columns(["Current", "Range"])
+        .filterable(true)
+        .row(demand::GridRow::new("react").cell("1.0.0").cell("1.1.0"))
+        .row(demand::GridRow::new("jest").cell("2.0.0").cell("2.1.0"))
+        .run()
+        .expect("run grid select");
+    println!("RESULT={choices:?}");
+    std::process::exit(0);
+}
+
 /// Type `keys` into a fresh `Input` and return what it submitted.
 fn submit(keys: &[&[u8]]) -> String {
+    submit_to(
+        "input_keys_child_scenario",
+        "DEMAND_INPUT_KEYS_SCENARIO",
+        keys,
+    )
+}
+
+/// Type `keys` into the prompt run by the child `scenario` test, which
+/// only runs when `env` is set, then press Enter and return what the
+/// prompt submitted.
+fn submit_to(scenario: &str, env: &str, keys: &[&[u8]]) -> String {
     let pair = native_pty_system()
         .openpty(PtySize {
             rows: 24,
@@ -30,8 +57,8 @@ fn submit(keys: &[&[u8]]) -> String {
         })
         .expect("openpty");
     let mut cmd = CommandBuilder::new(std::env::current_exe().expect("current_exe"));
-    cmd.args(["--exact", "input_keys_child_scenario", "--nocapture"]);
-    cmd.env("DEMAND_INPUT_KEYS_SCENARIO", "1");
+    cmd.args(["--exact", scenario, "--nocapture"]);
+    cmd.env(env, "1");
     let mut child = pair.slave.spawn_command(cmd).expect("spawn child");
     drop(pair.slave);
 
@@ -178,4 +205,17 @@ fn word_kills() {
     // alt-backspace kills "three"; alt-b, then alt-d kills "two".
     let result = submit(&[b"one two three", b"\x1b\x7f", b"\x1bb", b"\x1bd"]);
     assert_eq!(result, r#""one  ""#);
+}
+
+#[test]
+fn grid_select_enter_applies_filter_before_confirming() {
+    // Enter while typing a filter applies it instead of confirming, so the
+    // right arrow after it still moves jest to its range. Had the first
+    // Enter confirmed, jest would still be on column 0.
+    let result = submit_to(
+        "grid_select_child_scenario",
+        "DEMAND_GRID_SELECT_SCENARIO",
+        &[b"/jest", b"\r", b"\x1b[C"],
+    );
+    assert_eq!(result, r#"[("react", 0), ("jest", 1)]"#);
 }
