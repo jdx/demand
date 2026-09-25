@@ -271,6 +271,9 @@ impl<'a, T> GridSelect<'a, T> {
                 Key::ArrowRight => self.handle_step(1),
                 Key::PageDown => self.handle_page(1),
                 Key::PageUp => self.handle_page(-1),
+                // Like `List`: Enter applies the filter being typed, and
+                // only confirms the grid once filtering is done.
+                Key::Enter if self.filtering => self.filtering = false,
                 Key::Enter => {
                     ctrlc_handle.close();
                     return self.finish();
@@ -581,7 +584,11 @@ impl<'a, T> GridSelect<'a, T> {
         } else if self.filterable {
             help_keys.push(("/", "filter"));
         }
-        help_keys.push(("enter", "confirm"));
+        help_keys.push(if self.filtering {
+            ("enter", "apply filter")
+        } else {
+            ("enter", "confirm")
+        });
         help_keys
     }
 
@@ -728,6 +735,7 @@ mod tests {
         let rendered = without_ansi(&grid.render().unwrap()).to_string();
         assert!(rendered.contains(" > jest"), "{rendered}");
         assert!(!rendered.contains("react"), "{rendered}");
+        assert!(rendered.contains("enter apply filter"), "{rendered}");
     }
 
     #[test]
