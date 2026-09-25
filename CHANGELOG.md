@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1](https://github.com/jdx/demand/compare/v2.3.0...v2.3.1) - 2026-09-25
+
+### Other
+
+- add GridSelect demo and refresh prompt recordings ([#233](https://github.com/jdx/demand/pull/233))
+
 ## [2.3.0](https://github.com/jdx/demand/compare/v2.2.0...v2.3.0) - 2026-09-25
 
 ### Added
