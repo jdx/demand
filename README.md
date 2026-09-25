@@ -34,6 +34,13 @@ A prompt library for Rust. Based on [huh? for Go](https://github.com/charmbracel
   <a href="https://jdx.dev/sponsors.html">View all sponsors</a>
 </p>
 
+## Try the demos
+
+Run any example from the repository with `cargo run --example <name>`.
+Start with `grid_select`, `input`, `select`, or `multiselect`; use `themes -- dracula`
+to try a different theme. The animations below show the actual examples.
+See [the recording guide](./assets/README.md) to regenerate them.
+
 ## Input
 
 * Single-line text input with variable prompt and placeholder
@@ -165,17 +172,16 @@ Run example with [`cargo run --example select`](./examples/select.rs).
 use demand::{DemandOption, Select};
 
 fn main() {
-    let ms = Select::new("Toppings")
-        .description("Select your topping")
+    let select = Select::new("Country")
+        .description("Pick a country")
         .filterable(true)
-        .option(DemandOption::new("Lettuce").description("Fresh and crispy"))
-        .option(DemandOption::new("Tomatoes").description("Juicy and red"))
-        .option(DemandOption::new("Charm Sauce").description("Our secret recipe"))
-        .option(DemandOption::new("Jalapenos").label("Jalapeños").description("Spicy and hot"))
-        .option(DemandOption::new("Cheese").description("Melted and gooey"))
-        .option(DemandOption::new("Vegan Cheese").description("Melted and gooey"))
-        .option(DemandOption::new("Nutella").description("Sweet and creamy"));
-    ms.run().expect("error running select");
+        .option(DemandOption::new("US").label("United States"))
+        .option(DemandOption::new("DE").label("Germany"))
+        .option(DemandOption::new("BR").label("Brazil").selected(true))
+        .option(DemandOption::new("CA").label("Canada"))
+        .option(DemandOption::new("GB").label("United Kingdom"));
+    let country = select.run().expect("error running select");
+    println!("Country code: {country}");
 }
 ```
 
@@ -229,6 +235,8 @@ cells. Empty cells aren't selectable.
 
 Run example with [`cargo run --example grid_select`](./examples/grid_select.rs).
 
+![Grid select](./assets/grid-select.gif)
+
 ```rust
 use demand::{GridRow, GridSelect};
 
@@ -243,15 +251,6 @@ fn main() {
         println!("{package}: {column}");
     }
 }
-```
-
-```
-Pick the packages you want to upgrade
-         Current      Range        Latest
- > react  [•] ^18.2.0  [ ] ^18.3.1  [ ] ^19.0.0
-   chalk  [•] ^4.1.2                [ ] ^5.0.0
-   jest   [•] ^27.4.7  [ ] ^27.5.1
-↑/↓/k/j up/down • ←/→/h/l choose • / filter • enter confirm
 ```
 
 ## Confirm

@@ -1,26 +1,19 @@
 Output assets/themes/new.gif
-
-Set Shell "fish"
-Set Padding 10
-Set FontSize 16
-Set Width 800
-Set Height 300
-Set TypingSpeed 100ms
-
-Hide
-Type "cargo build --example themes && clear" Enter
-Sleep 2s
-Show
+Require target/debug/examples/themes
+Source assets/vhs/common.tape
 
 Type "target/debug/examples/themes" Enter
-Sleep 2s
-Type "jane.foo@acme.com" Sleep 1s Enter
-
-Space Sleep 1s
-Down Down Space Sleep 1s
-Enter
-
+Wait+Screen /Please enter your e-mail/
+Sleep 1s
+Type "jane.foo@acme.com" Enter
+Wait+Screen /Select your interests/
+Sleep 800ms
+Space
+Down 2
+Space
 Sleep 1s
 Enter
-
+Wait+Screen /Do you accept the privacy policy/
+Sleep 1s
+Enter
 Sleep 2s

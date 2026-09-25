@@ -1,9 +1,10 @@
 use demand::{GridRow, GridSelect};
 
 fn main() {
+    let columns = ["Current", "Range", "Latest"];
     let grid = GridSelect::new("Pick the packages you want to upgrade")
         .description("Choose a version for each package")
-        .columns(["Current", "Range", "Latest"])
+        .columns(columns)
         .filterable(true)
         .row(
             GridRow::new("@floating-ui/react-dom")
@@ -32,7 +33,7 @@ fn main() {
     match grid.run() {
         Ok(choices) => {
             for (package, column) in choices {
-                println!("{package}: {column}");
+                println!("{package}: {}", columns[column]);
             }
         }
         Err(e) => {
