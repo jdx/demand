@@ -929,6 +929,21 @@ mod tests {
         assert!(b.ends_with('…'), "{b}");
     }
 
+    /// Labels spanning two lines give every option two rows, whether or not
+    /// a description had to be cut.
+    #[test]
+    fn multi_line_labels_count_when_a_description_is_cut() {
+        let mut select = Select::new("Pick").options(
+            (0..20)
+                .map(|i| DemandOption::new(i).label(&format!("{i}\nsecond line")))
+                .chain([DemandOption::new(99).description(&"d".repeat(80 * 30))])
+                .collect(),
+        );
+        select.resize_layout(24, 80);
+        assert_eq!(select.description_fit.rows, Some(2));
+        assert_eq!(select.capacity, 9);
+    }
+
     #[test]
     fn resize_preserves_focused_option() {
         let mut select = Select::new("Pick").options(
