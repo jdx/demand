@@ -59,6 +59,7 @@ pub struct Select<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    description_width: Option<usize>,
     fuzzy_matcher: SkimMatcherV2,
     updates: Option<crate::handle::Updates>,
 }
@@ -81,6 +82,7 @@ impl<'a, T> Select<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            description_width: None,
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
             updates: None,
         };
@@ -365,15 +367,15 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn refresh_layout(&mut self) {
-        self.resize_layout(self.term.size().0 as usize);
+        let (rows, width) = self.term.size();
+        self.resize_layout(rows as usize, width as usize);
     }
 
-    fn resize_layout(&mut self, rows: usize) {
+    fn resize_layout(&mut self, rows: usize, width: usize) {
         // The fixed 6 rows assume a one-row title and description. A
         // longer one — including one a handle just set — wraps onto more,
         // and those come out of the options, or the help line would be
         // pushed off the screen.
-        let width = self.term.size().1 as usize;
         // Each line of a multi-line title or description is its own row
         // (or rows), so count them all.
         let header_rows = crate::height::rendered_rows(&self.title, width)
@@ -384,12 +386,12 @@ impl<'a, T> Select<'a, T> {
             };
         let available = (rows.max(8) - 6).saturating_sub(header_rows.saturating_sub(2));
         // An option whose label or description is wider than the terminal
-        // wraps too, so a page holds as many options as fit at the height
-        // of the tallest (jdx/demand#235).
+        // wraps too.
         let indent = console::measure_text_width(&self.theme.cursor_str);
-        let option_rows =
-            crate::option::tallest_option_rows(&self.filtered_options(), indent, width);
-        let capacity = (available / option_rows).max(1);
+        let layout =
+            crate::option::layout_options(&self.filtered_options(), indent, width, available);
+        self.description_width = layout.description_width;
+        let capacity = layout.capacity;
         if capacity == self.capacity {
             return;
         }
@@ -447,6 +449,7 @@ impl<'a, T> Select<'a, T> {
                     write!(out, " {label}")?;
                 }
                 out.set_color(&self.theme.description)?;
+                let desc = crate::option::fit_description(desc, self.description_width);
                 writeln!(out, "  {desc}")?;
             } else if self.filtering && !self.filter.is_empty() {
                 self.highlight_matches(&mut out, &option.label)?;
@@ -801,18 +804,17 @@ mod tests {
         let mut select = Select::new("Pick")
             .description("one row")
             .option(DemandOption::new("a"));
-        select.resize_layout(20);
+        select.resize_layout(20, 80);
         assert_eq!(select.capacity, 14);
 
-        let width = select.term.size().1 as usize;
-        select.title = "t".repeat(width * 2 + 1);
-        select.resize_layout(20);
+        select.title = "t".repeat(80 * 2 + 1);
+        select.resize_layout(20, 80);
         // Three rows of title instead of one.
         assert_eq!(select.capacity, 12);
 
         // Lines of a multi-line header each take a row.
         select.title = "one\ntwo\nthree".to_string();
-        select.resize_layout(20);
+        select.resize_layout(20, 80);
         assert_eq!(select.capacity, 12);
     }
 
@@ -825,19 +827,18 @@ mod tests {
                 .map(|i| DemandOption::new(i.to_string()).description("short"))
                 .collect(),
         );
-        select.resize_layout(24);
+        select.resize_layout(24, 80);
         assert_eq!(select.capacity, 18);
 
-        let width = select.term.size().1 as usize;
-        select.options[7].description = Some("d".repeat(width));
-        select.resize_layout(24);
+        select.options[7].description = Some("d".repeat(80));
+        select.resize_layout(24, 80);
         // One option wraps onto a second row, so every option is given two.
         assert_eq!(select.capacity, 9);
         assert_eq!(select.pages, 5);
 
         // Filtering it out gives the rows back.
         select.filter = "3".to_string();
-        select.resize_layout(24);
+        select.resize_layout(24, 80);
         assert_eq!(select.capacity, 18);
     }
 
@@ -858,7 +859,7 @@ mod tests {
                 .collect(),
         );
         select.term = term;
-        select.resize_layout(rows as usize);
+        select.resize_layout(rows as usize, width as usize);
         select.cursor_y = select.visible_options().len() - 1;
         select.draw().unwrap();
 
@@ -877,6 +878,34 @@ mod tests {
         assert!(screen.contains("enter confirm"), "help missing:\n{screen}");
     }
 
+    /// An option too tall for the screen even alone gets its description
+    /// cut to one row, instead of pushing the title and cursor off it.
+    #[test]
+    fn a_description_taller_than_the_screen_is_cut_short() {
+        let mut select = Select::new("Pick").options(vec![
+            DemandOption::new("a").description("short"),
+            DemandOption::new("b").description(&"d".repeat(80 * 30)),
+        ]);
+        select.resize_layout(24, 80);
+        // "❯ a  " before the description leaves 75 columns of the row.
+        assert_eq!(select.description_width, Some(75));
+        assert_eq!(select.capacity, 18);
+        let rendered = select.render().unwrap();
+        let line = without_ansi(&rendered)
+            .lines()
+            .find(|l| l.contains(" b "))
+            .unwrap()
+            .to_string();
+        assert_eq!(console::measure_text_width(&line), 80);
+        assert!(line.ends_with('…'), "{line}");
+
+        // Once it fits, descriptions print whole again.
+        select.options[1].description = Some("d".repeat(80 * 3));
+        select.resize_layout(24, 80);
+        assert_eq!(select.description_width, None);
+        assert_eq!(select.capacity, 4);
+    }
+
     #[test]
     fn resize_preserves_focused_option() {
         let mut select = Select::new("Pick").options(
@@ -889,7 +918,7 @@ mod tests {
         select.cur_page = 1;
         select.cursor_y = 5;
 
-        select.resize_layout(10);
+        select.resize_layout(10, 80);
 
         assert_eq!(select.capacity, 4);
         assert_eq!(select.pages, 5);

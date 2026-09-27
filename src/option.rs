@@ -77,25 +77,76 @@ impl<T: Display> PartialEq for DemandOption<T> {
 
 impl<T: Display> Eq for DemandOption<T> {}
 
-/// Rows the tallest of `options` wraps into in a terminal `width` columns
-/// wide, drawn the way `Select` and `MultiSelect` draw them: `indent`
-/// columns of cursor and prefix, then ` label`, padded to the widest label
-/// when the option has a description, then `  description`.
+/// How a page of options is laid out.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct OptionLayout {
+    /// Options on one page.
+    pub capacity: usize,
+    /// Columns a description may take before it's cut short with `…`, or
+    /// `None` to print every description whole.
+    pub description_width: Option<usize>,
+}
+
+/// Lay out `options` on pages `available` rows tall in a terminal `width`
+/// columns wide, drawn the way `Select` and `MultiSelect` draw them:
+/// `indent` columns of cursor and prefix, then ` label`, padded to the
+/// widest label when the option has a description, then `  description`.
 ///
-/// Pagination gives every option this many rows, so a page fits on screen
-/// whichever options land on it. Labels are padded to the widest one on
-/// the page rather than in the whole list, so measuring against the whole
-/// list can only overestimate.
-pub(crate) fn tallest_option_rows<T>(
+/// Every option is given as many rows as the tallest one wraps into, so a
+/// page fits on screen whichever options land on it (jdx/demand#235).
+/// When even the tallest alone doesn't fit, descriptions are cut to one
+/// row each instead: wrapping it anyway would push the title and cursor
+/// off the screen.
+pub(crate) fn layout_options<T>(
     options: &[&DemandOption<T>],
     indent: usize,
     width: usize,
-) -> usize {
+    available: usize,
+) -> OptionLayout {
     let label_width = options
         .iter()
         .map(|o| console::measure_text_width(&o.label))
         .max()
         .unwrap_or(0);
+    let rows = tallest_option_rows(options, indent, label_width, width);
+    if rows <= available.max(1) {
+        return OptionLayout {
+            capacity: (available / rows).max(1),
+            description_width: None,
+        };
+    }
+    let before = indent + 1 + label_width + 2;
+    let description_width = width.saturating_sub(before).max(1);
+    // Only a label wider than the terminal still wraps now.
+    let rows = (before + description_width).div_ceil(width.max(1));
+    OptionLayout {
+        capacity: (available / rows).max(1),
+        description_width: Some(description_width),
+    }
+}
+
+/// A description as it's printed: whole, or cut to `width` columns on a
+/// single row.
+pub(crate) fn fit_description(desc: &str, width: Option<usize>) -> std::borrow::Cow<'_, str> {
+    match width {
+        Some(width) => {
+            let desc = desc.replace('\n', " ");
+            console::truncate_str(&desc, width, "…").into_owned().into()
+        }
+        None => desc.into(),
+    }
+}
+
+/// Rows the tallest of `options` wraps into, labels padded to
+/// `label_width`. Labels are padded to the widest one on the page rather
+/// than in the whole list, so measuring against the whole list can only
+/// overestimate.
+fn tallest_option_rows<T>(
+    options: &[&DemandOption<T>],
+    indent: usize,
+    label_width: usize,
+    width: usize,
+) -> usize {
     options
         .iter()
         .map(|o| {

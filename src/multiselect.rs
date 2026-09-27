@@ -71,6 +71,7 @@ pub struct MultiSelect<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    description_width: Option<usize>,
     fuzzy_matcher: SkimMatcherV2,
 }
 
@@ -96,6 +97,7 @@ impl<'a, T> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            description_width: None,
             toggle_key: Key::Char(' '),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
@@ -455,19 +457,29 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn refresh_layout(&mut self) {
-        self.resize_layout(self.term.size().0 as usize);
+        let (rows, width) = self.term.size();
+        self.resize_layout(rows as usize, width as usize);
     }
 
-    fn resize_layout(&mut self, rows: usize) {
+    fn resize_layout(&mut self, rows: usize, width: usize) {
+        // The fixed 6 rows assume a one-row title and description. A
+        // longer one wraps onto more, and those come out of the options.
+        // The title's row also carries the error marker.
+        let header_rows = crate::height::rendered_rows(&format!("{} *", self.title), width)
+            + if self.description.is_empty() {
+                0
+            } else {
+                crate::height::rendered_rows(&self.description, width)
+            };
+        let available = (rows.max(8) - 6).saturating_sub(header_rows.saturating_sub(2));
         // An option whose label or description is wider than the terminal
-        // wraps, so a page holds as many options as fit at the height of
-        // the tallest (jdx/demand#235).
-        let width = self.term.size().1 as usize;
+        // wraps too.
         let prefix = console::measure_text_width(&self.theme.selected_prefix)
             .max(console::measure_text_width(&self.theme.unselected_prefix));
-        let option_rows =
-            crate::option::tallest_option_rows(&self.filtered_options(), 2 + prefix, width);
-        let capacity = ((rows.max(8) - 6) / option_rows).max(1);
+        let layout =
+            crate::option::layout_options(&self.filtered_options(), 2 + prefix, width, available);
+        self.description_width = layout.description_width;
+        let capacity = layout.capacity;
         if capacity == self.capacity {
             return;
         }
@@ -591,6 +603,7 @@ impl<'a, T> MultiSelect<'a, T> {
                 write!(out, " {label}")?;
             }
             out.set_color(&self.theme.description)?;
+            let desc = crate::option::fit_description(desc, self.description_width);
             writeln!(out, "  {desc}")?;
         } else if self.filtering && !self.filter.is_empty() {
             self.highlight_matches(out, &option.label)?;
@@ -923,14 +936,20 @@ mod tests {
                 .map(|i| DemandOption::new(i.to_string()).description("short"))
                 .collect(),
         );
-        ms.resize_layout(24);
+        ms.resize_layout(24, 80);
         assert_eq!(ms.capacity, 18);
 
-        let width = ms.term.size().1 as usize;
-        ms.options[7].description = Some("d".repeat(width));
-        ms.resize_layout(24);
+        ms.options[7].description = Some("d".repeat(80));
+        ms.resize_layout(24, 80);
         assert_eq!(ms.capacity, 9);
         assert_eq!(ms.pages, 5);
+
+        // A title wrapping onto three rows takes a row from the page too
+        // (one row each was already set aside for it and the description).
+        ms.options[7].description = None;
+        ms.title = "t".repeat(80 * 2);
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 17);
     }
 
     #[test]
@@ -945,7 +964,7 @@ mod tests {
         select.cur_page = 1;
         select.cursor = 5;
 
-        select.resize_layout(10);
+        select.resize_layout(10, 80);
 
         assert_eq!(select.capacity, 4);
         assert_eq!(select.pages, 5);
