@@ -71,6 +71,7 @@ pub struct MultiSelect<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    description_fit: crate::option::DescriptionFit,
     fuzzy_matcher: SkimMatcherV2,
 }
 
@@ -96,6 +97,7 @@ impl<'a, T> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            description_fit: Default::default(),
             toggle_key: Key::Char(' '),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
@@ -455,11 +457,29 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn refresh_layout(&mut self) {
-        self.resize_layout(self.term.size().0 as usize);
+        let (rows, width) = self.term.size();
+        self.resize_layout(rows as usize, width as usize);
     }
 
-    fn resize_layout(&mut self, rows: usize) {
-        let capacity = rows.max(8) - 6;
+    fn resize_layout(&mut self, rows: usize, width: usize) {
+        // The fixed 6 rows assume a one-row title and description. A
+        // longer one wraps onto more, and those come out of the options.
+        // The title's row also carries the error marker, when there is one.
+        let marker = if self.err.is_some() { " *" } else { "" };
+        let header_rows = crate::height::rendered_rows(&format!("{}{marker}", self.title), width)
+            + if self.description.is_empty() {
+                0
+            } else {
+                crate::height::rendered_rows(&self.description, width)
+            };
+        let available = (rows.max(8) - 6).saturating_sub(header_rows.saturating_sub(2));
+        // An option whose label or description is wider than the terminal
+        // wraps too.
+        let prefix = console::measure_text_width(&self.theme.selected_prefix)
+            .max(console::measure_text_width(&self.theme.unselected_prefix));
+        let (capacity, fit) =
+            crate::option::layout_options(&self.filtered_options(), 2 + prefix, width, available);
+        self.description_fit = fit;
         if capacity == self.capacity {
             return;
         }
@@ -497,12 +517,10 @@ impl<'a, T> MultiSelect<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
-        let max_label_len = self
-            .visible_options()
-            .iter()
-            .map(|o| console::measure_text_width(&o.label))
-            .max()
-            .unwrap_or(0);
+        // Padded to the widest label in the list, not just on this page:
+        // it's what the layout measured, and descriptions line up across
+        // pages.
+        let max_label_len = crate::option::label_width(&self.filtered_options());
         for (i, option) in self.visible_options().into_iter().enumerate() {
             if self.cursor == i {
                 out.set_color(&self.theme.cursor)?;
@@ -583,6 +601,15 @@ impl<'a, T> MultiSelect<'a, T> {
                 write!(out, " {label}")?;
             }
             out.set_color(&self.theme.description)?;
+            let prefix = if option.selected {
+                &self.theme.selected_prefix
+            } else {
+                &self.theme.unselected_prefix
+            };
+            let indent = 2 + console::measure_text_width(prefix);
+            let desc = self
+                .description_fit
+                .fit(&format!("{} {label}  ", " ".repeat(indent)), desc);
             writeln!(out, "  {desc}")?;
         } else if self.filtering && !self.filter.is_empty() {
             self.highlight_matches(out, &option.label)?;
@@ -906,6 +933,36 @@ mod tests {
         );
     }
 
+    /// jdx/demand#235: options whose descriptions wrap take more than one
+    /// row each, so fewer of them fit on a page.
+    #[test]
+    fn wrapping_descriptions_take_rows_from_the_page() {
+        let mut ms = MultiSelect::new("Pick").options(
+            (0..40)
+                .map(|i| DemandOption::new(i.to_string()).description("short"))
+                .collect(),
+        );
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 18);
+
+        ms.options[7].description = Some("d".repeat(80));
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 9);
+        assert_eq!(ms.pages, 5);
+
+        // A title filling two rows takes nothing: one row each was already
+        // set aside for it and the description.
+        ms.options[7].description = None;
+        ms.title = "t".repeat(80 * 2);
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 18);
+
+        // The error marker pushes it onto a third, which does.
+        ms.err = Some("pick one".to_string());
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 17);
+    }
+
     #[test]
     fn resize_preserves_focused_option() {
         let mut select = MultiSelect::new("Pick").options(
@@ -918,7 +975,7 @@ mod tests {
         select.cur_page = 1;
         select.cursor = 5;
 
-        select.resize_layout(10);
+        select.resize_layout(10, 80);
 
         assert_eq!(select.capacity, 4);
         assert_eq!(select.pages, 5);

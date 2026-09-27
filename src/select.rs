@@ -59,6 +59,7 @@ pub struct Select<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
+    description_fit: crate::option::DescriptionFit,
     fuzzy_matcher: SkimMatcherV2,
     updates: Option<crate::handle::Updates>,
 }
@@ -81,6 +82,7 @@ impl<'a, T> Select<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
+            description_fit: Default::default(),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
             updates: None,
         };
@@ -365,15 +367,15 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn refresh_layout(&mut self) {
-        self.resize_layout(self.term.size().0 as usize);
+        let (rows, width) = self.term.size();
+        self.resize_layout(rows as usize, width as usize);
     }
 
-    fn resize_layout(&mut self, rows: usize) {
+    fn resize_layout(&mut self, rows: usize, width: usize) {
         // The fixed 6 rows assume a one-row title and description. A
         // longer one — including one a handle just set — wraps onto more,
         // and those come out of the options, or the help line would be
         // pushed off the screen.
-        let width = self.term.size().1 as usize;
         // Each line of a multi-line title or description is its own row
         // (or rows), so count them all.
         let header_rows = crate::height::rendered_rows(&self.title, width)
@@ -382,9 +384,13 @@ impl<'a, T> Select<'a, T> {
             } else {
                 crate::height::rendered_rows(&self.description, width)
             };
-        let capacity = (rows.max(8) - 6)
-            .saturating_sub(header_rows.saturating_sub(2))
-            .max(1);
+        let available = (rows.max(8) - 6).saturating_sub(header_rows.saturating_sub(2));
+        // An option whose label or description is wider than the terminal
+        // wraps too.
+        let indent = console::measure_text_width(&self.theme.cursor_str);
+        let (capacity, fit) =
+            crate::option::layout_options(&self.filtered_options(), indent, width, available);
+        self.description_fit = fit;
         if capacity == self.capacity {
             return;
         }
@@ -416,12 +422,10 @@ impl<'a, T> Select<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
-        let max_label_len = self
-            .visible_options()
-            .iter()
-            .map(|o| console::measure_text_width(&o.label))
-            .max()
-            .unwrap_or(0);
+        // Padded to the widest label in the list, not just on this page:
+        // it's what the layout measured, and descriptions line up across
+        // pages.
+        let max_label_len = crate::option::label_width(&self.filtered_options());
         for (i, option) in self.visible_options().iter().enumerate() {
             if self.cursor_y == i {
                 out.set_color(&self.theme.cursor)?;
@@ -442,6 +446,10 @@ impl<'a, T> Select<'a, T> {
                     write!(out, " {label}")?;
                 }
                 out.set_color(&self.theme.description)?;
+                let indent = console::measure_text_width(&self.theme.cursor_str);
+                let desc = self
+                    .description_fit
+                    .fit(&format!("{} {label}  ", " ".repeat(indent)), desc);
                 writeln!(out, "  {desc}")?;
             } else if self.filtering && !self.filter.is_empty() {
                 self.highlight_matches(&mut out, &option.label)?;
@@ -796,19 +804,170 @@ mod tests {
         let mut select = Select::new("Pick")
             .description("one row")
             .option(DemandOption::new("a"));
-        select.resize_layout(20);
+        select.resize_layout(20, 80);
         assert_eq!(select.capacity, 14);
 
-        let width = select.term.size().1 as usize;
-        select.title = "t".repeat(width * 2 + 1);
-        select.resize_layout(20);
+        select.title = "t".repeat(80 * 2 + 1);
+        select.resize_layout(20, 80);
         // Three rows of title instead of one.
         assert_eq!(select.capacity, 12);
 
         // Lines of a multi-line header each take a row.
         select.title = "one\ntwo\nthree".to_string();
-        select.resize_layout(20);
+        select.resize_layout(20, 80);
         assert_eq!(select.capacity, 12);
+    }
+
+    /// jdx/demand#235: options whose descriptions wrap take more than one
+    /// row each, so fewer of them fit on a page.
+    #[test]
+    fn wrapping_descriptions_take_rows_from_the_page() {
+        let mut select = Select::new("Pick").options(
+            (0..40)
+                .map(|i| DemandOption::new(i.to_string()).description("short"))
+                .collect(),
+        );
+        select.resize_layout(24, 80);
+        assert_eq!(select.capacity, 18);
+
+        select.options[7].description = Some("d".repeat(80));
+        select.resize_layout(24, 80);
+        // One option wraps onto a second row, so every option is given two.
+        assert_eq!(select.capacity, 9);
+        assert_eq!(select.pages, 5);
+
+        // Filtering it out gives the rows back.
+        select.filter = "3".to_string();
+        select.resize_layout(24, 80);
+        assert_eq!(select.capacity, 18);
+    }
+
+    /// jdx/demand#235: with every description wrapping, a full page used to
+    /// be twice the height of the terminal, scrolling the title and the
+    /// cursor off the top of the screen.
+    #[cfg(unix)]
+    #[test]
+    fn a_page_of_wrapping_descriptions_fits_the_terminal() {
+        let (term, buf) = capture_term();
+        let (rows, width) = term.size();
+        let mut select = Select::new("Pick a tool").options(
+            (0..40)
+                .map(|i| {
+                    DemandOption::new(format!("tool-{i}"))
+                        .description(&format!("{i} {}", "d".repeat(width as usize)))
+                })
+                .collect(),
+        );
+        select.term = term;
+        select.resize_layout(rows as usize, width as usize);
+        select.cursor_y = select.visible_options().len() - 1;
+        select.draw().unwrap();
+
+        let mut parser = Parser::new(rows, width, 0);
+        replay(&mut parser, &snapshot(&buf));
+        let screen = parser.screen().contents();
+        assert!(
+            screen.starts_with("Pick a tool"),
+            "title scrolled off:\n{screen}"
+        );
+        let last = select.visible_options().last().unwrap().label.clone();
+        assert!(
+            screen.contains(&format!("❯ {last}")),
+            "cursor not on screen:\n{screen}"
+        );
+        assert!(screen.contains("enter confirm"), "help missing:\n{screen}");
+    }
+
+    /// An option too tall for the screen even alone has its description
+    /// cut short, instead of pushing the title and cursor off it. Only its
+    /// own: the rest still print whole.
+    #[test]
+    fn a_description_taller_than_the_screen_is_cut_short() {
+        let mut select = Select::new("Pick").options(vec![
+            DemandOption::new("a").description("short"),
+            DemandOption::new("b").description(&"d".repeat(80 * 30)),
+            DemandOption::new("c").description(&"c".repeat(100)),
+        ]);
+        select.resize_layout(24, 80);
+        // "c" wraps onto two rows, so every option gets two, and "b" is cut
+        // down to them.
+        assert_eq!(select.description_fit.rows, Some(2));
+        assert_eq!(select.capacity, 9);
+        let rendered = select.render().unwrap();
+        let rendered = without_ansi(&rendered);
+        let b = rendered.lines().find(|l| l.contains(" b ")).unwrap();
+        assert_eq!(console::measure_text_width(b), 160, "{b}");
+        assert!(b.ends_with('…'), "{b}");
+        assert!(rendered.contains(&"c".repeat(100)), "{rendered}");
+
+        // Once it fits, descriptions print whole again.
+        select.options[1].description = Some("d".repeat(80 * 3));
+        select.resize_layout(24, 80);
+        assert_eq!(select.description_fit.rows, None);
+        assert_eq!(select.capacity, 4);
+    }
+
+    /// Cutting a description short measures rows the way the terminal
+    /// wraps them: a wide character that would straddle the edge moves to
+    /// the next row, so columns alone would overfill the last one.
+    #[test]
+    fn a_cut_description_of_wide_characters_fits_its_rows() {
+        let mut select = Select::new("Pick").options(vec![
+            DemandOption::new("a").description("short"),
+            DemandOption::new("b").description(&"日".repeat(80 * 30)),
+        ]);
+        select.resize_layout(24, 80);
+        let rendered = select.render().unwrap();
+        let b = without_ansi(&rendered)
+            .lines()
+            .find(|l| l.contains(" b "))
+            .unwrap()
+            .to_string();
+        assert_eq!(crate::height::rows_for(&b, 80), 1, "{b}");
+        assert!(b.ends_with('…'), "{b}");
+    }
+
+    /// Labels spanning two lines give every option two rows, whether or not
+    /// a description had to be cut.
+    #[test]
+    fn multi_line_labels_count_when_a_description_is_cut() {
+        let mut select = Select::new("Pick").options(
+            (0..20)
+                .map(|i| DemandOption::new(i).label(&format!("{i}\nsecond line")))
+                .chain([DemandOption::new(99).description(&"d".repeat(80 * 30))])
+                .collect(),
+        );
+        select.resize_layout(24, 80);
+        assert_eq!(select.description_fit.rows, Some(2));
+        assert_eq!(select.capacity, 9);
+    }
+
+    /// Labels are padded to the widest in the list, as the layout measured
+    /// them, so a description starts in the same column on every page and
+    /// isn't cut for padding it wouldn't be drawn with.
+    #[test]
+    fn descriptions_line_up_across_pages() {
+        let mut select = Select::new("Pick").options(
+            (0..40)
+                .map(|i| {
+                    let label = if i == 0 { "a much longer label" } else { "x" };
+                    DemandOption::new(i).label(label).description("desc")
+                })
+                .collect(),
+        );
+        select.resize_layout(24, 80);
+        let column = |select: &Select<i32>| {
+            let rendered = select.render().unwrap();
+            let line = without_ansi(&rendered)
+                .lines()
+                .find(|l| l.ends_with("desc"))
+                .unwrap()
+                .to_string();
+            console::measure_text_width(&line) - "desc".len()
+        };
+        let first = column(&select);
+        select.cur_page = 1;
+        assert_eq!(column(&select), first);
     }
 
     #[test]
@@ -823,7 +982,7 @@ mod tests {
         select.cur_page = 1;
         select.cursor_y = 5;
 
-        select.resize_layout(10);
+        select.resize_layout(10, 80);
 
         assert_eq!(select.capacity, 4);
         assert_eq!(select.pages, 5);
