@@ -422,12 +422,10 @@ impl<'a, T> Select<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
-        let max_label_len = self
-            .visible_options()
-            .iter()
-            .map(|o| console::measure_text_width(&o.label))
-            .max()
-            .unwrap_or(0);
+        // Padded to the widest label in the list, not just on this page:
+        // it's what the layout measured, and descriptions line up across
+        // pages.
+        let max_label_len = crate::option::label_width(&self.filtered_options());
         for (i, option) in self.visible_options().iter().enumerate() {
             if self.cursor_y == i {
                 out.set_color(&self.theme.cursor)?;
@@ -942,6 +940,34 @@ mod tests {
         select.resize_layout(24, 80);
         assert_eq!(select.description_fit.rows, Some(2));
         assert_eq!(select.capacity, 9);
+    }
+
+    /// Labels are padded to the widest in the list, as the layout measured
+    /// them, so a description starts in the same column on every page and
+    /// isn't cut for padding it wouldn't be drawn with.
+    #[test]
+    fn descriptions_line_up_across_pages() {
+        let mut select = Select::new("Pick").options(
+            (0..40)
+                .map(|i| {
+                    let label = if i == 0 { "a much longer label" } else { "x" };
+                    DemandOption::new(i).label(label).description("desc")
+                })
+                .collect(),
+        );
+        select.resize_layout(24, 80);
+        let column = |select: &Select<i32>| {
+            let rendered = select.render().unwrap();
+            let line = without_ansi(&rendered)
+                .lines()
+                .find(|l| l.ends_with("desc"))
+                .unwrap()
+                .to_string();
+            console::measure_text_width(&line) - "desc".len()
+        };
+        let first = column(&select);
+        select.cur_page = 1;
+        assert_eq!(column(&select), first);
     }
 
     #[test]

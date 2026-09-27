@@ -517,12 +517,10 @@ impl<'a, T> MultiSelect<'a, T> {
             write!(out, "{}", self.description)?;
             writeln!(out)?;
         }
-        let max_label_len = self
-            .visible_options()
-            .iter()
-            .map(|o| console::measure_text_width(&o.label))
-            .max()
-            .unwrap_or(0);
+        // Padded to the widest label in the list, not just on this page:
+        // it's what the layout measured, and descriptions line up across
+        // pages.
+        let max_label_len = crate::option::label_width(&self.filtered_options());
         for (i, option) in self.visible_options().into_iter().enumerate() {
             if self.cursor == i {
                 out.set_color(&self.theme.cursor)?;

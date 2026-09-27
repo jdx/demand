@@ -97,11 +97,7 @@ pub(crate) fn layout_options<T>(
     width: usize,
     available: usize,
 ) -> (usize, DescriptionFit) {
-    let label_width = options
-        .iter()
-        .map(|o| console::measure_text_width(&o.label))
-        .max()
-        .unwrap_or(0);
+    let label_width = label_width(options);
     let available = available.max(1);
     let mut rows = 1;
     let mut cut = false;
@@ -177,9 +173,18 @@ fn option_line<T>(
     )
 }
 
-/// Rows `option` wraps into, its label padded to `label_width`. Labels are
-/// padded to the widest one on the page rather than in the whole list, so
-/// measuring against the whole list can only overestimate.
+/// The column labels are padded to when options have descriptions: the
+/// widest label among `options`, the whole filtered list rather than one
+/// page, so the layout measures exactly what is drawn.
+pub(crate) fn label_width<T>(options: &[&DemandOption<T>]) -> usize {
+    options
+        .iter()
+        .map(|o| console::measure_text_width(&o.label))
+        .max()
+        .unwrap_or(0)
+}
+
+/// Rows `option` wraps into, its label padded to `label_width`.
 fn option_rows<T>(
     option: &DemandOption<T>,
     indent: usize,
