@@ -71,7 +71,7 @@ pub struct MultiSelect<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
-    description_width: Option<usize>,
+    description_fit: crate::option::DescriptionFit,
     fuzzy_matcher: SkimMatcherV2,
 }
 
@@ -97,7 +97,7 @@ impl<'a, T> MultiSelect<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
-            description_width: None,
+            description_fit: Default::default(),
             toggle_key: Key::Char(' '),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
         };
@@ -464,8 +464,9 @@ impl<'a, T> MultiSelect<'a, T> {
     fn resize_layout(&mut self, rows: usize, width: usize) {
         // The fixed 6 rows assume a one-row title and description. A
         // longer one wraps onto more, and those come out of the options.
-        // The title's row also carries the error marker.
-        let header_rows = crate::height::rendered_rows(&format!("{} *", self.title), width)
+        // The title's row also carries the error marker, when there is one.
+        let marker = if self.err.is_some() { " *" } else { "" };
+        let header_rows = crate::height::rendered_rows(&format!("{}{marker}", self.title), width)
             + if self.description.is_empty() {
                 0
             } else {
@@ -476,10 +477,9 @@ impl<'a, T> MultiSelect<'a, T> {
         // wraps too.
         let prefix = console::measure_text_width(&self.theme.selected_prefix)
             .max(console::measure_text_width(&self.theme.unselected_prefix));
-        let layout =
+        let (capacity, fit) =
             crate::option::layout_options(&self.filtered_options(), 2 + prefix, width, available);
-        self.description_width = layout.description_width;
-        let capacity = layout.capacity;
+        self.description_fit = fit;
         if capacity == self.capacity {
             return;
         }
@@ -603,7 +603,15 @@ impl<'a, T> MultiSelect<'a, T> {
                 write!(out, " {label}")?;
             }
             out.set_color(&self.theme.description)?;
-            let desc = crate::option::fit_description(desc, self.description_width);
+            let prefix = if option.selected {
+                &self.theme.selected_prefix
+            } else {
+                &self.theme.unselected_prefix
+            };
+            let indent = 2 + console::measure_text_width(prefix);
+            let desc = self
+                .description_fit
+                .fit(&format!("{} {label}  ", " ".repeat(indent)), desc);
             writeln!(out, "  {desc}")?;
         } else if self.filtering && !self.filter.is_empty() {
             self.highlight_matches(out, &option.label)?;
@@ -944,10 +952,15 @@ mod tests {
         assert_eq!(ms.capacity, 9);
         assert_eq!(ms.pages, 5);
 
-        // A title wrapping onto three rows takes a row from the page too
-        // (one row each was already set aside for it and the description).
+        // A title filling two rows takes nothing: one row each was already
+        // set aside for it and the description.
         ms.options[7].description = None;
         ms.title = "t".repeat(80 * 2);
+        ms.resize_layout(24, 80);
+        assert_eq!(ms.capacity, 18);
+
+        // The error marker pushes it onto a third, which does.
+        ms.err = Some("pick one".to_string());
         ms.resize_layout(24, 80);
         assert_eq!(ms.capacity, 17);
     }

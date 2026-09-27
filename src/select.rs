@@ -59,7 +59,7 @@ pub struct Select<'a, T> {
     pages: usize,
     cur_page: usize,
     capacity: usize,
-    description_width: Option<usize>,
+    description_fit: crate::option::DescriptionFit,
     fuzzy_matcher: SkimMatcherV2,
     updates: Option<crate::handle::Updates>,
 }
@@ -82,7 +82,7 @@ impl<'a, T> Select<'a, T> {
             pages: 0,
             cur_page: 0,
             capacity: 0,
-            description_width: None,
+            description_fit: Default::default(),
             fuzzy_matcher: SkimMatcherV2::default().use_cache(true).smart_case(),
             updates: None,
         };
@@ -388,10 +388,9 @@ impl<'a, T> Select<'a, T> {
         // An option whose label or description is wider than the terminal
         // wraps too.
         let indent = console::measure_text_width(&self.theme.cursor_str);
-        let layout =
+        let (capacity, fit) =
             crate::option::layout_options(&self.filtered_options(), indent, width, available);
-        self.description_width = layout.description_width;
-        let capacity = layout.capacity;
+        self.description_fit = fit;
         if capacity == self.capacity {
             return;
         }
@@ -449,7 +448,10 @@ impl<'a, T> Select<'a, T> {
                     write!(out, " {label}")?;
                 }
                 out.set_color(&self.theme.description)?;
-                let desc = crate::option::fit_description(desc, self.description_width);
+                let indent = console::measure_text_width(&self.theme.cursor_str);
+                let desc = self
+                    .description_fit
+                    .fit(&format!("{} {label}  ", " ".repeat(indent)), desc);
                 writeln!(out, "  {desc}")?;
             } else if self.filtering && !self.filter.is_empty() {
                 self.highlight_matches(&mut out, &option.label)?;
@@ -878,32 +880,53 @@ mod tests {
         assert!(screen.contains("enter confirm"), "help missing:\n{screen}");
     }
 
-    /// An option too tall for the screen even alone gets its description
-    /// cut to one row, instead of pushing the title and cursor off it.
+    /// An option too tall for the screen even alone has its description
+    /// cut short, instead of pushing the title and cursor off it. Only its
+    /// own: the rest still print whole.
     #[test]
     fn a_description_taller_than_the_screen_is_cut_short() {
         let mut select = Select::new("Pick").options(vec![
             DemandOption::new("a").description("short"),
             DemandOption::new("b").description(&"d".repeat(80 * 30)),
+            DemandOption::new("c").description(&"c".repeat(100)),
         ]);
         select.resize_layout(24, 80);
-        // "❯ a  " before the description leaves 75 columns of the row.
-        assert_eq!(select.description_width, Some(75));
-        assert_eq!(select.capacity, 18);
+        // "c" wraps onto two rows, so every option gets two, and "b" is cut
+        // down to them.
+        assert_eq!(select.description_fit.rows, Some(2));
+        assert_eq!(select.capacity, 9);
         let rendered = select.render().unwrap();
-        let line = without_ansi(&rendered)
-            .lines()
-            .find(|l| l.contains(" b "))
-            .unwrap()
-            .to_string();
-        assert_eq!(console::measure_text_width(&line), 80);
-        assert!(line.ends_with('…'), "{line}");
+        let rendered = without_ansi(&rendered);
+        let b = rendered.lines().find(|l| l.contains(" b ")).unwrap();
+        assert_eq!(console::measure_text_width(b), 160, "{b}");
+        assert!(b.ends_with('…'), "{b}");
+        assert!(rendered.contains(&"c".repeat(100)), "{rendered}");
 
         // Once it fits, descriptions print whole again.
         select.options[1].description = Some("d".repeat(80 * 3));
         select.resize_layout(24, 80);
-        assert_eq!(select.description_width, None);
+        assert_eq!(select.description_fit.rows, None);
         assert_eq!(select.capacity, 4);
+    }
+
+    /// Cutting a description short measures rows the way the terminal
+    /// wraps them: a wide character that would straddle the edge moves to
+    /// the next row, so columns alone would overfill the last one.
+    #[test]
+    fn a_cut_description_of_wide_characters_fits_its_rows() {
+        let mut select = Select::new("Pick").options(vec![
+            DemandOption::new("a").description("short"),
+            DemandOption::new("b").description(&"日".repeat(80 * 30)),
+        ]);
+        select.resize_layout(24, 80);
+        let rendered = select.render().unwrap();
+        let b = without_ansi(&rendered)
+            .lines()
+            .find(|l| l.contains(" b "))
+            .unwrap()
+            .to_string();
+        assert_eq!(crate::height::rows_for(&b, 80), 1, "{b}");
+        assert!(b.ends_with('…'), "{b}");
     }
 
     #[test]
