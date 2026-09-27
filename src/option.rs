@@ -76,3 +76,52 @@ impl<T: Display> PartialEq for DemandOption<T> {
 }
 
 impl<T: Display> Eq for DemandOption<T> {}
+
+/// Rows the tallest of `options` wraps into in a terminal `width` columns
+/// wide, drawn the way `Select` and `MultiSelect` draw them: `indent`
+/// columns of cursor and prefix, then ` label`, padded to the widest label
+/// when the option has a description, then `  description`.
+///
+/// Pagination gives every option this many rows, so a page fits on screen
+/// whichever options land on it. Labels are padded to the widest one on
+/// the page rather than in the whole list, so measuring against the whole
+/// list can only overestimate.
+pub(crate) fn tallest_option_rows<T>(
+    options: &[&DemandOption<T>],
+    indent: usize,
+    width: usize,
+) -> usize {
+    let label_width = options
+        .iter()
+        .map(|o| console::measure_text_width(&o.label))
+        .max()
+        .unwrap_or(0);
+    options
+        .iter()
+        .map(|o| {
+            let desc = o.description.as_deref();
+            let cols = indent
+                + 1
+                + match desc {
+                    Some(desc) => label_width + 2 + console::measure_text_width(desc),
+                    None => console::measure_text_width(&o.label),
+                };
+            // Most options fit, and a line that fits can't wrap: skip
+            // building it and walking it a character at a time.
+            if cols <= width && !o.label.contains('\n') && !desc.is_some_and(|d| d.contains('\n')) {
+                return 1;
+            }
+            let line = match desc {
+                Some(desc) => format!(
+                    "{} {}  {desc}",
+                    " ".repeat(indent),
+                    console::pad_str(&o.label, label_width, console::Alignment::Left, None)
+                ),
+                None => format!("{} {}", " ".repeat(indent), o.label),
+            };
+            crate::height::rendered_rows(&line, width)
+        })
+        .max()
+        .unwrap_or(1)
+        .max(1)
+}

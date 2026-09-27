@@ -459,7 +459,15 @@ impl<'a, T> MultiSelect<'a, T> {
     }
 
     fn resize_layout(&mut self, rows: usize) {
-        let capacity = rows.max(8) - 6;
+        // An option whose label or description is wider than the terminal
+        // wraps, so a page holds as many options as fit at the height of
+        // the tallest (jdx/demand#235).
+        let width = self.term.size().1 as usize;
+        let prefix = console::measure_text_width(&self.theme.selected_prefix)
+            .max(console::measure_text_width(&self.theme.unselected_prefix));
+        let option_rows =
+            crate::option::tallest_option_rows(&self.filtered_options(), 2 + prefix, width);
+        let capacity = ((rows.max(8) - 6) / option_rows).max(1);
         if capacity == self.capacity {
             return;
         }
@@ -904,6 +912,25 @@ mod tests {
             1,
             "prompt drawn more than once:\n{screen}"
         );
+    }
+
+    /// jdx/demand#235: options whose descriptions wrap take more than one
+    /// row each, so fewer of them fit on a page.
+    #[test]
+    fn wrapping_descriptions_take_rows_from_the_page() {
+        let mut ms = MultiSelect::new("Pick").options(
+            (0..40)
+                .map(|i| DemandOption::new(i.to_string()).description("short"))
+                .collect(),
+        );
+        ms.resize_layout(24);
+        assert_eq!(ms.capacity, 18);
+
+        let width = ms.term.size().1 as usize;
+        ms.options[7].description = Some("d".repeat(width));
+        ms.resize_layout(24);
+        assert_eq!(ms.capacity, 9);
+        assert_eq!(ms.pages, 5);
     }
 
     #[test]

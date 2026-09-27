@@ -382,9 +382,14 @@ impl<'a, T> Select<'a, T> {
             } else {
                 crate::height::rendered_rows(&self.description, width)
             };
-        let capacity = (rows.max(8) - 6)
-            .saturating_sub(header_rows.saturating_sub(2))
-            .max(1);
+        let available = (rows.max(8) - 6).saturating_sub(header_rows.saturating_sub(2));
+        // An option whose label or description is wider than the terminal
+        // wraps too, so a page holds as many options as fit at the height
+        // of the tallest (jdx/demand#235).
+        let indent = console::measure_text_width(&self.theme.cursor_str);
+        let option_rows =
+            crate::option::tallest_option_rows(&self.filtered_options(), indent, width);
+        let capacity = (available / option_rows).max(1);
         if capacity == self.capacity {
             return;
         }
@@ -809,6 +814,67 @@ mod tests {
         select.title = "one\ntwo\nthree".to_string();
         select.resize_layout(20);
         assert_eq!(select.capacity, 12);
+    }
+
+    /// jdx/demand#235: options whose descriptions wrap take more than one
+    /// row each, so fewer of them fit on a page.
+    #[test]
+    fn wrapping_descriptions_take_rows_from_the_page() {
+        let mut select = Select::new("Pick").options(
+            (0..40)
+                .map(|i| DemandOption::new(i.to_string()).description("short"))
+                .collect(),
+        );
+        select.resize_layout(24);
+        assert_eq!(select.capacity, 18);
+
+        let width = select.term.size().1 as usize;
+        select.options[7].description = Some("d".repeat(width));
+        select.resize_layout(24);
+        // One option wraps onto a second row, so every option is given two.
+        assert_eq!(select.capacity, 9);
+        assert_eq!(select.pages, 5);
+
+        // Filtering it out gives the rows back.
+        select.filter = "3".to_string();
+        select.resize_layout(24);
+        assert_eq!(select.capacity, 18);
+    }
+
+    /// jdx/demand#235: with every description wrapping, a full page used to
+    /// be twice the height of the terminal, scrolling the title and the
+    /// cursor off the top of the screen.
+    #[cfg(unix)]
+    #[test]
+    fn a_page_of_wrapping_descriptions_fits_the_terminal() {
+        let (term, buf) = capture_term();
+        let (rows, width) = term.size();
+        let mut select = Select::new("Pick a tool").options(
+            (0..40)
+                .map(|i| {
+                    DemandOption::new(format!("tool-{i}"))
+                        .description(&format!("{i} {}", "d".repeat(width as usize)))
+                })
+                .collect(),
+        );
+        select.term = term;
+        select.resize_layout(rows as usize);
+        select.cursor_y = select.visible_options().len() - 1;
+        select.draw().unwrap();
+
+        let mut parser = Parser::new(rows, width, 0);
+        replay(&mut parser, &snapshot(&buf));
+        let screen = parser.screen().contents();
+        assert!(
+            screen.starts_with("Pick a tool"),
+            "title scrolled off:\n{screen}"
+        );
+        let last = select.visible_options().last().unwrap().label.clone();
+        assert!(
+            screen.contains(&format!("❯ {last}")),
+            "cursor not on screen:\n{screen}"
+        );
+        assert!(screen.contains("enter confirm"), "help missing:\n{screen}");
     }
 
     #[test]
