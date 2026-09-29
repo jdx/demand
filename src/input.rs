@@ -220,6 +220,8 @@ const CTRL_T: char = '\u{14}';
 const CTRL_U: char = '\u{15}';
 const CTRL_W: char = '\u{17}';
 const CTRL_Y: char = '\u{19}';
+pub(crate) const CTRL_N: char = '\u{e}';
+pub(crate) const CTRL_P: char = '\u{10}';
 
 impl<'a> Input<'a> {
     /// Creates a new input with the given title.
