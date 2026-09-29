@@ -142,38 +142,38 @@ url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.
 url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573487227"
 
 [[tools.hk]]
-version = "2.1.0"
+version = "2.4.0"
 backend = "packslip:github.com/jdx/hk"
 specifiers = ["latest"]
 
 [tools.hk."platforms.linux-arm64"]
-checksum = "sha256:7ffb155147a8a9dae1b571fb31a5d19a35d0175afb5fe3e5b2c652ebf67feb9f"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-aarch64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:836235bd8aa06f25e7ff28591b32efb5297abe55366e912095636a49ffe4d363"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-aarch64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-arm64-musl"]
-checksum = "sha256:8417655fd02f8311bcad9efab7594d4b6d7cca1c4d00cd1576f12ad5e40dac06"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-aarch64-unknown-linux-musl.tar.gz"
+checksum = "sha256:ad5c5a556e0a505d9a3441868217976bd4ae610e1364e93516993b9717d9ef28"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-aarch64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-x64"]
-checksum = "sha256:7a7b28741d16f777d8be90fbcd8523996ee95c2d5222d5b173652d9b37e31969"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-x86_64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:6efabe30aeabc4611a42ce6cf0fd46b9a19478e2cfd9acfd1bd93998736f3153"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-x64-musl"]
-checksum = "sha256:ab5a8fa2819fe3a1762576ac557b9797e1fe587b41a1f93c50e4dfa9f5b89e76"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-x86_64-unknown-linux-musl.tar.gz"
+checksum = "sha256:f34598671ca40be5c308324a60ef30b736dbbbf4259dfb511abd79009ee4de2a"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-x86_64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.macos-arm64"]
-checksum = "sha256:b30c6fb4447b5a9c24f9f80d165dca2d2e682907b8acb8222391e0527fea1ebe"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:6e1c970b9de7ab4ee52c85869b2ea9cfe8769d25a0fe9536062e0ba62366ec59"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-aarch64-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.windows-x64"]
-checksum = "sha256:c0344c09c76f7e25985c4770148130881b19313393d238949e5512ec3691fac3"
-url = "https://github.com/jdx/hk/releases/download/v2.1.0/hk-x86_64-pc-windows-msvc.zip"
+checksum = "sha256:028931e00fd670ad891a428bf44e14ac8e2726a8f72b7fae80b27b6502af2be3"
+url = "https://github.com/jdx/hk/releases/download/v2.4.0/hk-x86_64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [[tools.pkl]]
