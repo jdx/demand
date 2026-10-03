@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.0](https://github.com/jdx/demand/compare/v2.3.0...v2.4.0) - 2026-10-03
+
+### Added
+
+- use Ctrl-N/Ctrl-P for vertical movement in lists ([#197](https://github.com/jdx/demand/pull/197))
+
+### Fixed
+
+- keep select pages on screen when option descriptions wrap ([#236](https://github.com/jdx/demand/pull/236))
+
+### Other
+
+- add hk pre-commit hook ([#239](https://github.com/jdx/demand/pull/239))
+- *(deps)* update dependency hk to latest ([#238](https://github.com/jdx/demand/pull/238))
+- *(deps)* update release-plz/action digest to b8d6b54 ([#237](https://github.com/jdx/demand/pull/237))
+- *(entire)* restore lower-cost trail findings
+- *(entire)* commit claude session hooks
+- *(entire)* commit codex session hooks
+- *(entire)* store checkpoints in a private repository
+- add GridSelect demo and refresh prompt recordings ([#233](https://github.com/jdx/demand/pull/233))
+
 ## [2.3.0](https://github.com/jdx/demand/compare/v2.2.0...v2.3.0) - 2026-09-25
 
 ### Added
