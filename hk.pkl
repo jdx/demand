@@ -1,7 +1,7 @@
 amends "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Builtins.pkl"
 
-steps {
+local linters = new Mapping<String, Step> {
     ["cargo-fmt"] = Builtins.cargo_fmt
     ["cargo-clippy"] = (Builtins.cargo_clippy) {
         check = new CommandSpec {
@@ -12,5 +12,20 @@ steps {
             command = "cargo clippy --fix --allow-dirty -- -D warnings"
             effect = "write"
         }
+    }
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "git"
+        steps = linters
+    }
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps = linters
     }
 }
