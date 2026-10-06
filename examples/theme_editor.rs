@@ -463,6 +463,7 @@ fn select_theme_from_simple(
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "theme not found"))?
         .clone();
     store.active_theme = next.name.clone();
+    store.save()?;
     *state = PaletteEditorState::from_theme(next);
     Ok(())
 }
