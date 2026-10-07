@@ -1,4 +1,6 @@
 [workspace]
+# Label the release PR so it is easy to find and filter.
+pr_labels = ["release"]
 changelog_update = true
 git_release_enable = true
 publish = true
