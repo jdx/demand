@@ -4,6 +4,7 @@ cargo-release = "1"
 hk = { version = "latest", minimum_release_age = "0s" }
 cargo-binstall = "latest"
 pkl = "latest"
+jactionlint = "latest"
 
 [tasks.changelog]
 description = "Generate changelog"
