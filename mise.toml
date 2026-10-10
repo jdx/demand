@@ -4,7 +4,7 @@ cargo-release = "1"
 hk = { version = "latest", minimum_release_age = "0s" }
 cargo-binstall = "latest"
 pkl = "latest"
-jactionlint = { version = "latest", minimum_release_age = "0s" }
+jactionlint = "2.1.0"
 
 [tasks.changelog]
 description = "Generate changelog"
