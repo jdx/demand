@@ -1,0 +1,5 @@
+ignores:
+  - rule: stale-action-refs
+    uses: dtolnay/rust-toolchain
+    file: .github/workflows/release-plz.yml
+    reason: dtolnay/rust-toolchain publishes the toolchain as the `stable` branch and tags only specific Rust versions, so the stable head never has a tag; the pin is the current head of that branch
