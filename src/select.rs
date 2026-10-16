@@ -249,15 +249,14 @@ impl<'a, T> Select<'a, T> {
     }
 
     fn filtered_options(&self) -> Vec<&DemandOption<T>> {
+        if self.filter.is_empty() {
+            return self.options.iter().collect();
+        }
         self.options
             .iter()
             .filter_map(|opt| {
-                if self.filter.is_empty() {
-                    Some((0, opt))
-                } else {
-                    crate::fuzzy::score(&self.fuzzy_matcher, &opt.label, &self.filter)
-                        .map(|score| (score, opt))
-                }
+                crate::fuzzy::score(&self.fuzzy_matcher, &opt.label, &self.filter)
+                    .map(|score| (score, opt))
             })
             .sorted_by_key(|(score, _opt)| -1 * *score)
             .map(|(_score, opt)| opt)
@@ -391,13 +390,15 @@ impl<'a, T> Select<'a, T> {
         // An option whose label or description is wider than the terminal
         // wraps too.
         let indent = console::measure_text_width(&self.theme.cursor_str);
+        let filtered_options = self.filtered_options();
+        let option_count = filtered_options.len();
         let (capacity, fit) =
-            crate::option::layout_options(&self.filtered_options(), indent, width, available);
+            crate::option::layout_options(&filtered_options, indent, width, available);
+        drop(filtered_options);
         self.description_fit = fit;
         if capacity == self.capacity {
             return;
         }
-        let option_count = self.filtered_options().len();
         let cursor =
             (self.cur_page * self.capacity + self.cursor_y).min(option_count.saturating_sub(1));
         self.capacity = capacity;
@@ -428,8 +429,15 @@ impl<'a, T> Select<'a, T> {
         // Padded to the widest label in the list, not just on this page:
         // it's what the layout measured, and descriptions line up across
         // pages.
-        let max_label_len = crate::option::label_width(&self.filtered_options());
-        for (i, option) in self.visible_options().iter().enumerate() {
+        let filtered_options = self.filtered_options();
+        let max_label_len = crate::option::label_width(&filtered_options);
+        let start = self.cur_page * self.capacity;
+        for (i, option) in filtered_options
+            .iter()
+            .skip(start)
+            .take(self.capacity)
+            .enumerate()
+        {
             if self.cursor_y == i {
                 out.set_color(&self.theme.cursor)?;
                 write!(out, "{}", self.theme.cursor_str)?;
