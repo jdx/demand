@@ -436,6 +436,8 @@ impl<'a> Input<'a> {
                 Key::Char(CTRL_D) | Key::Del => self.delete_char()?,
                 Key::Char(CTRL_B) => self.handle_arrow_left()?,
                 Key::Char(CTRL_F) => self.handle_arrow_right()?,
+                Key::Char(CTRL_P) => self.handle_arrow_up()?,
+                Key::Char(CTRL_N) => self.handle_arrow_down()?,
                 // Any other control char has no binding; inserting it
                 // would put an invisible byte in the input.
                 Key::Char(c) if c.is_control() => {}
@@ -999,7 +1001,13 @@ impl<'a> Input<'a> {
                 .iter()
                 .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
                 .and_then(|s| {
-                    let suggestion = s[self.input.len()..].to_string();
+                    let char_count = self.input.chars().count();
+                    let byte_offset = s
+                        .char_indices()
+                        .nth(char_count)
+                        .map(|(i, _)| i)
+                        .unwrap_or(s.len());
+                    let suggestion = s[byte_offset..].to_string();
                     (!suggestion.is_empty()).then_some(suggestion)
                 });
         }
@@ -1417,6 +1425,31 @@ mod tests {
         input.cursor = 1;
         let rendered = input.render().unwrap();
         assert!(without_ansi(&rendered).contains("> 日本語"));
+    }
+
+    #[test]
+    fn multibyte_char_suggestion() {
+        let mut input = Input::new("Language").suggestions(&["日本語", "日本語（会話）"]);
+        input.input = "日本".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("語"));
+    }
+
+    #[test]
+    fn ctrl_n_and_ctrl_p_navigate_suggestions() {
+        let mut input = Input::new("Select")
+            .autocomplete_fn(|_| Ok(vec!["apple".into(), "banana".into(), "cherry".into()]));
+        input.update_suggestions().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(0));
+
+        input.handle_arrow_down().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(1));
+
+        input.handle_arrow_down().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(2));
+
+        input.handle_arrow_up().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(1));
     }
 
     /// Wide chars take two columns, so the caret has to be measured, not
