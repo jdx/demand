@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.1](https://github.com/jdx/demand/compare/v2.4.0...v2.4.1) - 2026-10-17
+
+### Fixed
+
+- clippy for all-targets, empty-filter selection perf, and input Ctrl-N/Ctrl-P ([#249](https://github.com/jdx/demand/pull/249))
+
+### Other
+
+- *(release-plz)* use the image's rust instead of dtolnay/rust-toolchain ([#250](https://github.com/jdx/demand/pull/250))
+
 ## [2.4.0](https://github.com/jdx/demand/compare/v2.3.0...v2.4.0) - 2026-10-07
 
 ### Added
