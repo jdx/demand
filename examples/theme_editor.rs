@@ -301,10 +301,8 @@ fn run_simple_editor(store: &mut ThemeStore) -> io::Result<()> {
                     run_advanced_hub(store)?;
                     state = PaletteEditorState::from_theme(store.active_theme_definition().clone());
                 }
-                Key::Escape | Key::Char('q') => {
-                    if confirm_discard_if_dirty(&state)? {
-                        break Ok(());
-                    }
+                Key::Escape | Key::Char('q') if confirm_discard_if_dirty(&state)? => {
+                    break Ok(());
                 }
                 _ => {}
             }
@@ -1121,8 +1119,8 @@ impl StoredStyle {
 
     fn to_spec(&self) -> ColorSpec {
         let mut spec = ColorSpec::new();
-        spec.set_fg(self.fg.as_ref().map(StoredColor::to_termcolor));
-        spec.set_bg(self.bg.as_ref().map(StoredColor::to_termcolor));
+        spec.set_fg(self.fg.map(StoredColor::to_termcolor));
+        spec.set_bg(self.bg.map(StoredColor::to_termcolor));
         spec.set_bold(self.bold);
         spec.set_underline(self.underline);
         spec
@@ -1207,7 +1205,7 @@ impl StoredColor {
         }
     }
 
-    fn to_termcolor(&self) -> Color {
+    fn to_termcolor(self) -> Color {
         match self {
             Self::Black => Color::Black,
             Self::Blue => Color::Blue,
@@ -1217,8 +1215,8 @@ impl StoredColor {
             Self::Magenta => Color::Magenta,
             Self::Yellow => Color::Yellow,
             Self::White => Color::White,
-            Self::Ansi256(value) => Color::Ansi256(*value),
-            Self::Rgb(r, g, b) => Color::Rgb(*r, *g, *b),
+            Self::Ansi256(value) => Color::Ansi256(value),
+            Self::Rgb(r, g, b) => Color::Rgb(r, g, b),
         }
     }
 
@@ -2401,16 +2399,16 @@ fn pick_color_with_picker(
     term.hide_cursor()?;
     let result = (|| -> io::Result<Option<StoredColor>> {
         loop {
-            let output = render_color_picker(
+            let output = render_color_picker(&ColorPickerView {
                 theme,
                 title,
                 description,
-                current,
+                selected: current,
                 focus_row,
                 focus_col,
                 fine_tune_mode,
                 fine_tune_channel,
-            )?;
+            })?;
             term.clear_screen()?;
             term.write_all(output.as_bytes())?;
             term.flush()?;
@@ -2420,9 +2418,7 @@ fn pick_color_with_picker(
                     if fine_tune_mode {
                         current = adjust_color_channel(current, fine_tune_channel, -8);
                     } else if focus_row < presets.len() {
-                        if focus_col > 0 {
-                            focus_col -= 1;
-                        }
+                        focus_col = focus_col.saturating_sub(1);
                         current = presets[focus_row].1[focus_col];
                     }
                 }
@@ -2513,16 +2509,28 @@ fn parse_user_color(value: &str) -> io::Result<StoredColor> {
     Ok(StoredColor::from_termcolor(&color))
 }
 
-fn render_color_picker(
-    theme: &Theme,
-    title: &str,
-    description: &str,
+struct ColorPickerView<'a> {
+    theme: &'a Theme,
+    title: &'a str,
+    description: &'a str,
     selected: StoredColor,
     focus_row: usize,
     focus_col: usize,
     fine_tune_mode: bool,
     fine_tune_channel: usize,
-) -> io::Result<String> {
+}
+
+fn render_color_picker(view: &ColorPickerView<'_>) -> io::Result<String> {
+    let ColorPickerView {
+        theme,
+        title,
+        description,
+        selected,
+        focus_row,
+        focus_col,
+        fine_tune_mode,
+        fine_tune_channel,
+    } = *view;
     let mut out = Buffer::ansi();
     let (r, g, b) = selected.rgb_triplet();
     let presets = preset_palette_rows();
