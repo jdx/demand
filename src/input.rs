@@ -997,15 +997,15 @@ impl<'a> Input<'a> {
             return Ok(());
         }
         if let Some(suggestions) = &self.suggestions {
+            let input_lower = self.input.to_lowercase();
             self.suggestion = suggestions
                 .iter()
-                .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
+                .find(|s| s.to_lowercase().starts_with(&input_lower))
                 .and_then(|s| {
-                    let char_count = self.input.chars().count();
                     let byte_offset = s
                         .char_indices()
-                        .nth(char_count)
-                        .map(|(i, _)| i)
+                        .map(|(i, c)| i + c.len_utf8())
+                        .find(|&offset| s[..offset].to_lowercase().starts_with(&input_lower))
                         .unwrap_or(s.len());
                     let suggestion = s[byte_offset..].to_string();
                     (!suggestion.is_empty()).then_some(suggestion)
@@ -1433,6 +1433,16 @@ mod tests {
         input.input = "日本".to_string();
         input.suggest().unwrap();
         assert_eq!(input.suggestion.as_deref(), Some("語"));
+
+        let mut input = Input::new("Unit").suggestions(&["\u{212a}elvin"]);
+        input.input = "k".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("elvin"));
+
+        let mut input = Input::new("City").suggestions(&["İstanbul"]);
+        input.input = "i\u{307}".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("stanbul"));
     }
 
     #[test]
