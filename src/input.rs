@@ -998,15 +998,20 @@ impl<'a> Input<'a> {
         }
         if let Some(suggestions) = &self.suggestions {
             let input_lower = self.input.to_lowercase();
+            let target_chars = input_lower.chars().count();
             self.suggestion = suggestions
                 .iter()
                 .find(|s| s.to_lowercase().starts_with(&input_lower))
                 .and_then(|s| {
-                    let byte_offset = s
-                        .char_indices()
-                        .map(|(i, c)| i + c.len_utf8())
-                        .find(|&offset| s[..offset].to_lowercase().starts_with(&input_lower))
-                        .unwrap_or(s.len());
+                    let mut matched_chars = 0;
+                    let mut byte_offset = s.len();
+                    for (i, c) in s.char_indices() {
+                        matched_chars += c.to_lowercase().count();
+                        if matched_chars >= target_chars {
+                            byte_offset = i + c.len_utf8();
+                            break;
+                        }
+                    }
                     let suggestion = s[byte_offset..].to_string();
                     (!suggestion.is_empty()).then_some(suggestion)
                 });
@@ -1443,6 +1448,11 @@ mod tests {
         input.input = "i\u{307}".to_string();
         input.suggest().unwrap();
         assert_eq!(input.suggestion.as_deref(), Some("stanbul"));
+
+        let mut input = Input::new("Greek").suggestions(&["ΟΣΑ"]);
+        input.input = "οσ".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("Α"));
     }
 
     #[test]
