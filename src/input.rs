@@ -436,6 +436,8 @@ impl<'a> Input<'a> {
                 Key::Char(CTRL_D) | Key::Del => self.delete_char()?,
                 Key::Char(CTRL_B) => self.handle_arrow_left()?,
                 Key::Char(CTRL_F) => self.handle_arrow_right()?,
+                Key::Char(CTRL_P) => self.handle_arrow_up()?,
+                Key::Char(CTRL_N) => self.handle_arrow_down()?,
                 // Any other control char has no binding; inserting it
                 // would put an invisible byte in the input.
                 Key::Char(c) if c.is_control() => {}
@@ -995,11 +997,22 @@ impl<'a> Input<'a> {
             return Ok(());
         }
         if let Some(suggestions) = &self.suggestions {
+            let input_lower = self.input.to_lowercase();
+            let target_chars = input_lower.chars().count();
             self.suggestion = suggestions
                 .iter()
-                .find(|s| s.to_lowercase().starts_with(&self.input.to_lowercase()))
+                .find(|s| s.to_lowercase().starts_with(&input_lower))
                 .and_then(|s| {
-                    let suggestion = s[self.input.len()..].to_string();
+                    let mut matched_chars = 0;
+                    let mut byte_offset = s.len();
+                    for (i, c) in s.char_indices() {
+                        matched_chars += c.to_lowercase().count();
+                        if matched_chars >= target_chars {
+                            byte_offset = i + c.len_utf8();
+                            break;
+                        }
+                    }
+                    let suggestion = s[byte_offset..].to_string();
                     (!suggestion.is_empty()).then_some(suggestion)
                 });
         }
@@ -1417,6 +1430,46 @@ mod tests {
         input.cursor = 1;
         let rendered = input.render().unwrap();
         assert!(without_ansi(&rendered).contains("> 日本語"));
+    }
+
+    #[test]
+    fn multibyte_char_suggestion() {
+        let mut input = Input::new("Language").suggestions(&["日本語", "日本語（会話）"]);
+        input.input = "日本".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("語"));
+
+        let mut input = Input::new("Unit").suggestions(&["\u{212a}elvin"]);
+        input.input = "k".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("elvin"));
+
+        let mut input = Input::new("City").suggestions(&["İstanbul"]);
+        input.input = "i\u{307}".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("stanbul"));
+
+        let mut input = Input::new("Greek").suggestions(&["ΟΣΑ"]);
+        input.input = "οσ".to_string();
+        input.suggest().unwrap();
+        assert_eq!(input.suggestion.as_deref(), Some("Α"));
+    }
+
+    #[test]
+    fn ctrl_n_and_ctrl_p_navigate_suggestions() {
+        let mut input = Input::new("Select")
+            .autocomplete_fn(|_| Ok(vec!["apple".into(), "banana".into(), "cherry".into()]));
+        input.update_suggestions().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(0));
+
+        input.handle_arrow_down().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(1));
+
+        input.handle_arrow_down().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(2));
+
+        input.handle_arrow_up().unwrap();
+        assert_eq!(input.selected_suggestion_idx, Some(1));
     }
 
     /// Wide chars take two columns, so the caret has to be measured, not

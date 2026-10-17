@@ -2,7 +2,7 @@ name: auto-merge-release
 
 # Releases demand on a cadence rather than on every merge: once a day this looks
 # for release-plz's open release PR and merges it, but only if the last release
-# is at least seven days old and something user-visible has landed since.
+# is at least two days old and something user-visible has landed since.
 #
 # Merging that PR is what triggers release-plz.yml's release job, so this is the
 # whole release trigger — nothing else merges it.
@@ -44,10 +44,10 @@ jobs:
               range="${latest_tag}..HEAD"
               tag_time=$(git for-each-ref --format='%(creatordate:unix)' "refs/tags/$latest_tag")
               now=$(date +%s)
-              min_age=$((7 * 24 * 60 * 60))
+              min_age=$((2 * 24 * 60 * 60))
               age=$((now - tag_time))
               if [ "$age" -lt "$min_age" ]; then
-                echo "Latest release ${latest_tag} is less than 7 days old; not auto-merging release PRs"
+                echo "Latest release ${latest_tag} is less than 2 days old; not auto-merging release PRs"
                 exit 0
               fi
             else

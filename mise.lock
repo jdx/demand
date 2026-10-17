@@ -3,50 +3,50 @@
 lockfile_version = 2
 
 [[tools.cargo-binstall]]
-version = "1.25.1"
+version = "1.25.3"
 backend = "aqua:cargo-bins/cargo-binstall"
 specifiers = ["latest"]
 
 [tools.cargo-binstall."platforms.linux-arm64"]
-checksum = "sha256:0c209d4fecaf428358b1a798d35e2372c98a9a5513c541ba08450c2ba1b2bf69"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-aarch64-unknown-linux-gnu.tgz"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607778085"
+checksum = "sha256:6beb20bdaa19033d51e296a3610e812e0b41f43bd6646287e4d510b3256bcda0"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-aarch64-unknown-linux-gnu.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628281059"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.linux-arm64-musl"]
-checksum = "sha256:87495c6a6e921e02dd9ccf4dc8cc0a9b3a8d7ae8a07681f7f99bbcf306f42fdd"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-aarch64-unknown-linux-musl.tgz"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607777995"
+checksum = "sha256:19ef7a058397f83d6b2cc83727fb8d38babd8ad657210c921b7771a9e8b3a6fb"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-aarch64-unknown-linux-musl.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628280895"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.linux-x64"]
-checksum = "sha256:7566158bf76a99974e081abe442978b8a3e5f4e834ee8247d847902b588b2133"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-x86_64-unknown-linux-gnu.tgz"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607777440"
+checksum = "sha256:a974ce4e525edfb78f953869cbe7c1b57d00ae04358adc1ae47462120d80bb6c"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-x86_64-unknown-linux-gnu.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628280029"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.linux-x64-musl"]
-checksum = "sha256:8e06c41af972f9922f28c6ae467e41ffa9b0688d563d0aabd0dcbd5244ab849b"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-x86_64-unknown-linux-musl.tgz"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607777371"
+checksum = "sha256:1f72931713e9091478538c6c78c3f11f205b4f6f394f35e61835036b23929d2a"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-x86_64-unknown-linux-musl.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628279880"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.macos-arm64"]
-checksum = "sha256:44fc93543677e08d9e591d7c72a0b0346049ff249816814335da864e588f0413"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-aarch64-apple-darwin.zip"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607778292"
+checksum = "sha256:b027e09e54431e56a75ce63858a798e1bfd9cd5fa62894186d46808d50b31335"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-aarch64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628281302"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.macos-x64"]
-checksum = "sha256:0f39bb6dcb534ffe20d5cee7e0c131451eb721ca6c6b962418d1fc1a48d5917d"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-x86_64-apple-darwin.zip"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607777587"
+checksum = "sha256:8f194ca2bf4bfe42fa70763e2f1227e7fd617d814fd12bf81dd2e09e380b0134"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-x86_64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628280256"
 provenance = "github-attestations"
 
 [tools.cargo-binstall."platforms.windows-x64"]
-checksum = "sha256:8b8019ac54adbb5338e68c3cd6e37dc48a156747eb9174a9231089ce648c5df3"
-url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.1/cargo-binstall-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/607777522"
+checksum = "sha256:de20bf4eefbbc4d90888e32938e4e66808c14bfe122458b2dd7d826821529cd9"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.25.3/cargo-binstall-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/628280147"
 provenance = "github-attestations"
 
 [[tools.cargo-release]]
@@ -142,38 +142,38 @@ url = "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.
 url_api = "https://api.github.com/repos/orhun/git-cliff/releases/assets/573487227"
 
 [[tools.hk]]
-version = "2.5.0"
+version = "2.6.0"
 backend = "packslip:github.com/jdx/hk"
 specifiers = ["latest"]
 
 [tools.hk."platforms.linux-arm64"]
-checksum = "sha256:c800091c414e1c8e8628137275d88c257bcfe0c35dd31d2762923a71dae7df7f"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-aarch64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:bcccd60f962a784bcf602b3a1ee6aac4dc53c76b298bffe38c4f9101725d2fb0"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-aarch64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-arm64-musl"]
-checksum = "sha256:1e839b96defad21b5118d9554f2146811a2ce8d8eef90b3da1d592834969b717"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-aarch64-unknown-linux-musl.tar.gz"
+checksum = "sha256:5f6585ebc8deb8ae581c0127693982da6dca6b4eaf52dfd55f882d5bbca398ae"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-aarch64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-x64"]
-checksum = "sha256:449b83c35ac3a460f80a4c9a41ad99430add8cf6caa6ceadc27e810feac3647d"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-x86_64-unknown-linux-gnu.tar.gz"
+checksum = "sha256:dfc2e1140a114c28f42fa6d1b958fac7008de3b96b19bbf74d693c0f86bcff60"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-x86_64-unknown-linux-gnu.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.linux-x64-musl"]
-checksum = "sha256:55b349ed8ebbb9cc11e3ff7f741230035061e45621c0b2c87fffeeb37fadcfd0"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-x86_64-unknown-linux-musl.tar.gz"
+checksum = "sha256:cd7d76e014e709f8cac760e3cb6500305ba106915fc3b4764d88aa69a0c3a92d"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-x86_64-unknown-linux-musl.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.macos-arm64"]
-checksum = "sha256:fabbed3a44e72c601759fa81d56f3c9403ca466853bdf77e87cc69d986cb151a"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:40a336e793397d5940b284aae674477d430b24dc86167be92e080120d80e42f2"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-aarch64-apple-darwin.tar.gz"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [tools.hk."platforms.windows-x64"]
-checksum = "sha256:9d3063f0eadb316415dc2aaea51608f436eb6ffe44e00c2e460294c66f269a54"
-url = "https://github.com/jdx/hk/releases/download/v2.5.0/hk-x86_64-pc-windows-msvc.zip"
+checksum = "sha256:5afd28127f09f6b5a5d246413611b4494ad38d30930dd0cd009a8d6aff0f4c3d"
+url = "https://github.com/jdx/hk/releases/download/v2.6.0/hk-x86_64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/hk/.github/workflows/release.yml"
 
 [[tools.jactionlint]]
