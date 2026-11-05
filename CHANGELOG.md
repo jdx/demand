@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.2](https://github.com/jdx/demand/compare/v2.4.1...v2.4.2) - 2026-11-05
+
+### Other
+
+- *(deps)* bump rio-vt to 0.5.29 ([#268](https://github.com/jdx/demand/pull/268))
+
 ## [2.4.1](https://github.com/jdx/demand/compare/v2.4.0...v2.4.1) - 2026-10-17
 
 ### Fixed
