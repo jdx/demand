@@ -26,7 +26,7 @@ insta = "1"
 
 [target.'cfg(unix)'.dev-dependencies]
 portable-pty = "0.9"
-rio-vt = "0.5.1"
+rio-vt = "0.5.29"
 
 [profile.dev]
 debug = 1
