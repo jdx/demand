@@ -289,15 +289,20 @@ impl Theme {
     }
 
     /// Create a new theme with the base16 color scheme
+    ///
+    /// Uses the terminal's named ANSI colors rather than fixed 256-color
+    /// values for most roles, so it follows the terminal's palette on light
+    /// and dark backgrounds. Help text uses fixed RGB greys. Unselected
+    /// options use the terminal's default text color.
     pub fn base16() -> Self {
-        let mut title = make_color(Color::Ansi256(6));
+        let mut title = make_color(Color::Cyan);
         title.set_bold(true);
 
-        let mut focused_button = make_color(Color::Ansi256(7));
-        focused_button.set_bg(Some(Color::Ansi256(5)));
+        let mut focused_button = make_color(Color::White);
+        focused_button.set_bg(Some(Color::Magenta));
 
-        let mut blurred_button = make_color(Color::Ansi256(7));
-        blurred_button.set_bg(Some(Color::Ansi256(0)));
+        let mut blurred_button = make_color(Color::White);
+        blurred_button.set_bg(Some(Color::Black));
 
         // TODO: theme them
         let mut cursor_style = ColorSpec::new();
@@ -305,23 +310,30 @@ impl Theme {
             .set_fg(Some(Color::White))
             .set_bg(Some(Color::Black));
 
+        // Bright black, which `Ansi256(8)` selected before.
+        let mut bright_black = make_color(Color::Black);
+        bright_black.set_intense(true);
+
+        let mut bright_red = make_color(Color::Red);
+        bright_red.set_intense(true);
+
         Self {
             title,
-            error_indicator: make_color(Color::Ansi256(9)),
-            description: make_color(Color::Ansi256(8)),
-            cursor: make_color(Color::Ansi256(3)),
+            error_indicator: bright_red,
+            description: bright_black.clone(),
+            cursor: make_color(Color::Yellow),
             cursor_str: String::from("❯"),
 
             selected_prefix: String::from(" [•]"),
-            selected_prefix_fg: make_color(Color::Ansi256(2)),
-            selected_option: make_color(Color::Ansi256(2)),
+            selected_prefix_fg: make_color(Color::Green),
+            selected_option: make_color(Color::Green),
             unselected_prefix: String::from(" [ ]"),
-            unselected_prefix_fg: make_color(Color::Ansi256(7)),
-            unselected_option: make_color(Color::Ansi256(7)),
+            unselected_prefix_fg: ColorSpec::new(),
+            unselected_option: ColorSpec::new(),
 
-            input_cursor: make_color(Color::Ansi256(5)),
-            input_placeholder: make_color(Color::Ansi256(8)),
-            input_prompt: make_color(Color::Ansi256(3)),
+            input_cursor: make_color(Color::Magenta),
+            input_placeholder: bright_black.clone(),
+            input_prompt: make_color(Color::Yellow),
 
             help_key: make_color(Color::Rgb(98, 98, 98)),
             help_desc: make_color(Color::Rgb(74, 74, 74)),
@@ -336,9 +348,9 @@ impl Theme {
             force_style: true,
 
             // Breadcrumb navigation
-            breadcrumb_active: make_color(Color::Ansi256(3)),
-            breadcrumb_clickable: make_color(Color::Ansi256(6)),
-            breadcrumb_future: make_color(Color::Ansi256(8)),
+            breadcrumb_active: make_color(Color::Yellow),
+            breadcrumb_clickable: make_color(Color::Cyan),
+            breadcrumb_future: bright_black,
             breadcrumb_separator: String::from(" > "),
         }
     }
@@ -434,4 +446,76 @@ fn make_color(color: Color) -> ColorSpec {
     let mut spec = ColorSpec::new();
     spec.set_fg(Some(color));
     spec
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base16_uses_named_colors() {
+        let theme = Theme::base16();
+        let specs = [
+            &theme.title,
+            &theme.description,
+            &theme.cursor,
+            &theme.selected_prefix_fg,
+            &theme.selected_option,
+            &theme.unselected_prefix_fg,
+            &theme.unselected_option,
+            &theme.input_cursor,
+            &theme.input_placeholder,
+            &theme.input_prompt,
+            &theme.focused_button,
+            &theme.blurred_button,
+            &theme.error_indicator,
+            &theme.breadcrumb_active,
+            &theme.breadcrumb_clickable,
+            &theme.breadcrumb_future,
+        ];
+        for spec in specs {
+            for color in [spec.fg(), spec.bg()].into_iter().flatten() {
+                assert!(
+                    !matches!(color, Color::Ansi256(_)),
+                    "base16 still has {color:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn base16_role_colors() {
+        let theme = Theme::base16();
+        let cases = [
+            (&theme.title, Color::Cyan, false),
+            (&theme.description, Color::Black, true),
+            (&theme.cursor, Color::Yellow, false),
+            (&theme.selected_option, Color::Green, false),
+            (&theme.selected_prefix_fg, Color::Green, false),
+            (&theme.error_indicator, Color::Red, true),
+            (&theme.input_cursor, Color::Magenta, false),
+            (&theme.input_placeholder, Color::Black, true),
+            (&theme.input_prompt, Color::Yellow, false),
+            (&theme.breadcrumb_active, Color::Yellow, false),
+            (&theme.breadcrumb_clickable, Color::Cyan, false),
+            (&theme.breadcrumb_future, Color::Black, true),
+        ];
+        for (spec, color, intense) in cases {
+            assert_eq!(spec.fg(), Some(&color));
+            assert_eq!(spec.intense(), intense, "{color:?}");
+        }
+        assert_eq!(theme.focused_button.fg(), Some(&Color::White));
+        assert_eq!(theme.focused_button.bg(), Some(&Color::Magenta));
+        assert_eq!(theme.blurred_button.fg(), Some(&Color::White));
+        assert_eq!(theme.blurred_button.bg(), Some(&Color::Black));
+    }
+
+    #[test]
+    fn base16_leaves_unselected_options_in_the_terminal_text_color() {
+        let theme = Theme::base16();
+        for spec in [&theme.unselected_option, &theme.unselected_prefix_fg] {
+            assert_eq!(spec.fg(), None);
+            assert_eq!(spec.bg(), None);
+        }
+    }
 }
