@@ -290,9 +290,10 @@ impl Theme {
 
     /// Create a new theme with the base16 color scheme
     ///
-    /// Uses the terminal's 16 named ANSI colors rather than fixed 256-color
-    /// values, so it follows the terminal's palette on light and dark
-    /// backgrounds. Unselected options use the terminal's default text color.
+    /// Uses the terminal's named ANSI colors rather than fixed 256-color
+    /// values for most roles, so it follows the terminal's palette on light
+    /// and dark backgrounds. Help text uses fixed RGB greys. Unselected
+    /// options use the terminal's default text color.
     pub fn base16() -> Self {
         let mut title = make_color(Color::Cyan);
         title.set_bold(true);
@@ -479,6 +480,29 @@ mod tests {
                     "base16 still has {color:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn base16_role_colors() {
+        let theme = Theme::base16();
+        let cases = [
+            (&theme.title, Color::Cyan, false),
+            (&theme.description, Color::Black, true),
+            (&theme.cursor, Color::Yellow, false),
+            (&theme.selected_option, Color::Green, false),
+            (&theme.selected_prefix_fg, Color::Green, false),
+            (&theme.error_indicator, Color::Red, true),
+            (&theme.input_cursor, Color::Magenta, false),
+            (&theme.input_placeholder, Color::Black, true),
+            (&theme.input_prompt, Color::Yellow, false),
+            (&theme.breadcrumb_active, Color::Yellow, false),
+            (&theme.breadcrumb_clickable, Color::Cyan, false),
+            (&theme.breadcrumb_future, Color::Black, true),
+        ];
+        for (spec, color, intense) in cases {
+            assert_eq!(spec.fg(), Some(&color));
+            assert_eq!(spec.intense(), intense, "{color:?}");
         }
     }
 
