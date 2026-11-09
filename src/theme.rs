@@ -504,6 +504,10 @@ mod tests {
             assert_eq!(spec.fg(), Some(&color));
             assert_eq!(spec.intense(), intense, "{color:?}");
         }
+        assert_eq!(theme.focused_button.fg(), Some(&Color::White));
+        assert_eq!(theme.focused_button.bg(), Some(&Color::Magenta));
+        assert_eq!(theme.blurred_button.fg(), Some(&Color::White));
+        assert_eq!(theme.blurred_button.bg(), Some(&Color::Black));
     }
 
     #[test]
