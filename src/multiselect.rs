@@ -564,16 +564,18 @@ impl<'a, T> MultiSelect<'a, T> {
             out.reset()?;
 
             let cursor_idx = self.get_char_idx(&self.filter, self.cursor_x);
+            // the caret covers one char, which can be several bytes
+            let after_cursor = self.get_char_idx(&self.filter, self.cursor_x + 1);
             write!(out, "{}", &self.filter[..cursor_idx])?;
 
             if cursor_idx < self.filter.len() {
                 out.set_color(&self.theme.real_cursor_color(None))?;
-                write!(out, "{}", &self.filter[cursor_idx..cursor_idx + 1])?;
+                write!(out, "{}", &self.filter[cursor_idx..after_cursor])?;
                 out.reset()?;
             }
-            if cursor_idx + 1 < self.filter.len() {
+            if after_cursor < self.filter.len() {
                 out.reset()?;
-                write!(out, "{}", &self.filter[cursor_idx + 1..])?;
+                write!(out, "{}", &self.filter[after_cursor..])?;
             }
             if cursor_idx >= self.filter.len() {
                 out.set_color(&self.theme.real_cursor_color(None))?;
@@ -993,5 +995,23 @@ mod tests {
         assert_eq!(select.cur_page, 3);
         assert_eq!(select.cursor, 3);
         assert_eq!(select.visible_options()[select.cursor].label, "15");
+    }
+
+    /// The caret is drawn over one char of the filter. Slicing one byte
+    /// instead panics as soon as that char is multi-byte.
+    #[test]
+    fn filter_caret_on_multibyte_char() {
+        let mut select = MultiSelect::new("Pick")
+            .option(DemandOption::new("café"))
+            .filtering(true);
+        for c in "aé✓b".chars() {
+            select.handle_filter_key(c).unwrap();
+        }
+        // step the caret back over every char, the 2-byte and 3-byte ones included
+        for _ in 0..4 {
+            select.handle_left().unwrap();
+            let rendered = select.render().unwrap();
+            assert!(without_ansi(&rendered).contains("/aé✓b\n"), "{rendered:?}");
+        }
     }
 }
