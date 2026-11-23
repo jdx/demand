@@ -298,7 +298,7 @@ impl Theme {
         let mut title = make_color(Color::Cyan);
         title.set_bold(true);
 
-        let mut focused_button = make_color(Color::White);
+        let mut focused_button = make_color(Color::Black);
         focused_button.set_bg(Some(Color::Magenta));
 
         let mut blurred_button = make_color(Color::White);
@@ -504,7 +504,7 @@ mod tests {
             assert_eq!(spec.fg(), Some(&color));
             assert_eq!(spec.intense(), intense, "{color:?}");
         }
-        assert_eq!(theme.focused_button.fg(), Some(&Color::White));
+        assert_eq!(theme.focused_button.fg(), Some(&Color::Black));
         assert_eq!(theme.focused_button.bg(), Some(&Color::Magenta));
         assert_eq!(theme.blurred_button.fg(), Some(&Color::White));
         assert_eq!(theme.blurred_button.bg(), Some(&Color::Black));
