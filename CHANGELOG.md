@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.3](https://github.com/jdx/demand/compare/v2.4.2...v2.4.3) - 2026-11-23
+
+### Fixed
+
+- *(select)* don't panic when the filter caret is on a multi-byte character ([#284](https://github.com/jdx/demand/pull/284))
+- *(theme)* use black text on the base16 focused button ([#281](https://github.com/jdx/demand/pull/281))
+
 ## [2.4.2](https://github.com/jdx/demand/compare/v2.4.1...v2.4.2) - 2026-11-09
 
 ### Fixed
