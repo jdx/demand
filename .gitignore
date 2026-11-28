@@ -20,3 +20,4 @@ Cargo.lock
 /target
 
 .vscode/
+.claude/settings.local.json
